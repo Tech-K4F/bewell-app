@@ -121,6 +121,10 @@ class AppProvider extends ChangeNotifier {
   String _todayKey() =>
       'completed_${DateTime.now().toIso8601String().split('T')[0]}';
 
+  // Chiave per il giorno specifico (usata anche per weeklyCompletions)
+  String _dateKey(DateTime date) =>
+      date.toIso8601String().split('T')[0];
+
   void _buildTodayPlan() {
     if (_allActivities.isEmpty) {
       _todayPlan = _fallbackActivities();
@@ -216,10 +220,21 @@ class AppProvider extends ChangeNotifier {
     final mins = activity?.durationMinutes ?? 5;
 
     if (_user != null) {
+      // ── FIX 1: Aggiorna streak ─────────────────────────────────────────────
+      final newStreak = _calculateStreak();
+
+      // ── FIX 2: Aggiorna weeklyCompletions ──────────────────────────────────
+      final todayStr = _dateKey(DateTime.now());
+      final updatedWeekly = Map<String, int>.from(_user!.weeklyCompletions);
+      updatedWeekly[todayStr] = (updatedWeekly[todayStr] ?? 0) + 1;
+
       _user = _user!.copyWith(
         points: _user!.points + pts,
+        streak: newStreak,
         totalSessions: _user!.totalSessions + 1,
         totalMinutes: _user!.totalMinutes + mins,
+        lastActivityDate: DateTime.now(),
+        weeklyCompletions: updatedWeekly,
       );
       await _checkAndAwardBadges();
       await _saveUser();
@@ -230,20 +245,44 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Marketplace ────────────────────────────────────────────────────────────
+  // ── FIX 1: Calcolo streak reale ─────────────────────────────────────────────
+  // Logica: conta i giorni consecutivi a ritroso a partire da oggi
+  // in cui l'utente ha completato almeno 1 attività.
+  // Usa weeklyCompletions come fonte di verità (chiavi = date ISO).
+  int _calculateStreak() {
+    if (_user == null) return 0;
 
-  /// Restituisce true se il riscatto è andato a buon fine, false se punti insufficienti
+    // Includi anche il completamento di oggi (appena aggiunto)
+    final todayStr = _dateKey(DateTime.now());
+    final completions = Map<String, int>.from(_user!.weeklyCompletions);
+    // Aggiungi today se non c'è ancora (il completamento corrente)
+    completions[todayStr] = (completions[todayStr] ?? 0) + 1;
+
+    int streak = 0;
+    DateTime day = DateTime.now();
+
+    while (true) {
+      final key = _dateKey(day);
+      if ((completions[key] ?? 0) > 0) {
+        streak++;
+        day = day.subtract(const Duration(days: 1));
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }
+
+  // ── Marketplace ────────────────────────────────────────────────────────────
   Future<bool> redeemReward(RewardItem reward) async {
     if (_user == null) return false;
     if (_user!.points < reward.pointsCost) return false;
 
-    // Scala i punti
     _user = _user!.copyWith(points: _user!.points - reward.pointsCost);
 
-    // Genera codice mock
     final code = _generateCode(reward.id);
 
-    // Salva nel log riscatti
     final redeemed = RedeemedReward(
       rewardId: reward.id,
       rewardTitle: reward.title,
@@ -302,6 +341,11 @@ class AppProvider extends ChangeNotifier {
         case 'sessions':
           earned = _user!.totalSessions >= badge.requiredCount;
           break;
+        case 'completions':
+          // Conta completamenti della categoria corrispondente
+          earned = _countCompletionsByCategory(badge.category) >=
+              badge.requiredCount;
+          break;
         case 'plan_complete':
           earned = completedCount >= totalCount && totalCount > 0;
           break;
@@ -312,6 +356,26 @@ class AppProvider extends ChangeNotifier {
         _user = _user!.copyWith(earnedBadgeIds: updated);
         _newlyEarnedBadges.add(badge.id);
       }
+    }
+  }
+
+  // Conta completamenti totali per categoria badge
+  int _countCompletionsByCategory(String badgeCategory) {
+    if (_user == null) return 0;
+    // Usa totalSessions come proxy — in futuro si può affinare
+    // per categoria specifica con un contatore dedicato
+    switch (badgeCategory) {
+      case 'Stress':
+        // Conta sessioni breathing (attività con id STR*)
+        return _completedToday
+            .where((id) => id.startsWith('STR'))
+            .length + (_user!.totalSessions ~/ 5);
+      case 'Movimento':
+        return _completedToday
+            .where((id) => id.startsWith('MOV'))
+            .length + (_user!.totalSessions ~/ 5);
+      default:
+        return _user!.totalSessions;
     }
   }
 

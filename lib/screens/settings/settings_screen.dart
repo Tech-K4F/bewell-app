@@ -1,129 +1,180 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../theme/app_theme.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool _notificationsEnabled = true;
-  bool _hardRemindersEnabled = true;
-  bool _soundEnabled = true;
-  bool _vibrationEnabled = true;
-  String _reminderFrequency = '90min';
-  bool _largeText = false;
-  bool _highContrast = false;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: BwColors.darkPanel,
-      appBar: AppBar(title: const Text('Impostazioni')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-        children: [
-          // Notifications
-          _sectionHeader('🔔 Notifiche'),
-          _switchTile(
-            'Notifiche attive',
-            'Ricevi reminder per le tue attività',
-            _notificationsEnabled,
-            (v) => setState(() => _notificationsEnabled = v),
-          ),
-          if (_notificationsEnabled) ...[
-            _switchTile(
-              'Reminder urgenti (Hard)',
-              'Per attività critiche come 20-20-20',
-              _hardRemindersEnabled,
-              (v) => setState(() => _hardRemindersEnabled = v),
-            ),
-            _switchTile(
-              'Suoni',
-              'Notifiche con suono',
-              _soundEnabled,
-              (v) => setState(() => _soundEnabled = v),
-            ),
-            _switchTile(
-              'Vibrazione',
-              'Vibrazione per le notifiche',
-              _vibrationEnabled,
-              (v) => setState(() => _vibrationEnabled = v),
-            ),
-            _dropdownTile(
-              'Frequenza reminder',
-              'Con quale frequenza ricevere promemoria',
-              _reminderFrequency,
-              const {'30min': 'Ogni 30 min', '60min': 'Ogni ora', '90min': 'Ogni 90 min', '120min': 'Ogni 2 ore'},
-              (v) => setState(() => _reminderFrequency = v!),
-            ),
-          ],
-          const SizedBox(height: 8),
-
-          // Accessibility
-          _sectionHeader('♿ Accessibilità'),
-          _switchTile(
-            'Testo grande',
-            'Aumenta la dimensione del testo',
-            _largeText,
-            (v) => setState(() => _largeText = v),
-          ),
-          _switchTile(
-            'Alto contrasto',
-            'Migliore visibilità per ipovedenti',
-            _highContrast,
-            (v) => setState(() => _highContrast = v),
-          ),
-          const SizedBox(height: 8),
-
-          // Planner
-          _sectionHeader('📅 Piano'),
-          _navigationTile(
-            context,
-            '⏰',
-            'Orari di lavoro',
-            'Configura inizio e fine giornata lavorativa',
-            () => Navigator.pop(context),
-          ),
-          _navigationTile(
-            context,
-            '🎯',
-            'Obiettivi',
-            'Imposta i tuoi obiettivi di benessere',
-            () {},
-          ),
-          const SizedBox(height: 8),
-
-          // Account
-          _sectionHeader('👤 Account'),
-          Consumer<AppProvider>(builder: (context, p, _) {
-            return Column(
-              children: [
-                _navigationTile(context, '✏️', 'Modifica profilo',
-                    'Nome, email, tipo utente', () {}),
-                _navigationTile(context, '🔄', 'Ripristina progressi',
-                    'Azzera punti e streak', () => _showResetDialog(context, p)),
+    // FIX 4: legge da SettingsProvider invece di setState locale
+    return Consumer<SettingsProvider>(
+      builder: (context, settings, _) {
+        return Scaffold(
+          backgroundColor: BwColors.darkPanel,
+          appBar: AppBar(title: const Text('Impostazioni')),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+            children: [
+              // ── Notifiche ──────────────────────────────────────────────────
+              _sectionHeader('🔔 Notifiche'),
+              _switchTile(
+                context,
+                'Notifiche attive',
+                'Ricevi reminder per le tue attività',
+                settings.notificationsEnabled,
+                (v) => settings.setNotificationsEnabled(v),
+              ),
+              if (settings.notificationsEnabled) ...[
+                _switchTile(
+                  context,
+                  'Reminder urgenti (Hard)',
+                  'Per attività critiche come 20-20-20',
+                  settings.hardRemindersEnabled,
+                  (v) => settings.setHardReminders(v),
+                ),
+                _switchTile(
+                  context,
+                  'Suoni',
+                  'Notifiche con suono',
+                  settings.soundEnabled,
+                  (v) => settings.setSound(v),
+                ),
+                _switchTile(
+                  context,
+                  'Vibrazione',
+                  'Vibrazione per le notifiche',
+                  settings.vibrationEnabled,
+                  (v) => settings.setVibration(v),
+                ),
+                _dropdownTile(
+                  context,
+                  'Frequenza reminder',
+                  'Con quale frequenza ricevere promemoria',
+                  settings.reminderFrequency,
+                  const {
+                    '30min': 'Ogni 30 min',
+                    '60min': 'Ogni ora',
+                    '90min': 'Ogni 90 min',
+                    '120min': 'Ogni 2 ore',
+                  },
+                  (v) => settings.setReminderFrequency(v!),
+                ),
               ],
-            );
-          }),
-          const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-          // Info
-          _sectionHeader('ℹ️ Info App'),
-          _navigationTile(context, '❓', 'Come funziona',
-              'Guida all\'app', () {}),
-          _navigationTile(context, '⭐', 'Lascia una recensione',
-              'Aiutaci a migliorare', () {}),
-          _navigationTile(context, '📧', 'Contatta il supporto',
-              'Segnala problemi o suggerimenti', () {}),
-          const SizedBox(height: 16),
-          Center(
-            child: Text('Be Well v1.0.0',
-                style: TextStyle(
-                    color: Colors.white.withOpacity(.2), fontSize: 11)),
+              // ── Accessibilità ──────────────────────────────────────────────
+              _sectionHeader('♿ Accessibilità'),
+
+              // Preview badge mostra l'effetto PRIMA di toccare il toggle
+              if (settings.largeText || settings.highContrast)
+                _accessibilityPreviewBadge(settings),
+
+              _switchTile(
+                context,
+                'Testo grande',
+                'Aumenta la dimensione del testo del 20%',
+                settings.largeText,
+                (v) => settings.setLargeText(v),
+                // FIX: ora chiama SettingsProvider.setLargeText()
+                // che chiama notifyListeners() → MaterialApp si ricostruisce
+                // → AppTheme.build(largeText: true) viene applicato
+              ),
+              _switchTile(
+                context,
+                'Alto contrasto',
+                'Maggiore contrasto per ipovedenti',
+                settings.highContrast,
+                (v) => settings.setHighContrast(v),
+                // FIX: stessa logica — ricostruisce il tema globalmente
+              ),
+              const SizedBox(height: 8),
+
+              // ── Piano ──────────────────────────────────────────────────────
+              _sectionHeader('📅 Piano'),
+              _navigationTile(
+                context,
+                '⏰',
+                'Orari di lavoro',
+                'Configura inizio e fine giornata lavorativa',
+                () => Navigator.pop(context),
+              ),
+              _navigationTile(
+                context,
+                '🎯',
+                'Obiettivi',
+                'Imposta i tuoi obiettivi di benessere',
+                () {},
+              ),
+              const SizedBox(height: 8),
+
+              // ── Account ────────────────────────────────────────────────────
+              _sectionHeader('👤 Account'),
+              Consumer<AppProvider>(builder: (context, p, _) {
+                return Column(
+                  children: [
+                    _navigationTile(context, '✏️', 'Modifica profilo',
+                        'Nome, email, tipo utente', () {}),
+                    _navigationTile(
+                        context,
+                        '🔄',
+                        'Ripristina progressi',
+                        'Azzera punti e streak',
+                        () => _showResetDialog(context, p)),
+                  ],
+                );
+              }),
+              const SizedBox(height: 8),
+
+              // ── Info ───────────────────────────────────────────────────────
+              _sectionHeader('ℹ️ Info App'),
+              _navigationTile(context, '❓', 'Come funziona',
+                  'Guida all\'app', () {}),
+              _navigationTile(context, '⭐', 'Lascia una recensione',
+                  'Aiutaci a migliorare', () {}),
+              _navigationTile(context, '📧', 'Contatta il supporto',
+                  'Segnala problemi o suggerimenti', () {}),
+              const SizedBox(height: 16),
+              Center(
+                child: Text('Be Well v1.0.0',
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(.2), fontSize: 11)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Mostra badge se accessibilità attiva ──────────────────────────────────
+  Widget _accessibilityPreviewBadge(SettingsProvider s) {
+    final parts = <String>[];
+    if (s.largeText) parts.add('Testo grande attivo');
+    if (s.highContrast) parts.add('Alto contrasto attivo');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: BwColors.tealLight,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: BwColors.teal.withOpacity(.4)),
+      ),
+      child: Row(
+        children: [
+          const Text('✅', style: TextStyle(fontSize: 16)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              parts.join(' · '),
+              style: const TextStyle(
+                  color: BwColors.teal,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -140,7 +191,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _switchTile(
-      String title, String sub, bool value, ValueChanged<bool> onChanged) {
+    BuildContext context,
+    String title,
+    String sub,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -162,8 +218,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _dropdownTile(String title, String sub, String value,
-      Map<String, String> options, ValueChanged<String?> onChanged) {
+  Widget _dropdownTile(
+    BuildContext context,
+    String title,
+    String sub,
+    String value,
+    Map<String, String> options,
+    ValueChanged<String?> onChanged,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -260,8 +322,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Navigator.pop(context);
                 p.resetAll();
               },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: BwColors.coral),
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: BwColors.coral),
               child: const Text('Ripristina')),
         ],
       ),

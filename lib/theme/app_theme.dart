@@ -24,6 +24,17 @@ class BwColors {
   static const textSecondary = Color(0x99FFFFFF);
   static const textMuted = Color(0x40FFFFFF);
 
+  // ── High contrast variants ─────────────────────────────────────────────
+  static const hcDarkPanel  = Color(0xFF000000);
+  static const hcPanel      = Color(0xFF0A0A0A);
+  static const hcBorder     = Color(0xFF444444);
+  static const hcSurface    = Color(0xFF111111);
+  static const hcText       = Color(0xFFFFFFFF);
+  static const hcTextMuted  = Color(0xFFCCCCCC);
+  static const hcTeal       = Color(0xFF00FFD4);
+  static const hcAmber      = Color(0xFFFFD000);
+  static const hcCoral      = Color(0xFFFF4422);
+
   static Color categoryColor(String category) {
     final c = category.toLowerCase();
     if (c.contains('hydration') || c.contains('nutrition')) return teal;
@@ -50,83 +61,148 @@ class BwColors {
 }
 
 class AppTheme {
-  static ThemeData get dark {
+  // ── Costruttore dinamico — unico punto di verità ───────────────────────
+  static ThemeData build({
+    bool highContrast = false,
+    bool largeText = false,
+  }) {
+    // Sceglie palette base o high-contrast
+    final bgMain   = highContrast ? BwColors.hcDarkPanel : BwColors.darkPanel;
+    final bgPanel  = highContrast ? BwColors.hcPanel     : BwColors.panel;
+    final bgSurf   = highContrast ? BwColors.hcSurface   : BwColors.surface;
+    final border   = highContrast ? BwColors.hcBorder    : BwColors.panelBorder;
+    final primary  = highContrast ? BwColors.hcTeal      : BwColors.teal;
+    final amber    = highContrast ? BwColors.hcAmber     : BwColors.amber;
+    final coral    = highContrast ? BwColors.hcCoral     : BwColors.coral;
+    final txtMain  = highContrast ? BwColors.hcText      : Colors.white;
+    final txtMuted = highContrast ? BwColors.hcTextMuted : const Color(0x99FFFFFF);
+
+    // Scala font: normale 1.0, grande 1.20
+    final fontScale = largeText ? 1.20 : 1.0;
+
+    // Helper per scalare font size
+    double fs(double base) => base * fontScale;
+
     return ThemeData(
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: BwColors.darkPanel,
-      colorScheme: const ColorScheme.dark(
-        primary: BwColors.teal,
-        secondary: BwColors.blue,
-        surface: BwColors.panel,
-        error: BwColors.coral,
+      scaffoldBackgroundColor: bgMain,
+
+      colorScheme: ColorScheme.dark(
+        primary: primary,
+        secondary: highContrast ? BwColors.hcTeal : BwColors.blue,
+        surface: bgPanel,
+        error: coral,
       ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: BwColors.darkPanel,
+
+      // ── Testo globale ──────────────────────────────────────────────────
+      textTheme: TextTheme(
+        // Titoli
+        headlineLarge:  TextStyle(color: txtMain, fontSize: fs(28), fontWeight: FontWeight.w700),
+        headlineMedium: TextStyle(color: txtMain, fontSize: fs(22), fontWeight: FontWeight.w700),
+        headlineSmall:  TextStyle(color: txtMain, fontSize: fs(18), fontWeight: FontWeight.w600),
+        // Body
+        bodyLarge:   TextStyle(color: txtMain,  fontSize: fs(16)),
+        bodyMedium:  TextStyle(color: txtMain,  fontSize: fs(14)),
+        bodySmall:   TextStyle(color: txtMuted, fontSize: fs(12)),
+        // Labels
+        labelLarge:  TextStyle(color: txtMain,  fontSize: fs(14), fontWeight: FontWeight.w600),
+        labelMedium: TextStyle(color: txtMuted, fontSize: fs(12)),
+        labelSmall:  TextStyle(color: txtMuted, fontSize: fs(10)),
+        // Title (usato da AppBar, ListTile ecc.)
+        titleLarge:  TextStyle(color: txtMain, fontSize: fs(18), fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(color: txtMain, fontSize: fs(15), fontWeight: FontWeight.w500),
+        titleSmall:  TextStyle(color: txtMain, fontSize: fs(13), fontWeight: FontWeight.w500),
+      ),
+
+      appBarTheme: AppBarTheme(
+        backgroundColor: bgMain,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          color: Colors.white,
-          fontSize: 18,
+          color: txtMain,
+          fontSize: fs(18),
           fontWeight: FontWeight.w600,
         ),
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: txtMain),
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: BwColors.panel,
-        selectedItemColor: BwColors.teal,
-        unselectedItemColor: Color(0x55FFFFFF),
+
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: bgPanel,
+        selectedItemColor: primary,
+        unselectedItemColor: const Color(0x55FFFFFF),
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        selectedLabelStyle: TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: TextStyle(fontSize: 10),
+        selectedLabelStyle: TextStyle(fontSize: fs(10), fontWeight: FontWeight.w600),
+        unselectedLabelStyle: TextStyle(fontSize: fs(10)),
       ),
+
       cardTheme: CardThemeData(
-        color: BwColors.panel,
+        color: bgPanel,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: BwColors.panelBorder),
+          side: BorderSide(color: border),
         ),
       ),
+
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: BwColors.panel,
+        fillColor: bgPanel,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: BwColors.panelBorder),
+          borderSide: BorderSide(color: border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: BwColors.panelBorder),
+          borderSide: BorderSide(color: border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: BwColors.teal, width: 1.5),
+          borderSide: BorderSide(color: primary, width: 1.5),
         ),
-        labelStyle: const TextStyle(color: BwColors.textSecondary),
-        hintStyle: const TextStyle(color: BwColors.textMuted),
+        labelStyle: TextStyle(color: txtMuted, fontSize: fs(14)),
+        hintStyle: TextStyle(color: const Color(0x40FFFFFF), fontSize: fs(14)),
       ),
+
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: BwColors.teal,
-          foregroundColor: Colors.white,
+          backgroundColor: primary,
+          foregroundColor: highContrast ? Colors.black : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: TextStyle(fontSize: fs(15), fontWeight: FontWeight.w600),
         ),
       ),
+
       sliderTheme: SliderThemeData(
-        activeTrackColor: BwColors.teal,
+        activeTrackColor: primary,
         inactiveTrackColor: Colors.white.withOpacity(.1),
-        thumbColor: BwColors.teal,
-        overlayColor: BwColors.tealLight,
+        thumbColor: primary,
+        overlayColor: primary.withOpacity(.2),
       ),
+
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) ? BwColors.teal : null),
+            (s) => s.contains(WidgetState.selected) ? primary : null),
         trackColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) ? BwColors.tealLight : null),
+            (s) => s.contains(WidgetState.selected)
+                ? primary.withOpacity(.4)
+                : null),
       ),
+
+      tabBarTheme: TabBarThemeData(
+        indicatorColor: primary,
+        labelColor: primary,
+        unselectedLabelColor: const Color(0x99FFFFFF),
+        labelStyle: TextStyle(fontSize: fs(13), fontWeight: FontWeight.w600),
+        unselectedLabelStyle: TextStyle(fontSize: fs(13)),
+      ),
+
+      dividerTheme: DividerThemeData(color: border),
     );
   }
+
+  // Mantieni il getter .dark per retrocompatibilità con eventuali
+  // riferimenti vecchi nel codebase (non usato dalla nuova BewellApp)
+  static ThemeData get dark => build();
 }

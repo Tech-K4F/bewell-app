@@ -109,7 +109,7 @@ class ProfileScreen extends StatelessWidget {
             _LevelProgress(user: user),
             const SizedBox(height: 24),
 
-            // Weekly activity chart
+            // FIX 3: Weekly activity chart con dati reali
             _WeeklyChart(provider: p),
             const SizedBox(height: 24),
 
@@ -119,8 +119,7 @@ class ProfileScreen extends StatelessWidget {
             _infoRow('👤', 'Nome', user.name),
             if (user.email.isNotEmpty)
               _infoRow('📧', 'Email', user.email),
-            _infoRow('💼',
-                'Tipo utente',
+            _infoRow('💼', 'Tipo utente',
                 user.userType == 'worker'
                     ? 'Lavoratore'
                     : user.userType == 'student'
@@ -143,7 +142,7 @@ class ProfileScreen extends StatelessWidget {
                 'Progressi dettagliati e report', () {}),
             _settingTile(context, '📚', 'Libreria Attività',
                 'Sfoglia tutte le attività', () {
-              p.setNavIndex(1); // Go to planner
+              p.setNavIndex(1);
             }),
             const SizedBox(height: 20),
 
@@ -160,7 +159,6 @@ class ProfileScreen extends StatelessWidget {
                 danger: true),
             const SizedBox(height: 24),
 
-            // Reset / Logout
             OutlinedButton.icon(
               onPressed: () => _showLogoutDialog(context, p),
               icon: const Icon(Icons.logout, color: BwColors.coral, size: 18),
@@ -454,16 +452,38 @@ class _LevelProgress extends StatelessWidget {
   }
 }
 
+// ─── FIX 3: Grafico settimanale con dati reali ────────────────────────────────
 class _WeeklyChart extends StatelessWidget {
   final AppProvider provider;
   const _WeeklyChart({required this.provider});
 
+  /// Restituisce i completamenti degli ultimi 7 giorni (oggi incluso)
+  /// leggendo user.weeklyCompletions (Map<dateString, count>)
+  List<int> _buildWeekData() {
+    final completions = provider.user?.weeklyCompletions ?? {};
+    final today = DateTime.now();
+    return List.generate(7, (i) {
+      // i=0 → lunedì della settimana corrente, i=6 → domenica
+      // Calcoliamo i 7 giorni a partire da oggi-6 fino a oggi
+      final day = today.subtract(Duration(days: 6 - i));
+      final key =
+          '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+      return completions[key] ?? 0;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     const days = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
-    // Mock data — in production use weeklyCompletions from user
-    final data = [3, 5, 2, 6, 4, 1, 3];
+
+    // ── FIX: dati reali invece di [3, 5, 2, 6, 4, 1, 3] ──────────────────
+    final data = _buildWeekData();
     final maxVal = data.reduce((a, b) => a > b ? a : b);
+    final totalWeek = data.reduce((a, b) => a + b);
+
+    // Indice del giorno corrente rispetto ai 7 giorni mostrati
+    // L'ultimo elemento (indice 6) è sempre oggi
+    const todayIdx = 6;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -475,39 +495,58 @@ class _WeeklyChart extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Attività questa settimana',
-              style: TextStyle(
-                  color: Colors.white.withOpacity(.6),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Attività questa settimana',
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+              Text('$totalWeek totali',
+                  style: const TextStyle(
+                      color: BwColors.teal,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: List.generate(7, (i) {
               final h = maxVal > 0 ? (data[i] / maxVal) : 0.0;
-              final isToday = i == DateTime.now().weekday - 1;
+              final isToday = i == todayIdx;
+              final isEmpty = data[i] == 0;
+
               return Expanded(
                 child: Column(
                   children: [
-                    Text('${data[i]}',
-                        style: TextStyle(
-                            color: isToday
-                                ? BwColors.teal
-                                : Colors.white.withOpacity(.3),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700)),
+                    // Valore sopra la barra (nascosto se 0)
+                    Text(
+                      isEmpty ? '' : '${data[i]}',
+                      style: TextStyle(
+                          color: isToday
+                              ? BwColors.teal
+                              : Colors.white.withOpacity(.3),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700),
+                    ),
                     const SizedBox(height: 4),
+                    // Barra
                     Container(
-                      height: 60 * h + 4,
+                      height: maxVal > 0 ? (60 * h + 4) : 4,
                       margin: const EdgeInsets.symmetric(horizontal: 3),
                       decoration: BoxDecoration(
                         color: isToday
                             ? BwColors.teal
-                            : Colors.white.withOpacity(.12),
+                            : isEmpty
+                                ? Colors.white.withOpacity(.05)
+                                : Colors.white.withOpacity(.18),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                     const SizedBox(height: 4),
+                    // Etichetta giorno
                     Text(days[i],
                         style: TextStyle(
                             color: isToday
@@ -522,6 +561,19 @@ class _WeeklyChart extends StatelessWidget {
               );
             }),
           ),
+          // Nota se nessun dato
+          if (totalWeek == 0) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                'Completa le prime attività per vedere i tuoi progressi',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: Colors.white.withOpacity(.25),
+                    fontSize: 11),
+              ),
+            ),
+          ],
         ],
       ),
     );
