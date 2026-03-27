@@ -10,7 +10,8 @@ class ActivitiesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: BeWellColors.darkPanel,
+      // FIX: era BeWellColors.darkPanel → corretto in BwColors.darkPanel
+      backgroundColor: BwColors.darkPanel,
       appBar: AppBar(title: const Text('Il mio Piano')),
       body: Consumer<AppProvider>(
         builder: (context, provider, _) {

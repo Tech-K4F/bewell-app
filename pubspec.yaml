@@ -9,10 +9,33 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
+  # ── State management ───────────────────────────────────────────────────
   provider: ^6.1.1
+
+  # ── Storage ────────────────────────────────────────────────────────────
   shared_preferences: ^2.2.2
+  flutter_secure_storage: ^9.2.2   # JWT e token in Keychain/Keystore
+
+  # ── Firebase (autenticazione) ──────────────────────────────────────────
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+
+  # ── SSO ────────────────────────────────────────────────────────────────
+  google_sign_in: ^6.2.1
+  sign_in_with_apple: ^6.1.1       # Obbligatorio per App Store iOS
+
+  # ── Biometrica ─────────────────────────────────────────────────────────
+  local_auth: ^2.3.0
+
+  # ── Rete ───────────────────────────────────────────────────────────────
+  connectivity_plus: ^6.1.1        # Rilevamento stato connessione
+
+  # ── Notifiche locali ────────────────────────────────────────────────────
   flutter_local_notifications: ^17.0.0
   timezone: ^0.9.3
+
+  # ── UI ─────────────────────────────────────────────────────────────────
   cupertino_icons: ^1.0.6
 
 dev_dependencies:

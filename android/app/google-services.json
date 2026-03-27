@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "785267734057",
+    "project_id": "bewell-1e64c",
+    "storage_bucket": "bewell-1e64c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:785267734057:android:22a0dec4c54fae9c054e38",
+        "android_client_info": {
+          "package_name": "com.k4f.bewell"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "785267734057-rt771ml8745v7thde8jrprab2sinfgeh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.k4f.bewell",
+            "certificate_hash": "5d133b73646ddc72b5e1aff0203f615f286ea438"
+          }
+        },
+        {
+          "client_id": "785267734057-l8e67na43d6fvao4pqti5ft10maek8vh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDIXjSX0jdE0oyKeRQyJ234EypUCf3q6I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "785267734057-l8e67na43d6fvao4pqti5ft10maek8vh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "785267734057-5b0hfj696oace7d61h6gsud2qq2bd7ai.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.k4f.bewell"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
