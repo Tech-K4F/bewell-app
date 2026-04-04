@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -412,6 +413,53 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ── Navigation ─────────────────────────────────────────────────────────────
+  void _syncFirebaseUser() {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) return;
+    final fbName = firebaseUser.displayName ?? '';
+    final fbEmail = firebaseUser.email ?? '';
+    final fbId = firebaseUser.uid;
+    if (_user == null) {
+      _user = UserProfile(id: fbId, name: fbName.isNotEmpty ? fbName : 'Utente', email: fbEmail, userType: 'worker');
+      _saveUser();
+      return;
+    }
+    final needsUpdate = (fbName.isNotEmpty && (_user!.name.isEmpty || _user!.name == 'Utente' || _user!.name == 'user' || _user!.name == 'ok')) || (fbEmail.isNotEmpty && _user!.email.isEmpty) || _user!.id != fbId;
+    if (needsUpdate) {
+      _user = UserProfile(id: fbId, name: fbName.isNotEmpty ? fbName : _user!.name, email: fbEmail.isNotEmpty ? fbEmail : _user!.email, userType: _user!.userType, points: _user!.points, streak: _user!.streak, graceSkipsUsed: _user!.graceSkipsUsed, lastActivityDate: _user!.lastActivityDate, earnedBadgeIds: _user!.earnedBadgeIds, settings: _user!.settings, stressLevel: _user!.stressLevel, primaryGoal: _user!.primaryGoal, totalSessions: _user!.totalSessions, totalMinutes: _user!.totalMinutes, weeklyCompletions: _user!.weeklyCompletions);
+      _saveUser();
+    }
+  }
+
+  Future<void> updateDisplayName(String name) async {
+    if (_user == null) return;
+    await FirebaseAuth.instance.currentUser?.updateDisplayName(name);
+    _user = UserProfile(
+      id: _user!.id,
+      name: name,
+      email: _user!.email,
+      userType: _user!.userType,
+      points: _user!.points,
+      streak: _user!.streak,
+      graceSkipsUsed: _user!.graceSkipsUsed,
+      lastActivityDate: _user!.lastActivityDate,
+      earnedBadgeIds: _user!.earnedBadgeIds,
+      settings: _user!.settings,
+      stressLevel: _user!.stressLevel,
+      primaryGoal: _user!.primaryGoal,
+      totalSessions: _user!.totalSessions,
+      totalMinutes: _user!.totalMinutes,
+      weeklyCompletions: _user!.weeklyCompletions,
+    );
+    await _saveUser();
+    notifyListeners();
+  }
+
+  Future<void> onLoginComplete() async {
+    _syncFirebaseUser();
+    notifyListeners();
+  }
+
   void setNavIndex(int i) {
     _currentNavIndex = i;
     notifyListeners();
@@ -487,3 +535,8 @@ class AppProvider extends ChangeNotifier {
         ),
       ];
 }
+
+
+
+
+

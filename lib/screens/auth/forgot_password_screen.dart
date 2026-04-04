@@ -132,9 +132,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         BwAuthButton(
           label: 'Invia link di reset',
           isLoading: isLoading,
-          onPressed: (_emailCtrl.text.trim().isNotEmpty && !isLoading)
-              ? _submit
-              : null,
+          onPressed: isLoading ? null : _submit,
         ),
       ],
     );
@@ -244,3 +242,5 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 }
+
+

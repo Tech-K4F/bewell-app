@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/app_provider.dart';
 import '../../models/auth_result.dart';
 import '../../utils/validators.dart';
 import '../../widgets/auth/auth_widgets.dart';
@@ -158,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           BwAuthButton(
                             label: 'Accedi',
                             isLoading: isLoading,
-                            onPressed: (_canSubmit && !isLoading && auth.isOnline)
+                            onPressed: (!isLoading && auth.isOnline)
                                 ? _validateAndSubmit
                                 : null,
                           ),
@@ -271,8 +272,10 @@ class _LoginScreenState extends State<LoginScreen> {
     auth.consumeNavigation();
     switch (nav) {
       case AuthNavigation.toHome:
+        context.read<AppProvider>().onLoginComplete();
         Navigator.of(context).pushReplacementNamed('/home');
       case AuthNavigation.toOnboarding:
+        context.read<AppProvider>().onLoginComplete();
         Navigator.of(context).pushReplacementNamed('/onboarding');
       default:
         break;
@@ -372,4 +375,8 @@ class _BiometricButton extends StatelessWidget {
     );
   }
 }
+
+
+
+
 

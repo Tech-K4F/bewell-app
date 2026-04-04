@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
@@ -29,7 +30,7 @@ class ProfileScreen extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            // Avatar + Name
+            // ── Avatar + Name ───────────────────────────────────────────
             Center(
               child: Column(
                 children: [
@@ -45,32 +46,41 @@ class ProfileScreen extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: BwColors.teal.withOpacity(.35),
+                          color: BwColors.teal.withValues(alpha: 0.35),
                           blurRadius: 24,
                           spreadRadius: 4,
                         ),
                       ],
                     ),
                     child: Center(
-                      child: Text(user.initials,
-                          style: const TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white)),
+                      child: Text(
+                        user.initials,
+                        style: const TextStyle(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Text(user.name,
-                      style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white)),
+                  Text(
+                    user.name,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
                   if (user.email.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(user.email,
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.white.withOpacity(.4))),
+                    const SizedBox(height: 4),
+                    Text(
+                      user.email,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.45),
+                      ),
+                    ),
                   ],
                   const SizedBox(height: 10),
                   Container(
@@ -79,503 +89,355 @@ class ProfileScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: BwColors.amberLight,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: BwColors.amber.withOpacity(.3)),
                     ),
-                    child: Text('${user.levelEmoji} ${user.levelName}',
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: BwColors.amber)),
+                    child: Text(
+                      '${user.levelEmoji} ${user.levelName}',
+                      style: const TextStyle(
+                        color: BwColors.amber,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
 
-            // Stats grid
-            Row(children: [
-              _statBox('${user.streak}', '🔥', 'Streak'),
-              const SizedBox(width: 8),
-              _statBox('${user.points}', '⭐', 'Punti'),
-              const SizedBox(width: 8),
-              _statBox('${user.earnedBadgeIds.length}', '🏅', 'Badge'),
-              const SizedBox(width: 8),
-              _statBox('${user.totalSessions}', '🎯', 'Sessioni'),
-            ]),
-            const SizedBox(height: 16),
+            const SizedBox(height: 32),
 
-            // Level progress
-            _LevelProgress(user: user),
-            const SizedBox(height: 24),
-
-            // FIX 3: Weekly activity chart con dati reali
-            _WeeklyChart(provider: p),
-            const SizedBox(height: 24),
-
-            // Account info section
-            _sectionLabel('Account'),
-            const SizedBox(height: 8),
-            _infoRow('👤', 'Nome', user.name),
-            if (user.email.isNotEmpty)
-              _infoRow('📧', 'Email', user.email),
-            _infoRow('💼', 'Tipo utente',
-                user.userType == 'worker'
-                    ? 'Lavoratore'
-                    : user.userType == 'student'
-                        ? 'Studente'
-                        : 'Entrambi'),
-            const SizedBox(height: 20),
-
-            // Settings section
-            _sectionLabel('Impostazioni'),
-            const SizedBox(height: 8),
-            _settingTile(
-              context,
-              '⚙️',
-              'Impostazioni App',
-              'Notifiche, accessibilità, tema',
-              () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsScreen())),
+            // ── Stats ───────────────────────────────────────────────────
+            _SectionTitle(label: 'Le tue statistiche'),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                    child: _StatCard(
+                        label: 'Punti', value: '${user.points}', icon: '⭐')),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: _StatCard(
+                        label: 'Streak', value: '${user.streak}d', icon: '🔥')),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: _StatCard(
+                        label: 'Sessioni',
+                        value: '${user.totalSessions}',
+                        icon: '✅')),
+              ],
             ),
-            _settingTile(context, '📊', 'Statistiche',
-                'Progressi dettagliati e report', () {}),
-            _settingTile(context, '📚', 'Libreria Attività',
-                'Sfoglia tutte le attività', () {
-              p.setNavIndex(1);
-            }),
-            const SizedBox(height: 20),
 
-            // Privacy section
-            _sectionLabel('Privacy & Dati'),
-            const SizedBox(height: 8),
-            _settingTile(context, '🔒', 'Privacy & GDPR',
-                'Gestisci i tuoi dati', () => _showPrivacySheet(context)),
-            _settingTile(context, '📤', 'Esporta dati',
-                'Scarica un backup dei tuoi dati', () {}),
-            _settingTile(context, '🗑', 'Elimina account',
-                'Rimuovi tutti i dati permanentemente',
-                () => _showDeleteDialog(context, p),
-                danger: true),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
 
-            OutlinedButton.icon(
-              onPressed: () => _showLogoutDialog(context, p),
-              icon: const Icon(Icons.logout, color: BwColors.coral, size: 18),
-              label: const Text('Esci dall\'account'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: BwColors.coral,
-                side: const BorderSide(color: BwColors.coral),
-                minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+            // ── Account ─────────────────────────────────────────────────
+            _SectionTitle(label: 'Account'),
+            const SizedBox(height: 12),
+            _AccountTile(
+              icon: Icons.person_outline,
+              label: 'Nome',
+              value: user.name,
+              onTap: () => _showEditName(context, user.name),
+            ),
+            _AccountTile(
+              icon: Icons.email_outlined,
+              label: 'Email',
+              value: user.email,
+            ),
+            _AccountTile(
+              icon: Icons.lock_outline,
+              label: 'Cambia password',
+              value: '',
+              onTap: () => _showChangePassword(context, user.email),
+            ),
+
+            const SizedBox(height: 28),
+
+            // ── Logout ──────────────────────────────────────────────────
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                onPressed: () => _confirmLogout(context),
+                icon: const Icon(Icons.logout, color: Colors.redAccent),
+                label: const Text(
+                  'Esci dall\'account',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                      color: Colors.redAccent.withValues(alpha: 0.4)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            Center(
-              child: Text('Be Well v1.0.0 · Made with 🌿',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.white.withOpacity(.2))),
-            ),
+
+            const SizedBox(height: 40),
           ],
         );
       }),
     );
   }
 
-  Widget _statBox(String value, String emoji, String label) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: BwColors.panel,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: BwColors.panelBorder),
+  // ── Dialogo cambio password ────────────────────────────────────────────
+  void _showChangePassword(BuildContext context, String email) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _ChangePasswordDialog(email: email),
+    );
+  }
+
+  // ── Dialogo modifica nome ──────────────────────────────────────────────
+  void _showEditName(BuildContext context, String currentName) {
+    final ctrl = TextEditingController(text: currentName);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F1F33),
+        title: const Text('Modifica nome',
+            style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: ctrl,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Il tuo nome',
+            hintStyle: TextStyle(color: Colors.white38),
+          ),
         ),
-        child: Column(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 18)),
-            const SizedBox(height: 4),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white)),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 9,
-                    color: Colors.white.withOpacity(.35))),
-          ],
-        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla',
+                style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newName = ctrl.text.trim();
+              if (newName.isNotEmpty) {
+                await ctx.read<AppProvider>().updateDisplayName(newName);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Nome aggiornato')),
+                  );
+                }
+              }
+            },
+            child: const Text('Salva',
+                style: TextStyle(color: BwColors.teal)),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _sectionLabel(String t) => Text(t.toUpperCase(),
-      style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: Colors.white.withOpacity(.3),
-          letterSpacing: .5));
+  // ── Conferma logout ────────────────────────────────────────────────────
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F1F33),
+        title: const Text('Esci dall\'account',
+            style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Sei sicuro di voler uscire?',
+          style: TextStyle(color: Colors.white60),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla',
+                style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.of(context)
+                    .pushNamedAndRemoveUntil('/login', (_) => false);
+              }
+            },
+            child: const Text('Esci',
+                style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-  Widget _infoRow(String emoji, String label, String value) {
+// ── Dialogo cambio password ────────────────────────────────────────────────
+class _ChangePasswordDialog extends StatefulWidget {
+  final String email;
+  const _ChangePasswordDialog({required this.email});
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  bool _sent = false;
+  bool _loading = false;
+
+  Future<void> _send() async {
+    setState(() => _loading = true);
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: widget.email);
+      setState(() {
+        _sent = true;
+        _loading = false;
+      });
+    } catch (_) {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF0F1F33),
+      title: const Text('Cambia password',
+          style: TextStyle(color: Colors.white)),
+      content: Text(
+        _sent
+            ? '✅ Email inviata a ${widget.email}\n\nControlla la tua casella e segui le istruzioni.'
+            : 'Ti invieremo un link per reimpostare la password all\'indirizzo:\n\n${widget.email}',
+        style: const TextStyle(color: Colors.white70, height: 1.5),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            _sent ? 'Chiudi' : 'Annulla',
+            style: const TextStyle(color: Colors.white54),
+          ),
+        ),
+        if (!_sent)
+          TextButton(
+            onPressed: _loading ? null : _send,
+            child: _loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: BwColors.teal))
+                : const Text('Invia email',
+                    style: TextStyle(color: BwColors.teal)),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Widgets locali ─────────────────────────────────────────────────────────
+
+class _SectionTitle extends StatelessWidget {
+  final String label;
+  const _SectionTitle({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.4),
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.8,
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final String icon;
+  const _StatCard(
+      {required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: BwColors.panel,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: BwColors.panelBorder),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 18)),
-          const SizedBox(width: 12),
-          Text(label,
-              style: TextStyle(
-                  color: Colors.white.withOpacity(.5), fontSize: 13)),
-          const Spacer(),
+          Text(icon, style: const TextStyle(fontSize: 22)),
+          const SizedBox(height: 6),
           Text(value,
               style: const TextStyle(
                   color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13)),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
         ],
       ),
     );
   }
+}
 
-  Widget _settingTile(BuildContext ctx, String emoji, String title, String sub,
-      VoidCallback onTap,
-      {bool danger = false}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: BwColors.panel,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: BwColors.panelBorder),
-      ),
-      child: ListTile(
-        leading: Text(emoji, style: const TextStyle(fontSize: 20)),
-        title: Text(title,
-            style: TextStyle(
-                color: danger ? BwColors.coral : Colors.white,
-                fontWeight: FontWeight.w500,
-                fontSize: 14)),
-        subtitle: Text(sub,
-            style: TextStyle(
-                color: Colors.white.withOpacity(.3), fontSize: 11)),
-        trailing: Icon(Icons.chevron_right,
-            color: Colors.white.withOpacity(.2), size: 18),
-        onTap: onTap,
-      ),
-    );
-  }
+class _AccountTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback? onTap;
+  const _AccountTile(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      this.onTap});
 
-  void _showPrivacySheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: BwColors.panel,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: BwColors.panelBorder),
+        ),
+        child: Row(
           children: [
-            const Text('🔒 Privacy & GDPR',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18)),
-            const SizedBox(height: 16),
-            _privacyItem('Dati memorizzati',
-                'Solo sul tuo dispositivo. Nessun dato inviato a server esterni.'),
-            _privacyItem('Notifiche',
-                'Gestite localmente. Puoi disabilitarle in qualsiasi momento.'),
-            _privacyItem('Analytics',
-                'Be Well non raccoglie dati di utilizzo senza consenso.'),
-            _privacyItem('GDPR',
-                'In conformità con il Reg. UE 2016/679. Hai diritto all\'accesso, rettifica ed eliminazione.'),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48)),
-              child: const Text('Chiudi'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _privacyItem(String title, String desc) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.check_circle, color: BwColors.teal, size: 16),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13)),
-                Text(desc,
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(.5),
-                        fontSize: 11)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLogoutDialog(BuildContext context, AppProvider p) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: BwColors.panel,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Esci dall\'account',
-            style: TextStyle(color: Colors.white)),
-        content: Text('I tuoi progressi sono al sicuro.',
-            style: TextStyle(color: Colors.white.withOpacity(.5))),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Annulla',
-                  style: TextStyle(color: Colors.white.withOpacity(.4)))),
-          ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                p.resetAll();
-              },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: BwColors.coral),
-              child: const Text('Esci')),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteDialog(BuildContext context, AppProvider p) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: BwColors.panel,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('⚠️ Elimina account',
-            style:
-                TextStyle(color: BwColors.coral, fontWeight: FontWeight.w700)),
-        content: const Text(
-          'Questa azione è irreversibile. Tutti i tuoi dati, progressi e badge verranno eliminati permanentemente.',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annulla',
-                  style: TextStyle(color: BwColors.teal))),
-          ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                p.resetAll();
-              },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: BwColors.coral),
-              child: const Text('Elimina tutto')),
-        ],
-      ),
-    );
-  }
-}
-
-class _LevelProgress extends StatelessWidget {
-  final dynamic user;
-  const _LevelProgress({required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: BwColors.panel,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: BwColors.panelBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Prossimo livello: ${user.levelName}',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13)),
-              Text('${user.points} / ${user.nextLevelThreshold} pt',
-                  style: const TextStyle(
-                      color: BwColors.teal,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: user.levelProgress,
-              backgroundColor: Colors.white.withOpacity(.07),
-              valueColor:
-                  const AlwaysStoppedAnimation(BwColors.teal),
-              minHeight: 8,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── FIX 3: Grafico settimanale con dati reali ────────────────────────────────
-class _WeeklyChart extends StatelessWidget {
-  final AppProvider provider;
-  const _WeeklyChart({required this.provider});
-
-  /// Restituisce i completamenti degli ultimi 7 giorni (oggi incluso)
-  /// leggendo user.weeklyCompletions (Map<dateString, count>)
-  List<int> _buildWeekData() {
-    final completions = provider.user?.weeklyCompletions ?? {};
-    final today = DateTime.now();
-    return List.generate(7, (i) {
-      // i=0 → lunedì della settimana corrente, i=6 → domenica
-      // Calcoliamo i 7 giorni a partire da oggi-6 fino a oggi
-      final day = today.subtract(Duration(days: 6 - i));
-      final key =
-          '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
-      return completions[key] ?? 0;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const days = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
-
-    // ── FIX: dati reali invece di [3, 5, 2, 6, 4, 1, 3] ──────────────────
-    final data = _buildWeekData();
-    final maxVal = data.reduce((a, b) => a > b ? a : b);
-    final totalWeek = data.reduce((a, b) => a + b);
-
-    // Indice del giorno corrente rispetto ai 7 giorni mostrati
-    // L'ultimo elemento (indice 6) è sempre oggi
-    const todayIdx = 6;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: BwColors.panel,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: BwColors.panelBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Attività questa settimana',
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(.6),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-              Text('$totalWeek totali',
-                  style: const TextStyle(
-                      color: BwColors.teal,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: List.generate(7, (i) {
-              final h = maxVal > 0 ? (data[i] / maxVal) : 0.0;
-              final isToday = i == todayIdx;
-              final isEmpty = data[i] == 0;
-
-              return Expanded(
-                child: Column(
-                  children: [
-                    // Valore sopra la barra (nascosto se 0)
-                    Text(
-                      isEmpty ? '' : '${data[i]}',
+            Icon(icon,
+                color: Colors.white.withValues(alpha: 0.4), size: 20),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
                       style: TextStyle(
-                          color: isToday
-                              ? BwColors.teal
-                              : Colors.white.withOpacity(.3),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 4),
-                    // Barra
-                    Container(
-                      height: maxVal > 0 ? (60 * h + 4) : 4,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: isToday
-                            ? BwColors.teal
-                            : isEmpty
-                                ? Colors.white.withOpacity(.05)
-                                : Colors.white.withOpacity(.18),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    // Etichetta giorno
-                    Text(days[i],
-                        style: TextStyle(
-                            color: isToday
-                                ? BwColors.teal
-                                : Colors.white.withOpacity(.3),
-                            fontSize: 10,
-                            fontWeight: isToday
-                                ? FontWeight.w700
-                                : FontWeight.normal)),
-                  ],
-                ),
-              );
-            }),
-          ),
-          // Nota se nessun dato
-          if (totalWeek == 0) ...[
-            const SizedBox(height: 12),
-            Center(
-              child: Text(
-                'Completa le prime attività per vedere i tuoi progressi',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: Colors.white.withOpacity(.25),
-                    fontSize: 11),
+                          color: Colors.white.withValues(alpha: 0.4),
+                          fontSize: 11)),
+                  if (value.isNotEmpty)
+                    Text(value,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 15)),
+                ],
               ),
             ),
+            if (onTap != null)
+              Icon(Icons.chevron_right,
+                  color: Colors.white.withValues(alpha: 0.25), size: 20),
           ],
-        ],
+        ),
       ),
     );
   }
 }
+
+
+
+
+

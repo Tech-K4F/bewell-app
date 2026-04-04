@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/app_provider.dart';
+import '../../models/user_profile.dart';
+import '../../theme/app_theme.dart';
 
-/// S-01 · Splash / Entry Screen
-/// Prima schermata ad ogni cold start. Controlla la sessione esistente.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -15,31 +17,15 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _fade;
-  late Animation<Offset> _slide;
-  bool _sessionChecked = false;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut)
-        .drive(Tween(begin: 0.0, end: 1.0));
-    _slide = Tween<Offset>(
-      begin: const Offset(0, 0.15),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
-
+        vsync: this, duration: const Duration(milliseconds: 900));
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
     _ctrl.forward();
-
-    // Avvia il check sessione dopo 400ms (attesa animazione iniziale)
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted) {
-        context.read<AuthProvider>().init();
-      }
-    });
+    _checkAndNavigate();
   }
 
   @override
@@ -48,133 +34,144 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
+  Future<void> _checkAndNavigate() async {
+    // Attendi animazione minima
+    await Future.delayed(const Duration(milliseconds: 1800));
+    if (!mounted) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      // Non loggato → Login
+      Navigator.of(context).pushReplacementNamed('/login');
+      return;
+    }
+
+    // Utente loggato — verifica se ha completato l'onboarding
+    final prefs = await SharedPreferences.getInstance();
+    final isOnboarded = prefs.getBool('is_onboarded') ?? false;
+
+    // Popola UserProfile da Firebase se non già caricato
+    await _syncUserProfile(user, prefs);
+
+    if (!mounted) return;
+
+    if (!isOnboarded) {
+      Navigator.of(context).pushReplacementNamed('/onboarding');
+    } else {
+      Navigator.of(context).pushReplacementNamed('/home');
+    }
+  }
+
+  Future<void> _syncUserProfile(User firebaseUser, SharedPreferences prefs) async {
+    final appProvider = context.read<AppProvider>();
+
+    // Se non c'è profilo salvato, crealo dai dati Firebase
+    if (appProvider.user == null) {
+      final savedJson = prefs.getString('user_profile');
+      if (savedJson == null) {
+        // Prima volta: crea profilo dai dati Firebase
+        final profile = UserProfile(
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName ?? firebaseUser.email?.split('@').first ?? 'Utente',
+          email: firebaseUser.email ?? '',
+          userType: 'worker',
+        );
+        await appProvider.completeOnboarding(profile);
+      }
+    } else {
+      // Profilo esiste: aggiorna nome/email se Firebase li ha aggiornati
+      final current = appProvider.user!;
+      final firebaseName = firebaseUser.displayName ?? '';
+      final firebaseEmail = firebaseUser.email ?? '';
+
+      if ((firebaseName.isNotEmpty && current.name != firebaseName) ||
+          (firebaseEmail.isNotEmpty && current.email != firebaseEmail)) {
+        final updated = UserProfile(
+          id: firebaseUser.uid,
+          name: firebaseName.isNotEmpty ? firebaseName : current.name,
+          email: firebaseEmail.isNotEmpty ? firebaseEmail : current.email,
+          userType: current.userType,
+          points: current.points,
+          streak: current.streak,
+          graceSkipsUsed: current.graceSkipsUsed,
+          lastActivityDate: current.lastActivityDate,
+          earnedBadgeIds: current.earnedBadgeIds,
+          settings: current.settings,
+          stressLevel: current.stressLevel,
+          primaryGoal: current.primaryGoal,
+          totalSessions: current.totalSessions,
+          totalMinutes: current.totalMinutes,
+          weeklyCompletions: current.weeklyCompletions,
+        );
+        await appProvider.completeOnboarding(updated);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, auth, _) {
-        // Naviga quando il provider ha determinato lo stato
-        if (!_sessionChecked && auth.pendingNavigation != null) {
-          _sessionChecked = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _navigate(context, auth);
-          });
-        }
-
-        return Scaffold(
-          backgroundColor: const Color(0xFF0B1929),
-          body: SafeArea(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Spacer(flex: 2),
-                FadeTransition(
-                  opacity: _fade,
-                  child: SlideTransition(
-                    position: _slide,
-                    child: Column(
-                      children: [
-                        // Logo
-                        Container(
-                          width: 88,
-                          height: 88,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF1E9E87), Color(0xFF3A7BD5)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(26),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF1E9E87).withOpacity(0.4),
-                                blurRadius: 40,
-                                spreadRadius: 4,
-                              ),
-                            ],
-                          ),
-                          child: const Center(
-                            child: Text('🌿', style: TextStyle(fontSize: 42)),
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-                        const Text(
-                          'Be Well',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 34,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -1,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        // Mostra il nome utente se sessione valida
-                        if (auth.state == AuthState.authenticated &&
-                            auth.pendingNavigation == AuthNavigation.toHome)
-                          Text(
-                            'Bentornato 👋',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
-                              fontSize: 14,
-                            ),
-                          )
-                        else
-                          Text(
-                            'Il tuo percorso di benessere',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
-                              fontSize: 14,
-                            ),
-                          ),
-                      ],
+    return Scaffold(
+      backgroundColor: BwColors.darkPanel,
+      body: FadeTransition(
+        opacity: _fade,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [BwColors.teal, BwColors.blue],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: BwColors.teal.withValues(alpha: 0.4),
+                      blurRadius: 32,
+                      spreadRadius: 4,
                     ),
-                  ),
+                  ],
                 ),
-                const Spacer(flex: 2),
-                // Indicatore di caricamento
-                FadeTransition(
-                  opacity: _fade,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 48),
-                    child: auth.state == AuthState.checkingSession
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF1E9E87),
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const SizedBox(height: 20),
-                  ),
+                child: const Center(
+                  child: Text('🌿', style: TextStyle(fontSize: 44)),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Be Well',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Il tuo piano di benessere',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 60),
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: BwColors.teal.withValues(alpha: 0.6),
+                  strokeWidth: 2,
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
-  }
-
-  void _navigate(BuildContext context, AuthProvider auth) {
-    auth.consumeNavigation();
-    switch (auth.pendingNavigation ?? _resolveNav(auth)) {
-      case AuthNavigation.toHome:
-        Navigator.of(context).pushReplacementNamed('/home');
-      case AuthNavigation.toOnboarding:
-        Navigator.of(context).pushReplacementNamed('/onboarding');
-      case AuthNavigation.toLogin:
-        Navigator.of(context).pushReplacementNamed('/login');
-      case AuthNavigation.toRegister:
-        Navigator.of(context).pushReplacementNamed('/register');
-    }
-  }
-
-  AuthNavigation _resolveNav(AuthProvider auth) {
-    if (auth.isAuthenticated) {
-      return auth.isFirstLogin
-          ? AuthNavigation.toOnboarding
-          : AuthNavigation.toHome;
-    }
-    return AuthNavigation.toLogin;
   }
 }
