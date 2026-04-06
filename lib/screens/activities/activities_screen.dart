@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../widgets/bw_scaffold.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../widgets/bw_scaffold.dart';
+import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
-import '../../theme/app_theme.dart';
 import '../../widgets/activity_card.dart';
 
 class ActivitiesScreen extends StatelessWidget {
@@ -10,14 +15,14 @@ class ActivitiesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // FIX: era BeWellColors.darkPanel → corretto in BwColors.darkPanel
-      backgroundColor: BwColors.darkPanel,
-      appBar: AppBar(title: const Text('Il mio Piano')),
+      // FIX: era BeWellColors.darkPanel → corretto in context.read<ThemeProvider>().paletteData.bg
+      backgroundColor: context.read<ThemeProvider>().paletteData.bg,
+      appBar: AppBar(title: Text('Il mio Piano')),
       body: Consumer<AppProvider>(
         builder: (context, provider, _) {
           final activities = provider.todayPlan;
           return ListView.builder(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(20),
             itemCount: activities.length,
             itemBuilder: (context, i) {
               final a = activities[i];
@@ -33,3 +38,6 @@ class ActivitiesScreen extends StatelessWidget {
     );
   }
 }
+
+
+

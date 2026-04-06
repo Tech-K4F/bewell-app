@@ -1,11 +1,14 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
+import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/app_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/onboarding_provider.dart';
-import 'theme/app_theme.dart';
+import 'providers/theme_provider.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -13,18 +16,12 @@ import 'screens/auth/email_verify_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/home/home_shell.dart';
+import 'widgets/bw_scaffold.dart';
 import 'services/notification_service.dart';
-
-// NOTA: quando hai completato il setup Firebase (Blocco 2 e 3 della guida),
-// aggiungi questi due import e decommentali:
-//
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // NOTA: quando hai firebase_options.dart, sostituisci con:
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -45,6 +42,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => SettingsProvider()..init()),
         ChangeNotifierProvider(create: (_) => AppProvider()..init()),
         ChangeNotifierProvider(create: (_) => OnboardingProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()..init()),
       ],
       child: const BewellApp(),
     ),
@@ -56,15 +54,40 @@ class BewellApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SettingsProvider>(
-      builder: (context, settings, _) {
+    // Ascolta sia SettingsProvider che ThemeProvider per ricostruire il tema
+    return Consumer2<SettingsProvider, ThemeProvider>(
+      builder: (context, settings, theme, _) {
         return MaterialApp(
           title: 'Be Well',
-          theme: AppTheme.build(
-            highContrast: settings.highContrast,
-            largeText: settings.largeText,
+          // Il MaterialTheme viene generato dalla palette attiva
+          theme: theme.buildMaterialTheme().copyWith(
+            // Manteniamo le opzioni accessibilità
+            textTheme: theme.buildMaterialTheme().textTheme.apply(
+              fontSizeFactor: settings.largeText ? 1.2 : 1.0,
+            ),
           ),
           debugShowCheckedModeBanner: false,
+          builder: (context, child) {
+            return Consumer<ThemeProvider>(
+              builder: (context, theme, _) {
+                if (!theme.isAmbient) return child ?? const SizedBox();
+                return Stack(
+                  children: [
+                    Positioned(
+                      top: 0, left: 0, right: 0, height: 100,
+                      child: CustomPaint(
+                        painter: HorizonPainter(
+                          dark: theme.paletteData.isDark,
+                          bgColor: theme.paletteData.bg,
+                        ),
+                      ),
+                    ),
+                    child ?? const SizedBox(),
+                  ],
+                );
+              },
+            );
+          },
           home: const SplashScreen(),
           onGenerateRoute: _generateRoute,
         );
@@ -118,4 +141,5 @@ class BewellApp extends StatelessWidget {
     );
   }
 }
+
 

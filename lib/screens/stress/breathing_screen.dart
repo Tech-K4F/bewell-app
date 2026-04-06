@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../widgets/bw_scaffold.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../widgets/bw_scaffold.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../../providers/app_provider.dart';
-import '../../theme/app_theme.dart';
 
 class BreathingScreen extends StatefulWidget {
   const BreathingScreen({super.key});
@@ -145,10 +150,10 @@ class _BreathingScreenState extends State<BreathingScreen>
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        backgroundColor: BwColors.panel,
+        backgroundColor: context.read<ThemeProvider>().paletteData.bg,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Text('🌿 Ottimo lavoro!',
+        title: Text('🌿 Ottimo lavoro!',
             style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
@@ -161,19 +166,19 @@ class _BreathingScreenState extends State<BreathingScreen>
               style: TextStyle(
                   color: Colors.white.withOpacity(.6), fontSize: 14),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.symmetric(
+              padding: EdgeInsets.symmetric(
                   horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
-                color: BwColors.amberLight,
+                color: context.read<ThemeProvider>().paletteData.bg,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text('+30 punti ⭐',
+              child: Text('+30 punti ⭐',
                   style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: BwColors.amber)),
+                      color: context.read<ThemeProvider>().paletteData.bg)),
             ),
           ],
         ),
@@ -183,16 +188,16 @@ class _BreathingScreenState extends State<BreathingScreen>
               ..pop()
               ..pop(),
             style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(44)),
-            child: const Text('Fatto'),
+                minimumSize: Size.fromHeight(44)),
+            child: Text('Fatto'),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _start();
             },
-            child: const Text('Di nuovo',
-                style: TextStyle(color: BwColors.textSecondary)),
+            child: Text('Di nuovo',
+                style: TextStyle(color: context.read<ThemeProvider>().paletteData.textSec)),
           ),
         ],
       ),
@@ -201,24 +206,23 @@ class _BreathingScreenState extends State<BreathingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: BwColors.darkPanel,
+    return BwScaffold(
       appBar: AppBar(
-        title: const Text('Respirazione'),
+        title: Text('Respirazione'),
         leading: const BackButton(),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+        padding: EdgeInsets.fromLTRB(24, 12, 24, 40),
         child: Column(
           children: [
             // Technique selector
             if (!_isRunning) ...[
               Container(
-                padding: const EdgeInsets.all(5),
+                padding: EdgeInsets.all(5),
                 decoration: BoxDecoration(
-                  color: BwColors.panel,
+                  color: context.read<ThemeProvider>().paletteData.bg,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: BwColors.panelBorder),
+                  border: Border.all(color: context.read<ThemeProvider>().paletteData.bg),
                 ),
                 child: Row(
                   children: _techniques.keys.map((key) {
@@ -229,9 +233,9 @@ class _BreathingScreenState extends State<BreathingScreen>
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding:
-                              const EdgeInsets.symmetric(vertical: 10),
+                              EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: sel ? BwColors.blue : Colors.transparent,
+                            color: sel ? context.read<ThemeProvider>().paletteData.bg : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -250,25 +254,25 @@ class _BreathingScreenState extends State<BreathingScreen>
                   }).toList(),
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
 
               // Info card
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: BwColors.blueLight,
+                  color: context.read<ThemeProvider>().paletteData.bg,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: BwColors.blue.withOpacity(.3)),
+                      color: context.read<ThemeProvider>().paletteData.bg.withOpacity(.3)),
                 ),
                 child: Column(
                   children: [
                     Text(_names[_technique]!,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
                             fontSize: 15)),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: List.generate(
@@ -282,19 +286,19 @@ class _BreathingScreenState extends State<BreathingScreen>
                                               Colors.white.withOpacity(.5),
                                           fontSize: 10)),
                                   Text('${_durations[i]}s',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w700,
                                           fontSize: 18)),
                                 ],
                               )
-                            : const SizedBox(),
+                            : SizedBox(),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
 
               // Cycles selector
               Row(
@@ -310,15 +314,15 @@ class _BreathingScreenState extends State<BreathingScreen>
                       onTap: () => setState(() => _totalCycles = n),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        margin: EdgeInsets.symmetric(horizontal: 4),
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: sel ? BwColors.blue : Colors.transparent,
+                          color: sel ? context.read<ThemeProvider>().paletteData.bg : Colors.transparent,
                           shape: BoxShape.circle,
                           border: Border.all(
                               color: sel
-                                  ? BwColors.blue
+                                  ? context.read<ThemeProvider>().paletteData.bg
                                   : Colors.white.withOpacity(.15)),
                         ),
                         child: Center(
@@ -335,7 +339,7 @@ class _BreathingScreenState extends State<BreathingScreen>
                   }),
                 ],
               ),
-              const SizedBox(height: 36),
+              SizedBox(height: 36),
             ],
 
             // Breathing circle
@@ -357,7 +361,7 @@ class _BreathingScreenState extends State<BreathingScreen>
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: BwColors.blue.withOpacity(
+                                color: context.read<ThemeProvider>().paletteData.bg.withOpacity(
                                     0.15 * (1 - i * 0.3)),
                                 width: 1,
                               ),
@@ -373,14 +377,14 @@ class _BreathingScreenState extends State<BreathingScreen>
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              BwColors.blue.withOpacity(.5),
-                              BwColors.blue.withOpacity(.1),
+                              context.read<ThemeProvider>().paletteData.bg.withOpacity(.5),
+                              context.read<ThemeProvider>().paletteData.bg.withOpacity(.1),
                             ],
                           ),
                           boxShadow: _isRunning
                               ? [
                                   BoxShadow(
-                                    color: BwColors.blue.withOpacity(.4),
+                                    color: context.read<ThemeProvider>().paletteData.bg.withOpacity(.4),
                                     blurRadius: 40,
                                     spreadRadius: 5,
                                   )
@@ -394,17 +398,17 @@ class _BreathingScreenState extends State<BreathingScreen>
                               if (_isRunning) ...[
                                 Text(
                                   _phaseLabel,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w300,
                                     letterSpacing: 2,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                SizedBox(height: 8),
                                 Text(
                                   '${_currentPhaseDuration - _phaseSecond}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 48,
                                     fontWeight: FontWeight.w200,
@@ -418,9 +422,9 @@ class _BreathingScreenState extends State<BreathingScreen>
                                   ),
                                 ),
                               ] else ...[
-                                const Text('🫁',
+                                Text('🫁',
                                     style: TextStyle(fontSize: 48)),
-                                const SizedBox(height: 8),
+                                SizedBox(height: 8),
                                 Text(
                                   'Tocca per\ncominciare',
                                   textAlign: TextAlign.center,
@@ -438,30 +442,30 @@ class _BreathingScreenState extends State<BreathingScreen>
                 );
               },
             ),
-            const SizedBox(height: 48),
+            SizedBox(height: 48),
 
             // Start / Stop button
             if (!_isRunning)
               ElevatedButton(
                 onPressed: _start,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: BwColors.blue,
-                  minimumSize: const Size.fromHeight(54),
+                  backgroundColor: context.read<ThemeProvider>().paletteData.bg,
+                  minimumSize: Size.fromHeight(54),
                 ),
-                child: const Text('Inizia respirazione',
+                child: Text('Inizia respirazione',
                     style: TextStyle(
                         fontSize: 16, fontWeight: FontWeight.w700)),
               )
             else
               OutlinedButton.icon(
                 onPressed: _stop,
-                icon: const Icon(Icons.stop_rounded,
-                    color: BwColors.coral),
-                label: const Text('Interrompi',
-                    style: TextStyle(color: BwColors.coral)),
+                icon: Icon(Icons.stop_rounded,
+                    color: context.read<ThemeProvider>().paletteData.bg),
+                label: Text('Interrompi',
+                    style: TextStyle(color: context.read<ThemeProvider>().paletteData.bg)),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: BwColors.coral),
-                  minimumSize: const Size.fromHeight(52),
+                  side: BorderSide(color: context.read<ThemeProvider>().paletteData.bg),
+                  minimumSize: Size.fromHeight(52),
                 ),
               ),
           ],
@@ -470,3 +474,7 @@ class _BreathingScreenState extends State<BreathingScreen>
     );
   }
 }
+
+
+
+

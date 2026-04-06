@@ -1,531 +1,459 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'dart:async';
 import 'dart:math' as math;
-import '../../providers/app_provider.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/progress_ring.dart';
-import '../stress/breathing_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../widgets/bw_scaffold.dart';
+
+enum _TimerState { idle, running, paused, done }
 
 class FocusScreen extends StatefulWidget {
   const FocusScreen({super.key});
+
   @override
   State<FocusScreen> createState() => _FocusScreenState();
 }
 
 class _FocusScreenState extends State<FocusScreen>
-    with TickerProviderStateMixin {
-  int _selectedMinutes = 25;
-  int _secondsLeft = 25 * 60;
-  bool _isRunning = false;
+    with SingleTickerProviderStateMixin {
+  static const _totalSeconds = 25 * 60;
+  int _remaining = _totalSeconds;
+  _TimerState _state = _TimerState.idle;
   Timer? _timer;
-  String _mode = 'Focus'; // Focus | Short Break | Long Break
-
   late AnimationController _pulseCtrl;
-  late AnimationController _rotCtrl;
-  late Animation<double> _pulse;
-
-  final _durations = [15, 25, 45, 90];
-  final _durationLabels = ['Quick', 'Standard', 'Deep', 'Ultra'];
-
-  int _todaySessions = 0;
-  int _todayMinutes = 0;
 
   @override
   void initState() {
     super.initState();
     _pulseCtrl = AnimationController(
-        vsync: this, duration: const Duration(seconds: 2))
-      ..repeat(reverse: true);
-    _rotCtrl = AnimationController(
-        vsync: this, duration: const Duration(seconds: 6))
-      ..repeat();
-    _pulse = Tween<double>(begin: 1.0, end: 1.06)
-        .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     _pulseCtrl.dispose();
-    _rotCtrl.dispose();
     super.dispose();
   }
 
   void _start() {
-    setState(() => _isRunning = true);
+    setState(() => _state = _TimerState.running);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      if (_secondsLeft > 0) {
-        setState(() => _secondsLeft--);
-      } else {
-        _timer?.cancel();
-        setState(() => _isRunning = false);
-        _onComplete();
-      }
+      setState(() {
+        if (_remaining > 0) {
+          _remaining--;
+        } else {
+          _state = _TimerState.done;
+          _timer?.cancel();
+        }
+      });
     });
   }
 
   void _pause() {
     _timer?.cancel();
-    setState(() => _isRunning = false);
+    setState(() => _state = _TimerState.paused);
   }
 
-  void _reset() {
+  void _resume() => _start();
+
+  void _stop() {
     _timer?.cancel();
     setState(() {
-      _isRunning = false;
-      _secondsLeft = _selectedMinutes * 60;
+      _state = _TimerState.idle;
+      _remaining = _totalSeconds;
     });
   }
 
-  void _selectDuration(int m) {
-    if (_isRunning) return;
-    setState(() {
-      _selectedMinutes = m;
-      _secondsLeft = m * 60;
-    });
-  }
-
-  void _selectMode(String m) {
-    if (_isRunning) return;
-    setState(() {
-      _mode = m;
-      _selectedMinutes = m == 'Focus' ? 25 : m == 'Short Break' ? 5 : 15;
-      _secondsLeft = _selectedMinutes * 60;
-    });
-  }
-
-  void _onComplete() {
-    setState(() {
-      _todaySessions++;
-      _todayMinutes += _selectedMinutes;
-    });
-    if (_mode == 'Focus') {
-      context.read<AppProvider>().completeActivity('FOC001');
-    }
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _CompletionDialog(
-        mode: _mode,
-        minutes: _selectedMinutes,
-        onContinue: () {
-          Navigator.pop(context);
-          _reset();
-        },
-      ),
-    );
-  }
-
-  String get _timeStr {
-    final m = _secondsLeft ~/ 60;
-    final s = _secondsLeft % 60;
+  String get _timeLabel {
+    final m = _remaining ~/ 60;
+    final s = _remaining % 60;
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  double get _progress => 1 - (_secondsLeft / (_selectedMinutes * 60));
+  double get _progress => 1 - (_remaining / _totalSeconds);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: BwColors.darkPanel,
-      appBar: AppBar(title: const Text('Focus Timer')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
-        child: Column(
-          children: [
-            // Mode selector
-            Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: BwColors.panel,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: BwColors.panelBorder),
-              ),
-              child: Row(
-                children: ['Focus', 'Short Break', 'Long Break']
-                    .map((m) {
-                  final sel = _mode == m;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => _selectMode(m),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          gradient: sel
-                              ? const LinearGradient(
-                                  colors: [BwColors.purple, BwColors.blue])
-                              : null,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(m,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: sel
-                                    ? Colors.white
-                                    : Colors.white.withOpacity(.35))),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 36),
+    return Consumer<ThemeProvider>(
+      builder: (context, theme, _) {
+        final p = theme.paletteData;
+        final isAmb = theme.isAmbient;
 
-            // Duration presets (only in Focus mode)
-            if (_mode == 'Focus')
-              Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: BwColors.panel,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: BwColors.panelBorder),
-                    ),
-                    child: Row(
-                      children: List.generate(
-                        _durations.length,
-                        (i) {
-                          final d = _durations[i];
-                          final sel = d == _selectedMinutes;
-                          return Expanded(
-                            child: GestureDetector(
-                              onTap: () => _selectDuration(d),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: sel
-                                      ? BwColors.teal
-                                      : Colors.transparent,
-                                  borderRadius:
-                                      BorderRadius.circular(10),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text('${d}m',
-                                        style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: sel
-                                                ? Colors.white
-                                                : Colors.white.withOpacity(.3))),
-                                    Text(_durationLabels[i],
-                                        style: TextStyle(
-                                            fontSize: 9,
-                                            color: sel
-                                                ? Colors.white.withOpacity(.7)
-                                                : Colors.white.withOpacity(.2))),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                ],
-              ),
+        return BwScaffold(
+          body: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+              children: [
+                SizedBox(height: isAmb ? 80 : 0),
 
-            // Timer circle
-            AnimatedBuilder(
-              animation: _pulse,
-              builder: (_, child) => Transform.scale(
-                scale: _isRunning ? _pulse.value : 1.0,
-                child: child,
-              ),
-              child: SizedBox(
-                width: 240,
-                height: 240,
-                child: Stack(
-                  alignment: Alignment.center,
+                // ── Header ──────────────────────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Rotating gradient ring (when running)
-                    if (_isRunning)
-                      AnimatedBuilder(
-                        animation: _rotCtrl,
-                        builder: (_, __) => Transform.rotate(
-                          angle: _rotCtrl.value * 2 * math.pi,
-                          child: Container(
-                            width: 244,
-                            height: 244,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: SweepGradient(
-                                colors: [
-                                  BwColors.purple,
-                                  BwColors.teal,
-                                  BwColors.blue,
-                                  Colors.transparent,
-                                  Colors.transparent,
-                                ],
-                                stops: [0, .3, .5, .5, 1],
+                    Text(
+                      isAmb ? 'concentrazione' : 'Focus',
+                      style: TextStyle(
+                        fontSize: isAmb ? 28 : 22,
+                        fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
+                        fontFamily: isAmb ? 'CormorantGaramond' : null,
+                        fontStyle: isAmb ? FontStyle.normal : null,
+                        color: p.text,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: p.primaryLight,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text('Pomodoro',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: p.primaryText)),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 32),
+
+                // ── Ring timer ──────────────────────────────────────────
+                Center(
+                  child: SizedBox(
+                    width: 220,
+                    height: 220,
+                    child: CustomPaint(
+                      painter: _RingPainter(
+                        progress: _progress,
+                        trackColor: p.ringTrack,
+                        progressColor: p.ring,
+                        ambient: isAmb,
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _timeLabel,
+                              style: TextStyle(
+                                fontSize: isAmb ? 52 : 44,
+                                fontWeight: isAmb
+                                    ? FontWeight.w300
+                                    : FontWeight.w600,
+                                fontFamily:
+                                    isAmb ? 'CormorantGaramond' : null,
+                                color: p.text,
                               ),
                             ),
-                          ),
-                        ),
-                      ),
-                    // Glow
-                    if (_isRunning)
-                      Container(
-                        width: 180,
-                        height: 180,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: BwColors.purple.withOpacity(.25),
-                              blurRadius: 50,
-                              spreadRadius: 10,
+                            Text(
+                              'rimanenti',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: p.textSec,
+                                fontFamily:
+                                    isAmb ? 'CormorantGaramond' : null,
+                                fontStyle: isAmb
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
+                                letterSpacing: isAmb ? 1.5 : 0,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    // Progress ring
-                    ProgressRing(progress: _progress, size: 230),
-                    // Time
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_timeStr,
-                            style: const TextStyle(
-                                fontSize: 50,
-                                fontWeight: FontWeight.w200,
-                                color: Colors.white,
-                                letterSpacing: 2)),
-                        Text(
-                          _isRunning ? '$_mode...' : 'Pronto',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: _isRunning
-                                  ? BwColors.teal
-                                  : Colors.white.withOpacity(.3)),
-                        ),
-                      ],
                     ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 36),
-
-            // Controls
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: ElevatedButton.icon(
-                    onPressed: _isRunning ? _pause : _start,
-                    icon: Icon(_isRunning
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded),
-                    label: Text(_isRunning ? 'Pausa' : 'Inizia',
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w700)),
-                    style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(0, 56)),
                   ),
                 ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  height: 56,
-                  width: 56,
-                  child: ElevatedButton(
-                    onPressed: _reset,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: BwColors.panel,
-                      padding: EdgeInsets.zero,
-                      side: const BorderSide(color: BwColors.panelBorder),
-                    ),
-                    child: const Icon(Icons.stop_rounded,
-                        color: Colors.white, size: 22),
+
+                const SizedBox(height: 12),
+
+                // Info sessione
+                Text(
+                  _state == _TimerState.done
+                      ? 'Sessione completata!'
+                      : 'Blocco 1 di 4 · pausa tra ${_remaining ~/ 60} min',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: p.textSec,
+                    fontFamily: isAmb ? 'CormorantGaramond' : null,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 28),
 
-            // Today stats
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: BwColors.panel,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: BwColors.panelBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Oggi',
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(.5),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _stat(_todaySessions.toString(), 'Sessioni', '🎯'),
-                      _divider(),
-                      _stat(_todayMinutes.toString(), 'Minuti', '⏱'),
-                      _divider(),
-                      _stat(
-                          '${_todaySessions * 60}',
-                          'Punti',
-                          '⭐'),
-                    ],
+                const SizedBox(height: 28),
+
+                // ── Bottoni ──────────────────────────────────────────────
+                if (_state == _TimerState.idle) ...[
+                  _BigButton(
+                    label: 'Inizia sessione',
+                    color: p.btn,
+                    textColor: p.btnText,
+                    onTap: _start,
+                    ambient: isAmb,
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Quick breathing CTA
-            GestureDetector(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const BreathingScreen()),
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: BwColors.blueLight,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: BwColors.blue.withOpacity(.3)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: BwColors.blue.withOpacity(.15),
-                        borderRadius: BorderRadius.circular(8),
+                ] else if (_state == _TimerState.running) ...[
+                  Row(children: [
+                    Expanded(
+                      child: _BigButton(
+                        label: 'Pausa',
+                        color: p.bg2,
+                        textColor: p.textSec,
+                        onTap: _pause,
+                        ambient: isAmb,
                       ),
-                      child: const Text('🧘',
-                          style: TextStyle(fontSize: 18)),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Hai bisogno di un respiro?',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13)),
-                          Text('Prova un esercizio di respirazione',
-                              style: TextStyle(
-                                  color: BwColors.textSecondary,
-                                  fontSize: 11)),
-                        ],
+                    Expanded(
+                      child: _BigButton(
+                        label: 'Stop',
+                        color: p.btn,
+                        textColor: p.btnText,
+                        onTap: _stop,
+                        ambient: isAmb,
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios,
-                        color: BwColors.textMuted, size: 14),
-                  ],
-                ),
-              ),
+                  ]),
+                ] else if (_state == _TimerState.paused) ...[
+                  Row(children: [
+                    Expanded(
+                      child: _BigButton(
+                        label: 'Riprendi',
+                        color: p.btn,
+                        textColor: p.btnText,
+                        onTap: _resume,
+                        ambient: isAmb,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _BigButton(
+                        label: 'Stop',
+                        color: p.bg2,
+                        textColor: p.textSec,
+                        onTap: _stop,
+                        ambient: isAmb,
+                      ),
+                    ),
+                  ]),
+                ] else ...[
+                  _BigButton(
+                    label: 'Nuova sessione',
+                    color: p.btn,
+                    textColor: p.btnText,
+                    onTap: _stop,
+                    ambient: isAmb,
+                  ),
+                ],
+
+                const SizedBox(height: 32),
+
+                // ── Stats ────────────────────────────────────────────────
+                if (isAmb) ...[
+                  Divider(color: p.cardBorder, height: 1),
+                  const SizedBox(height: 20),
+                  Text('oggi',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontFamily: 'CormorantGaramond',
+                        fontStyle: FontStyle.italic,
+                        color: p.textSec,
+                        letterSpacing: 2,
+                      )),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _AmbStat(label: 'sessioni', value: '3', p: p),
+                      _AmbStat(label: 'min focus', value: '75', p: p),
+                      _AmbStat(label: 'streak', value: '7', p: p),
+                    ],
+                  ),
+                ] else ...[
+                  Row(children: [
+                    Expanded(child: _StatCard(label: 'Sessioni', value: '3', p: p)),
+                    const SizedBox(width: 10),
+                    Expanded(child: _StatCard(label: 'Min focus', value: '75', p: p)),
+                    const SizedBox(width: 10),
+                    Expanded(child: _StatCard(label: 'Streak', value: '7 gg', p: p)),
+                  ]),
+                ],
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
-
-  Widget _stat(String value, String label, String emoji) {
-    return Column(
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 18)),
-        const SizedBox(height: 6),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: Colors.white)),
-        Text(label,
-            style: TextStyle(
-                fontSize: 10,
-                color: Colors.white.withOpacity(.35))),
-      ],
-    );
-  }
-
-  Widget _divider() => Container(
-      width: 1, height: 40, color: Colors.white.withOpacity(.07));
 }
 
-class _CompletionDialog extends StatelessWidget {
-  final String mode;
-  final int minutes;
-  final VoidCallback onContinue;
-  const _CompletionDialog(
-      {required this.mode,
-      required this.minutes,
-      required this.onContinue});
+class _BigButton extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color textColor;
+  final VoidCallback onTap;
+  final bool ambient;
+
+  const _BigButton({
+    required this.label,
+    required this.color,
+    required this.textColor,
+    required this.onTap,
+    required this.ambient,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isFocus = mode == 'Focus';
-    return Dialog(
-      backgroundColor: BwColors.panel,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(isFocus ? '🎉' : '✅',
-                style: const TextStyle(fontSize: 56)),
-            const SizedBox(height: 12),
-            Text(
-              isFocus ? 'Sessione completata!' : 'Pausa finita!',
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 50,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(ambient ? 25 : 14),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: ambient ? FontWeight.w400 : FontWeight.w600,
+              fontFamily: ambient ? 'CormorantGaramond' : null,
+              color: textColor,
             ),
-            const SizedBox(height: 8),
-            if (isFocus) ...[
-              Text('$minutes minuti di focus',
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(.5),
-                      fontSize: 14)),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 10),
-                decoration: BoxDecoration(
-                  color: BwColors.amberLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text('+60 punti ⭐',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: BwColors.amber)),
-              ),
-            ],
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: onContinue,
-              style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48)),
-              child: const Text('Continua'),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _StatCard extends StatelessWidget {
+  final String label, value;
+  final BwPaletteData p;
+  const _StatCard({required this.label, required this.value, required this.p});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: p.cardBorder, width: 0.5),
+      ),
+      child: Column(
+        children: [
+          Text(value,
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w700, color: p.text)),
+          const SizedBox(height: 3),
+          Text(label,
+              style: TextStyle(fontSize: 10, color: p.textSec)),
+        ],
+      ),
+    );
+  }
+}
+
+class _AmbStat extends StatelessWidget {
+  final String label, value;
+  final BwPaletteData p;
+  const _AmbStat({required this.label, required this.value, required this.p});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(value,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w300,
+                fontFamily: 'CormorantGaramond',
+                color: p.text,
+              )),
+          Text(label,
+              style: TextStyle(fontSize: 10, color: p.textSec)),
+        ],
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  final double progress;
+  final Color trackColor, progressColor;
+  final bool ambient;
+
+  const _RingPainter({
+    required this.progress,
+    required this.trackColor,
+    required this.progressColor,
+    required this.ambient,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 12;
+    final stroke = ambient ? 2.0 : 8.0;
+
+    // Track
+    canvas.drawCircle(
+        center, radius, Paint()
+          ..color = trackColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke);
+
+    // Tick marks (ambient only)
+    if (ambient) {
+      for (int i = 0; i < 12; i++) {
+        final angle = (i / 12) * math.pi * 2 - math.pi / 2;
+        final isMaj = i % 3 == 0;
+        final r1 = radius + 6;
+        final r2 = radius + (isMaj ? 14 : 9);
+        canvas.drawLine(
+          Offset(center.dx + math.cos(angle) * r1,
+              center.dy + math.sin(angle) * r1),
+          Offset(center.dx + math.cos(angle) * r2,
+              center.dy + math.sin(angle) * r2),
+          Paint()
+            ..color = progressColor.withValues(alpha: isMaj ? 0.22 : 0.10)
+            ..strokeWidth = isMaj ? 0.9 : 0.5
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+      // Ripple rings
+      for (final dr in [14.0, 26.0]) {
+        canvas.drawCircle(
+            center, radius + dr, Paint()
+              ..color = progressColor.withValues(alpha: 0.05)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 0.5);
+      }
+    }
+
+    // Progress arc
+    if (progress > 0) {
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2,
+        progress * 2 * math.pi,
+        false,
+        Paint()
+          ..color = progressColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) =>
+      old.progress != progress || old.ambient != ambient;
 }

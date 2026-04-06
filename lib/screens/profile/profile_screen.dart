@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
-import '../../theme/app_theme.dart';
+import '../../providers/auth_provider.dart' as bw;
+import '../../providers/theme_provider.dart';
+import '../../widgets/bw_scaffold.dart';
 import '../settings/settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -10,252 +12,254 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: BwColors.darkPanel,
-      appBar: AppBar(
-        title: const Text('Profilo'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-        ],
-      ),
-      body: Consumer<AppProvider>(builder: (context, p, _) {
-        final user = p.user;
-        if (user == null) return const SizedBox();
+    return Consumer2<AppProvider, ThemeProvider>(
+      builder: (context, app, theme, _) {
+        final p = theme.paletteData;
+        final isAmb = theme.isAmbient;
+        final user = app.user;
+        if (user == null) return BwScaffold(body: const SizedBox());
 
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // ── Avatar + Name ───────────────────────────────────────────
-            Center(
-              child: Column(
-                children: [
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [BwColors.teal, BwColors.blue],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+        return BwScaffold(
+          appBar: AppBar(
+            backgroundColor: p.bg,
+            elevation: 0,
+            title: Text('Profilo',
+                style: TextStyle(
+                    color: p.text,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600)),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.settings_outlined, color: p.text),
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen())),
+              ),
+            ],
+          ),
+          body: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              SizedBox(height: isAmb ? 60 : 0),
+
+              // ── Avatar ─────────────────────────────────────────────────
+              Center(
+                child: Column(
+                  children: [
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        color: p.primaryLight,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: p.primary, width: 1.5),
                       ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: BwColors.teal.withValues(alpha: 0.35),
-                          blurRadius: 24,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        user.initials,
-                        style: const TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+                      child: Center(
+                        child: Text(user.initials,
+                            style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w600,
+                                color: p.primaryText)),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    user.name,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  if (user.email.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Text(user.name,
+                        style: TextStyle(
+                          fontSize: isAmb ? 26 : 20,
+                          fontWeight:
+                              isAmb ? FontWeight.w300 : FontWeight.w700,
+                          fontFamily: isAmb ? 'CormorantGaramond' : null,
+                          color: p.text,
+                        )),
                     const SizedBox(height: 4),
                     Text(
-                      user.email,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withValues(alpha: 0.45),
+                      user.email.isNotEmpty
+                          ? user.email
+                          : FirebaseAuth.instance.currentUser?.email ?? '',
+                      style: TextStyle(fontSize: 13, color: p.textSec),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: p.primaryLight,
+                        borderRadius: BorderRadius.circular(20),
                       ),
+                      child: Text(user.levelName,
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: p.primaryText)),
                     ),
                   ],
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: BwColors.amberLight,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${user.levelEmoji} ${user.levelName}',
-                      style: const TextStyle(
-                        color: BwColors.amber,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              // ── Stats ──────────────────────────────────────────────────
+              Row(children: [
+                _StatBox(label: 'Punti', value: '${user.points}', p: p),
+                const SizedBox(width: 10),
+                _StatBox(
+                    label: 'Streak', value: '${user.streak} gg', p: p),
+                const SizedBox(width: 10),
+                _StatBox(
+                    label: 'Sessioni',
+                    value: '${user.totalSessions}',
+                    p: p),
+              ]),
+
+              const SizedBox(height: 28),
+
+              // ── Account ───────────────────────────────────────────────
+              _SectionLabel(label: 'Account', p: p),
+              const SizedBox(height: 10),
+              _Card(p: p, children: [
+                _Tile(
+                  icon: Icons.person_outline,
+                  label: 'Modifica nome',
+                  p: p,
+                  onTap: () => _showEditName(context, app, p),
+                ),
+                _Tile(
+                  icon: Icons.lock_outline,
+                  label: 'Cambia password',
+                  p: p,
+                  onTap: () => _showChangePassword(context, p),
+                ),
+                _Tile(
+                  icon: Icons.email_outlined,
+                  label: user.email.isNotEmpty ? user.email : 'Email account',
+                  subtitle: 'Email account',
+                  p: p,
+                  onTap: null,
+                ),
+              ]),
+
+              const SizedBox(height: 20),
+
+              // ── Preferenze ────────────────────────────────────────────
+              _SectionLabel(label: 'Preferenze', p: p),
+              const SizedBox(height: 10),
+              _Card(p: p, children: [
+                _Tile(
+                  icon: Icons.palette_outlined,
+                  label: 'Aspetto e tema',
+                  p: p,
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(
+                          builder: (_) => const SettingsScreen())),
+                ),
+                _Tile(
+                  icon: Icons.notifications_outlined,
+                  label: 'Notifiche',
+                  p: p,
+                  onTap: () {},
+                ),
+              ]),
+
+              const SizedBox(height: 28),
+
+              // ── Logout ────────────────────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _confirmLogout(context, p),
+                  icon: const Icon(Icons.logout,
+                      color: Colors.redAccent, size: 18),
+                  label: const Text('Esci dall\'account',
+                      style: TextStyle(color: Colors.redAccent)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                        color: Colors.redAccent.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // ── Stats ───────────────────────────────────────────────────
-            _SectionTitle(label: 'Le tue statistiche'),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                    child: _StatCard(
-                        label: 'Punti', value: '${user.points}', icon: '⭐')),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _StatCard(
-                        label: 'Streak', value: '${user.streak}d', icon: '🔥')),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _StatCard(
-                        label: 'Sessioni',
-                        value: '${user.totalSessions}',
-                        icon: '✅')),
-              ],
-            ),
-
-            const SizedBox(height: 28),
-
-            // ── Account ─────────────────────────────────────────────────
-            _SectionTitle(label: 'Account'),
-            const SizedBox(height: 12),
-            _AccountTile(
-              icon: Icons.person_outline,
-              label: 'Nome',
-              value: user.name,
-              onTap: () => _showEditName(context, user.name),
-            ),
-            _AccountTile(
-              icon: Icons.email_outlined,
-              label: 'Email',
-              value: user.email,
-            ),
-            _AccountTile(
-              icon: Icons.lock_outline,
-              label: 'Cambia password',
-              value: '',
-              onTap: () => _showChangePassword(context, user.email),
-            ),
-
-            const SizedBox(height: 28),
-
-            // ── Logout ──────────────────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton.icon(
-                onPressed: () => _confirmLogout(context),
-                icon: const Icon(Icons.logout, color: Colors.redAccent),
-                label: const Text(
-                  'Esci dall\'account',
-                  style: TextStyle(color: Colors.redAccent),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                      color: Colors.redAccent.withValues(alpha: 0.4)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-            ),
-
-            const SizedBox(height: 40),
-          ],
+            ],
+          ),
         );
-      }),
+      },
     );
   }
 
-  // ── Dialogo cambio password ────────────────────────────────────────────
-  void _showChangePassword(BuildContext context, String email) {
-    showDialog(
-      context: context,
-      builder: (ctx) => _ChangePasswordDialog(email: email),
-    );
-  }
-
-  // ── Dialogo modifica nome ──────────────────────────────────────────────
-  void _showEditName(BuildContext context, String currentName) {
-    final ctrl = TextEditingController(text: currentName);
+  void _showEditName(
+      BuildContext context, AppProvider app, BwPaletteData p) {
+    final ctrl = TextEditingController(text: app.user?.name ?? '');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0F1F33),
-        title: const Text('Modifica nome',
-            style: TextStyle(color: Colors.white)),
+        backgroundColor: p.card,
+        title: Text('Modifica nome',
+            style: TextStyle(color: p.text, fontSize: 16)),
         content: TextField(
           controller: ctrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
+          style: TextStyle(color: p.text),
+          decoration: InputDecoration(
             hintText: 'Il tuo nome',
-            hintStyle: TextStyle(color: Colors.white38),
+            hintStyle: TextStyle(color: p.textMut),
+            enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: p.cardBorder)),
+            focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: p.primary)),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annulla',
-                style: TextStyle(color: Colors.white54)),
-          ),
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Annulla',
+                  style: TextStyle(color: p.textSec))),
           TextButton(
             onPressed: () async {
-              final newName = ctrl.text.trim();
-              if (newName.isNotEmpty) {
-                await ctx.read<AppProvider>().updateDisplayName(newName);
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Nome aggiornato')),
-                  );
-                }
-              }
+              final name = ctrl.text.trim();
+              if (name.isNotEmpty) await app.updateDisplayName(name);
+              if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Salva',
-                style: TextStyle(color: BwColors.teal)),
+            child: Text('Salva',
+                style: TextStyle(color: p.primary)),
           ),
         ],
       ),
     );
   }
 
-  // ── Conferma logout ────────────────────────────────────────────────────
-  void _confirmLogout(BuildContext context) {
+  void _showChangePassword(BuildContext context, BwPaletteData p) {
+    final user = FirebaseAuth.instance.currentUser;
+    final isPassword =
+        user?.providerData.any((d) => d.providerId == 'password') ?? false;
+    if (!isPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Accedi con Google — password gestita da Google')));
+      return;
+    }
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0F1F33),
-        title: const Text('Esci dall\'account',
-            style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'Sei sicuro di voler uscire?',
-          style: TextStyle(color: Colors.white60),
-        ),
+      builder: (_) => _ChangePasswordDialog(p: p),
+    );
+  }
+
+  void _confirmLogout(BuildContext context, BwPaletteData p) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: p.card,
+        title: Text('Esci dall\'account',
+            style: TextStyle(color: p.text)),
+        content: Text('Sei sicuro?',
+            style: TextStyle(color: p.textSec)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annulla',
-                style: TextStyle(color: Colors.white54)),
-          ),
+              onPressed: () => Navigator.pop(context),
+              child:
+                  Text('Annulla', style: TextStyle(color: p.textSec))),
           TextButton(
             onPressed: () async {
-              Navigator.pop(ctx);
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.of(context)
-                    .pushNamedAndRemoveUntil('/login', (_) => false);
-              }
+              Navigator.pop(context);
+              await context.read<AppProvider>().resetOnLogout();
+              await context.read<bw.AuthProvider>().logout();
             },
             child: const Text('Esci',
                 style: TextStyle(color: Colors.redAccent)),
@@ -266,170 +270,32 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// ── Dialogo cambio password ────────────────────────────────────────────────
-class _ChangePasswordDialog extends StatefulWidget {
-  final String email;
-  const _ChangePasswordDialog({required this.email});
-
-  @override
-  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
-}
-
-class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
-  bool _sent = false;
-  bool _loading = false;
-
-  Future<void> _send() async {
-    setState(() => _loading = true);
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: widget.email);
-      setState(() {
-        _sent = true;
-        _loading = false;
-      });
-    } catch (_) {
-      setState(() => _loading = false);
-    }
-  }
+class _StatBox extends StatelessWidget {
+  final String label, value;
+  final BwPaletteData p;
+  const _StatBox(
+      {required this.label, required this.value, required this.p});
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: const Color(0xFF0F1F33),
-      title: const Text('Cambia password',
-          style: TextStyle(color: Colors.white)),
-      content: Text(
-        _sent
-            ? '✅ Email inviata a ${widget.email}\n\nControlla la tua casella e segui le istruzioni.'
-            : 'Ti invieremo un link per reimpostare la password all\'indirizzo:\n\n${widget.email}',
-        style: const TextStyle(color: Colors.white70, height: 1.5),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(
-            _sent ? 'Chiudi' : 'Annulla',
-            style: const TextStyle(color: Colors.white54),
-          ),
-        ),
-        if (!_sent)
-          TextButton(
-            onPressed: _loading ? null : _send,
-            child: _loading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: BwColors.teal))
-                : const Text('Invia email',
-                    style: TextStyle(color: BwColors.teal)),
-          ),
-      ],
-    );
-  }
-}
-
-// ── Widgets locali ─────────────────────────────────────────────────────────
-
-class _SectionTitle extends StatelessWidget {
-  final String label;
-  const _SectionTitle({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.4),
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.8,
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final String icon;
-  const _StatCard(
-      {required this.label, required this.value, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: BwColors.panelBorder),
-      ),
-      child: Column(
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 22)),
-          const SizedBox(height: 6),
-          Text(value,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18)),
-          const SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
-        ],
-      ),
-    );
-  }
-}
-
-class _AccountTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final VoidCallback? onTap;
-  const _AccountTile(
-      {required this.icon,
-      required this.label,
-      required this.value,
-      this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
+    return Expanded(
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
+          color: p.card,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: BwColors.panelBorder),
+          border: Border.all(color: p.cardBorder, width: 0.5),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Icon(icon,
-                color: Colors.white.withValues(alpha: 0.4), size: 20),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          fontSize: 11)),
-                  if (value.isNotEmpty)
-                    Text(value,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 15)),
-                ],
-              ),
-            ),
-            if (onTap != null)
-              Icon(Icons.chevron_right,
-                  color: Colors.white.withValues(alpha: 0.25), size: 20),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: p.text)),
+            const SizedBox(height: 3),
+            Text(label,
+                style: TextStyle(fontSize: 10, color: p.textSec)),
           ],
         ),
       ),
@@ -437,7 +303,221 @@ class _AccountTile extends StatelessWidget {
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final BwPaletteData p;
+  const _SectionLabel({required this.label, required this.p});
 
+  @override
+  Widget build(BuildContext context) {
+    return Text(label.toUpperCase(),
+        style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+            color: p.textSec));
+  }
+}
 
+class _Card extends StatelessWidget {
+  final List<Widget> children;
+  final BwPaletteData p;
+  const _Card({required this.children, required this.p});
 
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: p.cardBorder, width: 0.5),
+      ),
+      child: Column(
+        children: children.asMap().entries.map((e) {
+          return Column(children: [
+            e.value,
+            if (e.key < children.length - 1)
+              Divider(height: 0.5, thickness: 0.5, color: p.cardBorder,
+                  indent: 52),
+          ]);
+        }).toList(),
+      ),
+    );
+  }
+}
 
+class _Tile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final BwPaletteData p;
+  final VoidCallback? onTap;
+  const _Tile(
+      {required this.icon,
+      required this.label,
+      this.subtitle,
+      required this.p,
+      this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+            color: p.primaryLight,
+            borderRadius: BorderRadius.circular(8)),
+        child: Icon(icon, color: p.primary, size: 17),
+      ),
+      title: Text(label,
+          style: TextStyle(
+              color: p.text, fontSize: 14, fontWeight: FontWeight.w500)),
+      subtitle: subtitle != null
+          ? Text(subtitle!,
+              style: TextStyle(color: p.textSec, fontSize: 11))
+          : null,
+      trailing: onTap != null
+          ? Icon(Icons.chevron_right, color: p.textMut, size: 18)
+          : null,
+      onTap: onTap,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+    );
+  }
+}
+
+class _ChangePasswordDialog extends StatefulWidget {
+  final BwPaletteData p;
+  const _ChangePasswordDialog({required this.p});
+
+  @override
+  State<_ChangePasswordDialog> createState() =>
+      _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _cur = TextEditingController();
+  final _new = TextEditingController();
+  final _conf = TextEditingController();
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _cur.dispose();
+    _new.dispose();
+    _conf.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_new.text != _conf.text) {
+      setState(() => _error = 'Le password non coincidono');
+      return;
+    }
+    if (_new.text.length < 8) {
+      setState(() => _error = 'Minimo 8 caratteri');
+      return;
+    }
+    setState(() { _loading = true; _error = null; });
+    try {
+      final user = FirebaseAuth.instance.currentUser!;
+      final cred = EmailAuthProvider.credential(
+          email: user.email!, password: _cur.text);
+      await user.reauthenticateWithCredential(cred);
+      await user.updatePassword(_new.text);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password aggiornata')));
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _error = e.code == 'wrong-password'
+            ? 'Password attuale errata'
+            : 'Errore: ${e.message}';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.p;
+    return AlertDialog(
+      backgroundColor: p.card,
+      title: Text('Cambia password',
+          style: TextStyle(color: p.text, fontSize: 16)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _PwdField(ctrl: _cur, label: 'Password attuale', p: p),
+          const SizedBox(height: 10),
+          _PwdField(ctrl: _new, label: 'Nuova password', p: p),
+          const SizedBox(height: 10),
+          _PwdField(ctrl: _conf, label: 'Conferma', p: p),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!,
+                style: const TextStyle(
+                    color: Colors.redAccent, fontSize: 12)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: _loading ? null : () => Navigator.pop(context),
+            child: Text('Annulla',
+                style: TextStyle(color: p.textSec))),
+        TextButton(
+          onPressed: _loading ? null : _submit,
+          child: _loading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : Text('Salva', style: TextStyle(color: p.primary)),
+        ),
+      ],
+    );
+  }
+}
+
+class _PwdField extends StatefulWidget {
+  final TextEditingController ctrl;
+  final String label;
+  final BwPaletteData p;
+  const _PwdField(
+      {required this.ctrl, required this.label, required this.p});
+
+  @override
+  State<_PwdField> createState() => _PwdFieldState();
+}
+
+class _PwdFieldState extends State<_PwdField> {
+  bool _obs = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: widget.ctrl,
+      obscureText: _obs,
+      style: TextStyle(color: widget.p.text, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: widget.label,
+        labelStyle: TextStyle(color: widget.p.textSec, fontSize: 13),
+        enabledBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: widget.p.cardBorder)),
+        focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: widget.p.primary)),
+        suffixIcon: IconButton(
+          icon: Icon(_obs ? Icons.visibility_outlined
+              : Icons.visibility_off_outlined,
+              color: widget.p.textMut, size: 18),
+          onPressed: () => setState(() => _obs = !_obs),
+        ),
+      ),
+    );
+  }
+}

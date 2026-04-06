@@ -2,331 +2,299 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../theme/app_theme.dart';
+import 'theme_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // FIX 4: legge da SettingsProvider invece di setState locale
-    return Consumer<SettingsProvider>(
-      builder: (context, settings, _) {
+    return Consumer2<SettingsProvider, ThemeProvider>(
+      builder: (context, settings, theme, _) {
+        final p = theme.paletteData;
         return Scaffold(
-          backgroundColor: BwColors.darkPanel,
-          appBar: AppBar(title: const Text('Impostazioni')),
+          backgroundColor: p.bg,
+          appBar: AppBar(
+            backgroundColor: p.bg,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back_ios, color: p.text, size: 18),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text('Impostazioni',
+                style: TextStyle(color: p.text, fontSize: 17, fontWeight: FontWeight.w600)),
+          ),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
             children: [
-              // ── Notifiche ──────────────────────────────────────────────────
-              _sectionHeader('🔔 Notifiche'),
-              _switchTile(
-                context,
-                'Notifiche attive',
-                'Ricevi reminder per le tue attività',
-                settings.notificationsEnabled,
-                (v) => settings.setNotificationsEnabled(v),
-              ),
-              if (settings.notificationsEnabled) ...[
-                _switchTile(
-                  context,
-                  'Reminder urgenti (Hard)',
-                  'Per attività critiche come 20-20-20',
-                  settings.hardRemindersEnabled,
-                  (v) => settings.setHardReminders(v),
+
+              // ── ASPETTO ────────────────────────────────────────────────────
+              _SectionHeader(label: 'Aspetto', p: p),
+              _SettingsCard(p: p, children: [
+                _NavRow(
+                  icon: Icons.palette_outlined,
+                  iconBg: p.primaryLight,
+                  iconColor: p.primary,
+                  label: 'Stile e tonalità',
+                  subtitle: '${theme.style == BwStyle.card ? "Card" : "Ambientale"} · ${theme.paletteData.name}',
+                  p: p,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ThemeScreen()),
+                  ),
                 ),
-                _switchTile(
-                  context,
-                  'Suoni',
-                  'Notifiche con suono',
-                  settings.soundEnabled,
-                  (v) => settings.setSound(v),
+              ]),
+
+              const SizedBox(height: 20),
+
+              // ── ACCESSIBILITÀ ──────────────────────────────────────────────
+              _SectionHeader(label: 'Accessibilità', p: p),
+              _SettingsCard(p: p, children: [
+                _ToggleRow(
+                  icon: Icons.contrast,
+                  iconBg: const Color(0x1A2B5EA7),
+                  iconColor: const Color(0xFF2B5EA7),
+                  label: 'Alto contrasto',
+                  subtitle: 'Aumenta il contrasto dei testi',
+                  value: settings.highContrast,
+                  onChanged: (v) => settings.setHighContrast(v),
+                  p: p,
                 ),
-                _switchTile(
-                  context,
-                  'Vibrazione',
-                  'Vibrazione per le notifiche',
-                  settings.vibrationEnabled,
-                  (v) => settings.setVibration(v),
+                _ToggleRow(
+                  icon: Icons.text_fields,
+                  iconBg: const Color(0x1AC47E3A),
+                  iconColor: const Color(0xFFC47E3A),
+                  label: 'Testo grande',
+                  subtitle: 'Aumenta la dimensione dei caratteri',
+                  value: settings.largeText,
+                  onChanged: (v) => settings.setLargeText(v),
+                  p: p,
                 ),
-                _dropdownTile(
-                  context,
-                  'Frequenza reminder',
-                  'Con quale frequenza ricevere promemoria',
-                  settings.reminderFrequency,
-                  const {
-                    '30min': 'Ogni 30 min',
-                    '60min': 'Ogni ora',
-                    '90min': 'Ogni 90 min',
-                    '120min': 'Ogni 2 ore',
-                  },
-                  (v) => settings.setReminderFrequency(v!),
+              ]),
+
+              const SizedBox(height: 20),
+
+              // ── NOTIFICHE ──────────────────────────────────────────────────
+              _SectionHeader(label: 'Notifiche', p: p),
+              _SettingsCard(p: p, children: [
+                _ToggleRow(
+                  icon: Icons.notifications_outlined,
+                  iconBg: const Color(0x1A1D9E75),
+                  iconColor: const Color(0xFF1D9E75),
+                  label: 'Promemoria attività',
+                  subtitle: 'Notifiche per le attività pianificate',
+                  value: settings.notificationsEnabled,
+                  onChanged: (v) => settings.setNotificationsEnabled(v),
+                  p: p,
                 ),
-              ],
-              const SizedBox(height: 8),
+                _ToggleRow(
+                  icon: Icons.local_drink_outlined,
+                  iconBg: const Color(0x1A2B5EA7),
+                  iconColor: const Color(0xFF2B5EA7),
+                  label: 'Promemoria acqua',
+                  subtitle: 'Ricordami di bere ogni ora',
+                  value: settings.soundEnabled,
+                  onChanged: (v) => settings.setSound(v),
+                  p: p,
+                ),
+              ]),
 
-              // ── Accessibilità ──────────────────────────────────────────────
-              _sectionHeader('♿ Accessibilità'),
+              const SizedBox(height: 20),
 
-              // Preview badge mostra l'effetto PRIMA di toccare il toggle
-              if (settings.largeText || settings.highContrast)
-                _accessibilityPreviewBadge(settings),
-
-              _switchTile(
-                context,
-                'Testo grande',
-                'Aumenta la dimensione del testo del 20%',
-                settings.largeText,
-                (v) => settings.setLargeText(v),
-                // FIX: ora chiama SettingsProvider.setLargeText()
-                // che chiama notifyListeners() → MaterialApp si ricostruisce
-                // → AppTheme.build(largeText: true) viene applicato
-              ),
-              _switchTile(
-                context,
-                'Alto contrasto',
-                'Maggiore contrasto per ipovedenti',
-                settings.highContrast,
-                (v) => settings.setHighContrast(v),
-                // FIX: stessa logica — ricostruisce il tema globalmente
-              ),
-              const SizedBox(height: 8),
-
-              // ── Piano ──────────────────────────────────────────────────────
-              _sectionHeader('📅 Piano'),
-              _navigationTile(
-                context,
-                '⏰',
-                'Orari di lavoro',
-                'Configura inizio e fine giornata lavorativa',
-                () => Navigator.pop(context),
-              ),
-              _navigationTile(
-                context,
-                '🎯',
-                'Obiettivi',
-                'Imposta i tuoi obiettivi di benessere',
-                () {},
-              ),
-              const SizedBox(height: 8),
-
-              // ── Account ────────────────────────────────────────────────────
-              _sectionHeader('👤 Account'),
-              Consumer<AppProvider>(builder: (context, p, _) {
-                return Column(
-                  children: [
-                    _navigationTile(context, '✏️', 'Modifica profilo',
-                        'Nome, email, tipo utente', () {}),
-                    _navigationTile(
-                        context,
-                        '🔄',
-                        'Ripristina progressi',
-                        'Azzera punti e streak',
-                        () => _showResetDialog(context, p)),
-                  ],
-                );
-              }),
-              const SizedBox(height: 8),
-
-              // ── Info ───────────────────────────────────────────────────────
-              _sectionHeader('ℹ️ Info App'),
-              _navigationTile(context, '❓', 'Come funziona',
-                  'Guida all\'app', () {}),
-              _navigationTile(context, '⭐', 'Lascia una recensione',
-                  'Aiutaci a migliorare', () {}),
-              _navigationTile(context, '📧', 'Contatta il supporto',
-                  'Segnala problemi o suggerimenti', () {}),
-              const SizedBox(height: 16),
-              Center(
-                child: Text('Be Well v1.0.0',
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(.2), fontSize: 11)),
-              ),
+              // ── ACCOUNT ────────────────────────────────────────────────────
+              _SectionHeader(label: 'Account', p: p),
+              _SettingsCard(p: p, children: [
+                _NavRow(
+                  icon: Icons.privacy_tip_outlined,
+                  iconBg: const Color(0x1AB87333),
+                  iconColor: const Color(0xFFB87333),
+                  label: 'Privacy e dati',
+                  p: p,
+                  onTap: () {},
+                ),
+                _NavRow(
+                  icon: Icons.help_outline,
+                  iconBg: const Color(0x1A7090AA),
+                  iconColor: const Color(0xFF7090AA),
+                  label: 'Supporto',
+                  p: p,
+                  onTap: () {},
+                ),
+              ]),
             ],
           ),
         );
       },
     );
   }
+}
 
-  // ── Mostra badge se accessibilità attiva ──────────────────────────────────
-  Widget _accessibilityPreviewBadge(SettingsProvider s) {
-    final parts = <String>[];
-    if (s.largeText) parts.add('Testo grande attivo');
-    if (s.highContrast) parts.add('Alto contrasto attivo');
+// ── Componenti UI ─────────────────────────────────────────────────────────────
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: BwColors.tealLight,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: BwColors.teal.withOpacity(.4)),
-      ),
-      child: Row(
-        children: [
-          const Text('✅', style: TextStyle(fontSize: 16)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              parts.join(' · '),
-              style: const TextStyle(
-                  color: BwColors.teal,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+class _SectionHeader extends StatelessWidget {
+  final String label;
+  final BwPaletteData p;
+  const _SectionHeader({required this.label, required this.p});
 
-  Widget _sectionHeader(String title) {
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
-      child: Text(title,
-          style: const TextStyle(
-              color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-    );
-  }
-
-  Widget _switchTile(
-    BuildContext context,
-    String title,
-    String sub,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: BwColors.panel,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: BwColors.panelBorder),
-      ),
-      child: ListTile(
-        title: Text(title,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500)),
-        subtitle: Text(sub,
-            style: TextStyle(
-                color: Colors.white.withOpacity(.3), fontSize: 11)),
-        trailing: Switch(value: value, onChanged: onChanged),
+      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          color: p.textSec,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
+}
 
-  Widget _dropdownTile(
-    BuildContext context,
-    String title,
-    String sub,
-    String value,
-    Map<String, String> options,
-    ValueChanged<String?> onChanged,
-  ) {
+class _SettingsCard extends StatelessWidget {
+  final List<Widget> children;
+  final BwPaletteData p;
+  const _SettingsCard({required this.children, required this.p});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: BwColors.panel,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: BwColors.panelBorder),
+        color: p.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: p.cardBorder, width: 0.5),
       ),
+      child: Column(
+        children: children.map((child) {
+          final index = children.indexOf(child);
+          return Column(
+            children: [
+              child,
+              if (index < children.length - 1)
+                Divider(
+                  height: 0.5,
+                  thickness: 0.5,
+                  color: p.cardBorder,
+                  indent: 52,
+                ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _NavRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final String label;
+  final String? subtitle;
+  final BwPaletteData p;
+  final VoidCallback onTap;
+
+  const _NavRow({
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.label,
+    this.subtitle,
+    required this.p,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: iconColor, size: 17),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500)),
-                  Text(sub,
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(.3),
-                          fontSize: 11)),
+                  Text(label, style: TextStyle(color: p.text, fontSize: 14, fontWeight: FontWeight.w500)),
+                  if (subtitle != null)
+                    Text(subtitle!, style: TextStyle(color: p.textSec, fontSize: 11, height: 1.3)),
                 ],
               ),
             ),
-            DropdownButton<String>(
-              value: value,
-              dropdownColor: BwColors.surface,
-              underline: const SizedBox(),
-              style: const TextStyle(
-                  color: BwColors.teal, fontWeight: FontWeight.w600),
-              items: options.entries
-                  .map((e) => DropdownMenuItem(
-                        value: e.key,
-                        child: Text(e.value),
-                      ))
-                  .toList(),
-              onChanged: onChanged,
-            ),
+            Icon(Icons.chevron_right, color: p.textMut, size: 18),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _navigationTile(BuildContext ctx, String emoji, String title,
-      String sub, VoidCallback onTap) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: BwColors.panel,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: BwColors.panelBorder),
-      ),
-      child: ListTile(
-        leading: Text(emoji, style: const TextStyle(fontSize: 20)),
-        title: Text(title,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500)),
-        subtitle: Text(sub,
-            style: TextStyle(
-                color: Colors.white.withOpacity(.3), fontSize: 11)),
-        trailing: Icon(Icons.chevron_right,
-            color: Colors.white.withOpacity(.2), size: 18),
-        onTap: onTap,
-      ),
-    );
-  }
+class _ToggleRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final BwPaletteData p;
 
-  void _showResetDialog(BuildContext context, AppProvider p) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: BwColors.panel,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Ripristina progressi',
-            style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Azzererai punti, streak e badge. Questa azione non è reversibile.',
-          style: TextStyle(color: Colors.white.withOpacity(.5)),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annulla',
-                  style: TextStyle(color: BwColors.teal))),
-          ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                p.resetAll();
-              },
-              style:
-                  ElevatedButton.styleFrom(backgroundColor: BwColors.coral),
-              child: const Text('Ripristina')),
+  const _ToggleRow({
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+    required this.p,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: iconColor, size: 17),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(color: p.text, fontSize: 14, fontWeight: FontWeight.w500)),
+                Text(subtitle, style: TextStyle(color: p.textSec, fontSize: 11, height: 1.3)),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: p.primary,
+            activeTrackColor: p.primaryLight,
+          ),
         ],
       ),
     );
   }
 }
+
+

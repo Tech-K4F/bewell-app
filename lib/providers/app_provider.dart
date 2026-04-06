@@ -455,6 +455,14 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> resetOnLogout() async {
+    _user = null;
+    _completedToday.clear();
+    final p = await SharedPreferences.getInstance();
+    await p.remove('user_profile');
+    notifyListeners();
+  }
+
   Future<void> onLoginComplete() async {
     _syncFirebaseUser();
     notifyListeners();
@@ -535,6 +543,8 @@ class AppProvider extends ChangeNotifier {
         ),
       ];
 }
+
+
 
 
 
