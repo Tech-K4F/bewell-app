@@ -1,4 +1,4 @@
-﻿name: bewell
+name: bewell
 description: Be Well - Personal Wellness App
 publish_to: 'none'
 version: 1.0.0+1
@@ -22,6 +22,7 @@ dependencies:
   flutter_local_notifications: ^17.0.0
   timezone: ^0.9.3
   cupertino_icons: ^1.0.6
+  video_player: ^2.9.2
 
 dev_dependencies:
   flutter_test:
@@ -32,6 +33,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/data/
+    - assets/images/habits/
+    - assets/images/companion/
     - assets/images/
   fonts:
     - family: CormorantGaramond
@@ -43,3 +46,5 @@ flutter:
           style: italic
         - asset: assets/fonts/CormorantGaramond-Regular.ttf
           weight: 400
+
+

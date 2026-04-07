@@ -9,6 +9,8 @@ import 'providers/app_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/onboarding_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/progression_provider.dart';
+import 'models/habit_library.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -16,6 +18,7 @@ import 'screens/auth/email_verify_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/home/home_shell.dart';
+import 'screens/growth/growth_screen.dart';
 import 'widgets/bw_scaffold.dart';
 import 'services/notification_service.dart';
 
@@ -43,6 +46,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AppProvider()..init()),
         ChangeNotifierProvider(create: (_) => OnboardingProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()..init()),
+        ChangeNotifierProvider(create: (_) => ProgressionProvider()..init()),
       ],
       child: const BewellApp(),
     ),
@@ -110,6 +114,8 @@ class BewellApp extends StatelessWidget {
         return _slideRoute(const ForgotPasswordScreen());
       case '/onboarding':
         return _fadeRoute(const OnboardingScreen());
+      case '/growth':
+        return _fadeRoute(const GrowthScreen());
       case '/home':
         return _fadeRoute(const HomeShell());
       default:
@@ -141,5 +147,8 @@ class BewellApp extends StatelessWidget {
     );
   }
 }
+
+
+
 
 

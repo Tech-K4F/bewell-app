@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/bw_scaffold.dart';
+import '../../widgets/companion/companion_home_card.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -242,6 +243,9 @@ class _CardHome extends StatelessWidget {
                   )),
                 ],
               )),
+              const SizedBox(height: 10),
+              // Card Companion — percorso crescita
+              const CompanionHomeCard(),
             ],
           ),
         ),
@@ -323,7 +327,6 @@ class _AmbientHome extends StatelessWidget {
             )),
           ),
         )),
-
         const SizedBox(height: 28),
 
         // Bottone
@@ -339,7 +342,6 @@ class _AmbientHome extends StatelessWidget {
                     color: p.btnText))),
           ),
         ),
-
         const SizedBox(height: 28),
         Divider(color: p.text.withValues(alpha: 0.07), height: 1),
         const SizedBox(height: 14),
@@ -379,7 +381,6 @@ class _AmbientHome extends StatelessWidget {
                     borderRadius: BorderRadius.circular(1))),
           ),
         ]),
-
         const SizedBox(height: 28),
         Divider(color: p.text.withValues(alpha: 0.07), height: 1),
         const SizedBox(height: 14),
@@ -413,6 +414,12 @@ class _AmbientHome extends StatelessWidget {
                     color: p.primary, shape: BoxShape.circle)),
           ]),
         )),
+        const SizedBox(height: 20),
+        Divider(color: p.text.withValues(alpha: 0.07), height: 1),
+        const SizedBox(height: 14),
+
+        // Companion card — percorso crescita
+        const CompanionHomeCard(),
       ],
     );
   }
@@ -431,7 +438,6 @@ class _AmbRingPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 8;
 
-    // Cerchi concentrici decorativi
     for (final dr in [22.0, 11.0]) {
       canvas.drawCircle(center, radius + dr,
           Paint()
@@ -439,15 +445,12 @@ class _AmbRingPainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 0.5);
     }
-
-    // Track
     canvas.drawCircle(center, radius,
         Paint()
           ..color = p.ringTrack
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2);
 
-    // Tick marks
     for (int i = 0; i < 12; i++) {
       final angle = (i / 12) * math.pi * 2 - math.pi / 2;
       final isMaj = i % 3 == 0;
@@ -465,7 +468,6 @@ class _AmbRingPainter extends CustomPainter {
       );
     }
 
-    // Progress arc
     if (progress > 0) {
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
@@ -485,7 +487,7 @@ class _AmbRingPainter extends CustomPainter {
   bool shouldRepaint(_AmbRingPainter old) => old.progress != progress;
 }
 
-// ── Card wrapper card style ───────────────────────────────────────────────────
+// ── Card wrapper ──────────────────────────────────────────────────────────────
 class _BwCard extends StatelessWidget {
   final Widget child;
   final BwPaletteData p;
