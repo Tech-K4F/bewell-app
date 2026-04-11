@@ -6,6 +6,8 @@ import '../../providers/auth_provider.dart' as bw;
 import '../../providers/theme_provider.dart';
 import '../../widgets/bw_scaffold.dart';
 import '../settings/settings_screen.dart';
+import '../../widgets/locale_selector.dart';
+import '../../l10n/app_localizations.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -17,7 +19,7 @@ class ProfileScreen extends StatelessWidget {
         final p = theme.paletteData;
         final isAmb = theme.isAmbient;
         final user = app.user;
-        if (user == null) return BwScaffold(body: const SizedBox());
+        if (user == null) return const SizedBox();
 
         return BwScaffold(
           appBar: AppBar(
@@ -99,13 +101,13 @@ class ProfileScreen extends StatelessWidget {
 
               // ── Stats ──────────────────────────────────────────────────
               Row(children: [
-                _StatBox(label: 'Punti', value: '${user.points}', p: p),
+                _StatBox(label: context.sL.points, value: '${user.points}', p: p),
                 const SizedBox(width: 10),
                 _StatBox(
-                    label: 'Streak', value: '${user.streak} gg', p: p),
+                    label: context.sL.daysStreak, value: '${user.streak} gg', p: p),
                 const SizedBox(width: 10),
                 _StatBox(
-                    label: 'Sessioni',
+                    label: context.sL.focusSessions,
                     value: '${user.totalSessions}',
                     p: p),
               ]),
@@ -118,13 +120,13 @@ class ProfileScreen extends StatelessWidget {
               _Card(p: p, children: [
                 _Tile(
                   icon: Icons.person_outline,
-                  label: 'Modifica nome',
+                  label: context.sL.editName,
                   p: p,
                   onTap: () => _showEditName(context, app, p),
                 ),
                 _Tile(
                   icon: Icons.lock_outline,
-                  label: 'Cambia password',
+                  label: context.sL.changePassword,
                   p: p,
                   onTap: () => _showChangePassword(context, p),
                 ),
@@ -140,23 +142,24 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               // ── Preferenze ────────────────────────────────────────────
-              _SectionLabel(label: 'Preferenze', p: p),
+              _SectionLabel(label: context.sL.settings, p: p),
               const SizedBox(height: 10),
               _Card(p: p, children: [
                 _Tile(
                   icon: Icons.palette_outlined,
-                  label: 'Aspetto e tema',
+                  label: context.sL.appearance,
                   p: p,
                   onTap: () => Navigator.push(context,
                       MaterialPageRoute(
                           builder: (_) => const SettingsScreen())),
                 ),
-                _Tile(
+_Tile(
                   icon: Icons.notifications_outlined,
-                  label: 'Notifiche',
+                  label: context.sL.notifications,
                   p: p,
                   onTap: () {},
                 ),
+                _LocaleTile(p: p),
               ]),
 
               const SizedBox(height: 28),
@@ -210,7 +213,7 @@ class ProfileScreen extends StatelessWidget {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Annulla',
+              child: Text(context.sL.cancel,
                   style: TextStyle(color: p.textSec))),
           TextButton(
             onPressed: () async {
@@ -231,8 +234,7 @@ class ProfileScreen extends StatelessWidget {
     final isPassword =
         user?.providerData.any((d) => d.providerId == 'password') ?? false;
     if (!isPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Accedi con Google — password gestita da Google')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.sL.loginWithGoogle)));
       return;
     }
     showDialog(
@@ -248,18 +250,21 @@ class ProfileScreen extends StatelessWidget {
         backgroundColor: p.card,
         title: Text('Esci dall\'account',
             style: TextStyle(color: p.text)),
-        content: Text('Sei sicuro?',
+        content: Text(context.sL.logoutConfirmSub,
             style: TextStyle(color: p.textSec)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
               child:
-                  Text('Annulla', style: TextStyle(color: p.textSec))),
+                  Text(context.sL.cancel, style: TextStyle(color: p.textSec))),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
               await context.read<AppProvider>().resetOnLogout();
               await context.read<bw.AuthProvider>().logout();
+              if (context.mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              }
             },
             child: const Text('Esci',
                 style: TextStyle(color: Colors.redAccent)),
@@ -430,7 +435,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password aggiornata')));
+            SnackBar(content: Text(context.sL.passwordUpdated)));
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -452,11 +457,11 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _PwdField(ctrl: _cur, label: 'Password attuale', p: p),
+          _PwdField(ctrl: _cur, label: context.sL.currentPassword, p: p),
           const SizedBox(height: 10),
-          _PwdField(ctrl: _new, label: 'Nuova password', p: p),
+          _PwdField(ctrl: _new, label: context.sL.newPassword, p: p),
           const SizedBox(height: 10),
-          _PwdField(ctrl: _conf, label: 'Conferma', p: p),
+          _PwdField(ctrl: _conf, label: context.sL.confirm, p: p),
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!,
@@ -468,7 +473,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       actions: [
         TextButton(
             onPressed: _loading ? null : () => Navigator.pop(context),
-            child: Text('Annulla',
+            child: Text(context.sL.cancel,
                 style: TextStyle(color: p.textSec))),
         TextButton(
           onPressed: _loading ? null : _submit,
@@ -521,3 +526,99 @@ class _PwdFieldState extends State<_PwdField> {
     );
   }
 }
+
+
+
+
+// -- Voce lingua ---------------------------------------------------------------
+// -- Voce lingua ---------------------------------------------------------------
+class _LocaleTile extends StatelessWidget {
+  final BwPaletteData p;
+  const _LocaleTile({required this.p});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<LocaleProvider>(
+      builder: (context, localeProvider, _) {
+        final sorted = [...BwLocale.values]
+          ..sort((a, b) => a.label.compareTo(b.label));
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          leading: Icon(Icons.language_outlined, color: p.textSec, size: 20),
+          title: Text('Lingua / Language',
+              style: TextStyle(fontSize: 14, color: p.text)),
+          trailing: GestureDetector(
+            onTap: () => _showPicker(context, localeProvider, sorted, p),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(localeProvider.locale.flag,
+                    style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 4),
+                Text(localeProvider.locale.label,
+                    style: TextStyle(fontSize: 13, color: p.textSec)),
+                const SizedBox(width: 4),
+                Icon(Icons.expand_more, color: p.textMut, size: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showPicker(BuildContext context, LocaleProvider localeProvider,
+      List<BwLocale> sorted, BwPaletteData p) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: p.card,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 36, height: 4,
+            decoration: BoxDecoration(
+                color: p.cardBorder,
+                borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 16),
+          ...sorted.map((locale) {
+            final isSelected = localeProvider.locale == locale;
+            return ListTile(
+              leading: Text(locale.flag,
+                  style: const TextStyle(fontSize: 22)),
+              title: Text(locale.label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: isSelected ? p.primary : p.text,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                  )),
+              trailing: isSelected
+                  ? Icon(Icons.check_circle_rounded,
+                      color: p.primary, size: 18)
+                  : null,
+              onTap: () {
+                localeProvider.setLocale(locale);
+                Navigator.pop(context);
+              },
+            );
+          }),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
+
+
+
+
+
+
+

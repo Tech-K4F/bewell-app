@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/theme_provider.dart';
-import '../../widgets/bw_scaffold.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/bw_scaffold.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../models/reward_model.dart';
 
@@ -38,15 +35,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
   Widget build(BuildContext context) {
     return BwScaffold(
       appBar: AppBar(
-        title: Text('Marketplace'),
+        title: Text(context.sL.rewards),
         bottom: TabBar(
           controller: _tab,
           indicatorColor: context.read<ThemeProvider>().paletteData.primary,
           labelColor: context.read<ThemeProvider>().paletteData.primary,
           unselectedLabelColor: context.read<ThemeProvider>().paletteData.textSec,
           tabs: [
-            Tab(text: 'Catalogo'),
-            Tab(text: 'I miei premi'),
+            Tab(text: context.sL.rewards),
+            Tab(text: context.sL.rewardsPoints),
           ],
         ),
       ),
@@ -116,7 +113,7 @@ class _CatalogTabState extends State<_CatalogTab> {
           children: [
             CircularProgressIndicator(color: context.read<ThemeProvider>().paletteData.primary),
             SizedBox(height: 16),
-            Text('Caricamento premi...',
+            Text(context.sL.rewardsLockedDesc,
                 style: TextStyle(color: context.read<ThemeProvider>().paletteData.textSec, fontSize: 13)),
           ],
         ),
@@ -131,12 +128,12 @@ class _CatalogTabState extends State<_CatalogTab> {
           children: [
             Text('⚠️', style: TextStyle(fontSize: 40)),
             SizedBox(height: 12),
-            Text('Impossibile caricare il catalogo',
+            Text(context.sL.errorGeneral,
                 style: TextStyle(color: Colors.white.withOpacity(.6), fontSize: 14)),
             SizedBox(height: 8),
             ElevatedButton(
               onPressed: _loadCatalog,
-              child: Text('Riprova'),
+              child: Text(context.sL.confirm),
             ),
           ],
         ),
@@ -203,7 +200,7 @@ class _CatalogTabState extends State<_CatalogTab> {
               onChanged: widget.onSearchChanged,
               style: TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Cerca premi o brand...',
+                hintText: context.sL.rewards,
                 prefixIcon: Icon(Icons.search, color: context.read<ThemeProvider>().paletteData.bg),
                 contentPadding: EdgeInsets.symmetric(vertical: 10),
               ),
@@ -258,7 +255,7 @@ class _CatalogTabState extends State<_CatalogTab> {
                       children: [
                         Text('🔍', style: TextStyle(fontSize: 40)),
                         SizedBox(height: 10),
-                        Text('Nessun premio trovato',
+                        Text(context.sL.rewardsLocked,
                             style: TextStyle(
                                 color: Colors.white.withOpacity(.4),
                                 fontSize: 14)),
@@ -667,7 +664,7 @@ class _RewardDetailSheet extends StatelessWidget {
               final ok = await p.redeemReward(reward);
               if (ok && context.mounted) _showSuccessDialog(context, p);
             },
-            child: Text('Conferma'),
+            child: Text(context.sL.confirm),
           ),
         ],
       ),
@@ -688,7 +685,7 @@ class _RewardDetailSheet extends StatelessWidget {
           children: [
             Text('🎉', style: TextStyle(fontSize: 56)),
             SizedBox(height: 12),
-            Text('Premio riscattato!',
+            Text(context.sL.rewardsPoints,
                 style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
@@ -724,7 +721,7 @@ class _RewardDetailSheet extends StatelessWidget {
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: redeemed.code));
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Codice copiato!'),
+                          content: Text('?'),
                           duration: Duration(seconds: 2)));
                     },
                     child: Row(
@@ -751,7 +748,7 @@ class _RewardDetailSheet extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
             style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(44)),
-            child: Text('Vai ai miei premi'),
+            child: Text(context.sL.rewards),
           ),
         ],
       ),
@@ -776,13 +773,13 @@ class _WalletTab extends StatelessWidget {
             children: [
               Text('🎁', style: TextStyle(fontSize: 56)),
               SizedBox(height: 16),
-              Text('Nessun premio ancora',
+              Text(context.sL.rewardsLocked,
                   style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w600)),
               SizedBox(height: 8),
-              Text('Riscatta i tuoi punti nel Catalogo',
+              Text(context.sL.rewardsLockedDesc,
                   style: TextStyle(
                       color: Colors.white.withOpacity(.4), fontSize: 13)),
             ],
@@ -945,7 +942,7 @@ class _RedeemedCard extends StatelessWidget {
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: reward.code));
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Codice copiato!'),
+                          content: Text('?'),
                           duration: Duration(seconds: 2)));
                     },
                     child: Icon(Icons.copy, size: 16, color: context.read<ThemeProvider>().paletteData.primary),
@@ -975,6 +972,9 @@ class _RedeemedCard extends StatelessWidget {
     );
   }
 }
+
+
+
 
 
 

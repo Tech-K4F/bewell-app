@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/app_provider.dart';
-import '../../models/auth_result.dart';
+import '../../providers/theme_provider.dart';
+import '../../l10n/app_localizations.dart';
 import '../../utils/validators.dart';
+import '../../models/auth_result.dart';
 import '../../widgets/auth/auth_widgets.dart';
+import '../../widgets/bw_scaffold.dart';
+import '../../widgets/locale_selector.dart';
 
-/// S-02 · Login Screen
-/// Per utenti con account esistente.
-/// Stati: default → focused → loading → error (1-4 tentativi) → locked → success
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -21,7 +22,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
-  final _formKey = GlobalKey<FormState>();
 
   String? _emailError;
   String? _passwordError;
@@ -36,11 +36,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   bool get _canSubmit =>
-      _emailCtrl.text.trim().isNotEmpty &&
-      _passwordCtrl.text.isNotEmpty;
+      _emailCtrl.text.trim().isNotEmpty && _passwordCtrl.text.isNotEmpty;
 
   void _validateAndSubmit() {
-    // Valida campi
     final emailErr = BwValidators.email(_emailCtrl.text);
     final passErr = BwValidators.loginPassword(_passwordCtrl.text);
     setState(() {
@@ -48,7 +46,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordError = passErr;
     });
     if (emailErr != null || passErr != null) return;
-
     context.read<AuthProvider>().loginWithEmail(
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
@@ -57,9 +54,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, auth, _) {
-        // Reazione alla navigazione
+    return Consumer2<AuthProvider, ThemeProvider>(
+      builder: (context, auth, theme, _) {
+        final p = theme.paletteData;
+        final isAmb = theme.isAmbient;
+        final s = context.sL;
+
         if (auth.pendingNavigation != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _handleNavigation(context, auth);
@@ -69,67 +69,131 @@ class _LoginScreenState extends State<LoginScreen> {
         final isLoading = auth.state == AuthState.loading;
         final isLocked = auth.state == AuthState.locked;
 
-        return Scaffold(
-          backgroundColor: const Color(0xFF0B1929),
+        return BwScaffold(
           body: SafeArea(
             child: Column(
               children: [
-                // Banner offline
                 if (!auth.isOnline) const OfflineBanner(),
-
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header
-                        _buildHeader(),
-                        const SizedBox(height: 36),
 
-                        // Account bloccato — sostituisce il form
+                        // ── Logo + titolo ─────────────────────────
+                        Row(
+                          children: [
+                            Image.asset(
+                              'assets/images/companion/companion_base.png',
+                              width: 40,
+                              height: 40,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 40, height: 40,
+                                decoration: BoxDecoration(
+                                  color: p.primaryLight,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Text('🌿',
+                                      style: const TextStyle(fontSize: 20)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Be Well',
+                              style: TextStyle(
+                                color: p.text,
+                                fontSize: 22,
+                                fontWeight: isAmb
+                                    ? FontWeight.w300
+                                    : FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        Text(
+                          s.welcomeBack,
+                          style: TextStyle(
+                            color: p.text,
+                            fontSize: isAmb ? 32 : 28,
+                            fontWeight: isAmb
+                                ? FontWeight.w300
+                                : FontWeight.w700,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          s.continueJourney,
+                          style: TextStyle(
+                            color: p.textSec,
+                            fontSize: 15,
+                            fontStyle: isAmb
+                                ? FontStyle.italic
+                                : FontStyle.normal,
+                          ),
+                        ),
+
+                        const SizedBox(height: 32),
+
                         if (isLocked)
                           AccountLockedWidget(
-                            initialSecondsRemaining: auth.lockSecondsRemaining,
+                            initialSecondsRemaining:
+                                auth.lockSecondsRemaining,
                             onUnlock: () => auth.clearError(),
                           )
                         else ...[
-                          // Bottoni SSO
+                          // SSO
                           SsoButtonRow(
                             enabled: !isLoading && auth.isOnline,
                             onGoogle: () => auth.loginWithGoogle(),
                             onApple: () => auth.loginWithApple(),
                           ),
                           const SizedBox(height: 20),
-                          const OrDivider(),
+                          _OrDivider(p: p, label: s.orDivider),
                           const SizedBox(height: 20),
 
-                          // Messaggio errore globale
-                          if (auth.state == AuthState.error && auth.lastError != null)
+                          // Errore
+                          if (auth.state == AuthState.error &&
+                              auth.lastError != null)
                             _ErrorBanner(
                               message: auth.lastError!.userMessage,
                               attemptsRemaining: auth.attemptsRemaining,
                               onDismiss: auth.clearError,
+                              p: p,
+                              attemptsLabel: s.attemptsRemaining,
                             ),
 
-                          // Form email
-                          BwEmailField(
+                          // Email
+                          _ThemedField(
                             controller: _emailCtrl,
+                            label: s.email,
                             errorText: _emailError,
                             enabled: !isLoading,
                             focusNode: _emailFocus,
-                            onEditingComplete: () =>
-                                FocusScope.of(context).requestFocus(_passwordFocus),
+                            keyboardType: TextInputType.emailAddress,
+                            p: p,
+                            onEditingComplete: () => FocusScope.of(context)
+                                .requestFocus(_passwordFocus),
                           ),
                           const SizedBox(height: 14),
 
-                          // Form password
-                          BwPasswordField(
+                          // Password
+                          _ThemedField(
                             controller: _passwordCtrl,
+                            label: s.password,
                             errorText: _passwordError,
                             enabled: !isLoading,
                             focusNode: _passwordFocus,
-                            onEditingComplete: _canSubmit ? _validateAndSubmit : null,
+                            obscureText: true,
+                            p: p,
+                            onEditingComplete:
+                                _canSubmit ? _validateAndSubmit : null,
                           ),
                           const SizedBox(height: 8),
 
@@ -140,13 +204,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: () => Navigator.of(context)
                                   .pushNamed('/forgot-password'),
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 0, vertical: 4),
-                              ),
-                              child: const Text(
-                                'Password dimenticata?',
+                                  padding: EdgeInsets.zero),
+                              child: Text(
+                                s.forgotPassword,
                                 style: TextStyle(
-                                  color: Color(0xFF1E9E87),
+                                  color: p.primary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -156,19 +218,60 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 24),
 
                           // Bottone login
-                          BwAuthButton(
-                            label: 'Accedi',
-                            isLoading: isLoading,
-                            onPressed: (!isLoading && auth.isOnline)
+                          GestureDetector(
+                            onTap: (_canSubmit && !isLoading && auth.isOnline)
                                 ? _validateAndSubmit
                                 : null,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: double.infinity,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: (_canSubmit && !isLoading)
+                                    ? p.btn
+                                    : p.bg2,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Center(
+                                child: isLoading
+                                    ? SizedBox(
+                                        width: 20, height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: p.btnText,
+                                        ),
+                                      )
+                                    : Text(
+                                        s.login,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: (_canSubmit && !isLoading)
+                                              ? p.btnText
+                                              : p.textMut,
+                                        ),
+                                      ),
+                              ),
+                            ),
                           ),
 
-                          // Biometrico (se disponibile)
+                          // Biometrico
                           if (auth.biometricAvailable && !isLoading) ...[
                             const SizedBox(height: 14),
-                            _BiometricButton(
-                              onPressed: () => auth.loginWithBiometric(),
+                            Center(
+                              child: TextButton.icon(
+                                onPressed: () => auth.loginWithBiometric(),
+                                icon: Icon(Icons.fingerprint,
+                                    color: p.primary, size: 22),
+                                label: Text(
+                                  s.loginWithBiometrics,
+                                  style: TextStyle(
+                                    color: p.primary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
 
@@ -182,15 +285,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: RichText(
                                 text: TextSpan(
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.4),
+                                    color: p.textSec,
                                     fontSize: 14,
                                   ),
-                                  children: const [
-                                    TextSpan(text: 'Non hai un account? '),
+                                  children: [
+                                    TextSpan(text: s.noAccount),
                                     TextSpan(
-                                      text: 'Creane uno',
+                                      text: s.createOne,
                                       style: TextStyle(
-                                        color: Color(0xFF1E9E87),
+                                        color: p.primary,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -199,6 +302,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
+
+                          const SizedBox(height: 32),
+
+                          // Selettore lingua
+                          const LocaleSelector(),
                         ],
                       ],
                     ),
@@ -212,70 +320,14 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1E9E87), Color(0xFF3A7BD5)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Center(
-                child: Text('🌿', style: TextStyle(fontSize: 20)),
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Be Well',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 28),
-        const Text(
-          'Bentornato',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Accedi per continuare il tuo percorso',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 15,
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _handleNavigation(BuildContext context, AuthProvider auth) {
+  Future<void> _handleNavigation(BuildContext context, AuthProvider auth) async {
     final nav = auth.pendingNavigation;
     auth.consumeNavigation();
     switch (nav) {
       case AuthNavigation.toHome:
-        context.read<AppProvider>().onLoginComplete();
-        Navigator.of(context).pushReplacementNamed('/home');
+        await context.read<AppProvider>().onLoginComplete();
+        if (context.mounted) Navigator.of(context).pushReplacementNamed('/home');
       case AuthNavigation.toOnboarding:
-        context.read<AppProvider>().onLoginComplete();
         Navigator.of(context).pushReplacementNamed('/onboarding');
       default:
         break;
@@ -283,17 +335,134 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ── Widgets locali ──────────────────────────────────────────────────────────
+// ── Componenti themed ─────────────────────────────────────────────────────────
+
+class _ThemedField extends StatefulWidget {
+  final TextEditingController controller;
+  final String label;
+  final String? errorText;
+  final bool enabled;
+  final FocusNode focusNode;
+  final bool obscureText;
+  final TextInputType keyboardType;
+  final BwPaletteData p;
+  final VoidCallback? onEditingComplete;
+
+  const _ThemedField({
+    required this.controller,
+    required this.label,
+    this.errorText,
+    required this.enabled,
+    required this.focusNode,
+    this.obscureText = false,
+    this.keyboardType = TextInputType.text,
+    required this.p,
+    this.onEditingComplete,
+  });
+
+  @override
+  State<_ThemedField> createState() => _ThemedFieldState();
+}
+
+class _ThemedFieldState extends State<_ThemedField> {
+  bool _obscure = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.p;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: widget.errorText != null
+                  ? Colors.redAccent.withValues(alpha: 0.6)
+                  : p.cardBorder,
+              width: 0.5,
+            ),
+          ),
+          child: TextField(
+            controller: widget.controller,
+            focusNode: widget.focusNode,
+            enabled: widget.enabled,
+            obscureText: widget.obscureText && _obscure,
+            keyboardType: widget.keyboardType,
+            onEditingComplete: widget.onEditingComplete,
+            style: TextStyle(color: p.text, fontSize: 15),
+            decoration: InputDecoration(
+              labelText: widget.label,
+              labelStyle:
+                  TextStyle(color: p.textSec, fontSize: 14),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 16),
+              suffixIcon: widget.obscureText
+                  ? IconButton(
+                      icon: Icon(
+                        _obscure
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: p.textMut,
+                        size: 18,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscure = !_obscure),
+                    )
+                  : null,
+            ),
+          ),
+        ),
+        if (widget.errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              widget.errorText!,
+              style: const TextStyle(
+                  color: Colors.redAccent, fontSize: 11),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  final BwPaletteData p;
+  final String label;
+  const _OrDivider({required this.p, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: p.cardBorder, height: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(label,
+              style: TextStyle(color: p.textMut, fontSize: 12)),
+        ),
+        Expanded(child: Divider(color: p.cardBorder, height: 1)),
+      ],
+    );
+  }
+}
 
 class _ErrorBanner extends StatelessWidget {
   final String message;
   final int attemptsRemaining;
   final VoidCallback onDismiss;
+  final BwPaletteData p;
+  final String attemptsLabel;
 
   const _ErrorBanner({
     required this.message,
     required this.attemptsRemaining,
     required this.onDismiss,
+    required this.p,
+    required this.attemptsLabel,
   });
 
   @override
@@ -302,44 +471,41 @@ class _ErrorBanner extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFE05640).withOpacity(0.12),
+        color: Colors.redAccent.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE05640).withOpacity(0.3)),
+        border: Border.all(
+            color: Colors.redAccent.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFE05640), size: 18),
+          const Icon(Icons.error_outline,
+              color: Colors.redAccent, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  message,
-                  style: const TextStyle(
-                    color: Color(0xFFE05640),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (attemptsRemaining > 0 && attemptsRemaining < 5)
+                Text(message,
+                    style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500)),
+                if (attemptsRemaining > 0 &&
+                    attemptsRemaining < 5)
                   Text(
-                    '$attemptsRemaining tentativi rimanenti prima del blocco',
+                    '$attemptsRemaining $attemptsLabel',
                     style: TextStyle(
-                      color: const Color(0xFFE05640).withOpacity(0.7),
-                      fontSize: 11,
-                    ),
+                        color: Colors.redAccent.withValues(alpha: 0.7),
+                        fontSize: 11),
                   ),
               ],
             ),
           ),
           IconButton(
             onPressed: onDismiss,
-            icon: Icon(
-              Icons.close,
-              size: 16,
-              color: const Color(0xFFE05640).withOpacity(0.6),
-            ),
+            icon: Icon(Icons.close,
+                size: 16,
+                color: Colors.redAccent.withValues(alpha: 0.6)),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
@@ -349,32 +515,7 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-class _BiometricButton extends StatelessWidget {
-  final VoidCallback onPressed;
-  const _BiometricButton({required this.onPressed});
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: TextButton.icon(
-        onPressed: onPressed,
-        icon: const Icon(
-          Icons.fingerprint,
-          color: Color(0xFF1E9E87),
-          size: 22,
-        ),
-        label: const Text(
-          'Accedi con biometria',
-          style: TextStyle(
-            color: Color(0xFF1E9E87),
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 
 

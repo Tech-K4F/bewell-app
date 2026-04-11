@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart' hide Badge;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/habit_library.dart';
+import '../l10n/app_localizations.dart';
 
 // ── Stato di una singola abitudine ───────────────────────────────────────────
 enum HabitStatus {
@@ -97,6 +98,7 @@ class CoachMessage {
 class ProgressionProvider extends ChangeNotifier {
   final Map<String, HabitState> _states = {};
   DateTime? _installDate;
+  int _debugDayOffset = 0;
   CoachMessage? _todayMessage;
   bool _initialized = false;
 
@@ -106,7 +108,7 @@ class ProgressionProvider extends ChangeNotifier {
 
   int get appDayNumber {
     if (_installDate == null) return 0;
-    return DateTime.now().difference(_installDate!).inDays;
+    return DateTime.now().difference(_installDate!).inDays + _debugDayOffset;
   }
 
   HabitState? stateOf(String habitId) => _states[habitId];
@@ -388,6 +390,49 @@ class ProgressionProvider extends ChangeNotifier {
     await prefs.setString('habit_states', jsonEncode(map));
   }
 
+
+  // -- Debug methods --------------------------------------------------------
+  Future<void> debugSimulateDays(int days) async {
+    // Sposta indietro la data di installazione
+    _debugDayOffset += days;
+    final prefs = await SharedPreferences.getInstance();
+    // offset only, no prefs change
+
+    // Aggiunge giorni completati a tutte le abitudini attive
+    for (final state in _states.values) {
+      if (state.status != HabitStatus.locked) {
+        state.daysCompleted += days;
+        state.lastCompletedAt = DateTime.now();
+        _updateHabitStatus(state);
+      }
+    }
+
+    await _saveStates();
+    _evaluateUnlocks();
+    _generateTodayMessage();
+    notifyListeners();
+  }
+
+  Future<void> debugUnlockAll() async {
+    for (final habit in HabitLibrary.all) {
+      if (!_states.containsKey(habit.id)) {
+        _states[habit.id] = HabitState(habitId: habit.id);
+      }
+      _states[habit.id]!.status = HabitStatus.active;
+      _states[habit.id]!.daysCompleted = 5;
+      _states[habit.id]!.activatedAt = DateTime.now();
+    }
+    _debugDayOffset = 30;
+    await _saveStates();
+    _evaluateUnlocks();
+    notifyListeners();
+  }
+  Future<void> forceEvaluate() async {
+    _evaluateUnlocks();
+    await _saveStates();
+    notifyListeners();
+  }
+
   Future<void> resetAll() async {
     _states.clear();
     final prefs = await SharedPreferences.getInstance();
@@ -487,15 +532,76 @@ extension ProgressionProviderUI on ProgressionProvider {
 
     return badges;
   }
+
+  String getLocalizedMessage(BwStrings s) {
+    final activeList = activeHabits;
+    if (activeList.isEmpty) return s.waterZero;
+    HabitDefinition? focusHabit;
+    int minDays = 9999;
+    for (final h in activeList) {
+      final days = daysCompletedFor(h.id);
+      if (days < minDays) {
+        minDays = days;
+        focusHabit = h;
+      }
+    }
+    if (focusHabit != null) {
+      final def = HabitLibrary.findById(focusHabit.id);
+      if (def != null) {
+        if (minDays == 0) {
+        if (def.id == 'water') return s.firstHabitBody2;
+        return def.coachIntro;
+      }
+        if (minDays == 1) return s.coachDay1;
+        if (minDays == 3) return s.coachDay3;
+        if (minDays == 7) return s.coachDay7;
+        if (minDays == 14) return s.coachDay14;
+        // Usa la descrizione localizzata come messaggio giornaliero
+        switch (def.id) {
+          case 'water': return s.habitWaterDesc;
+          case 'focus_25': return s.habitFocus25Desc;
+          case 'eyes_20_20_20': return s.habitEyes2020Desc;
+          case 'neck_stretch': return s.habitNeckDesc;
+          case 'breathing_box': return s.habitBreathingBoxDesc;
+          case 'walk_lunch': return s.habitWalkLunchDesc;
+          case 'desk_exercise': return s.habitDeskExDesc;
+          case 'water_morning': return s.habitWaterMornDesc;
+          case 'posture': return s.habitPostureDesc;
+          case 'sleep_routine': return s.habitSleepDesc;
+          case 'focus_50': return s.habitFocus50Desc;
+          case 'meditation': return s.habitMeditationDesc;
+          default: return def.coachDaily;
+        }
+      }
+    }
+    return s.coachGeneral;
+  }
+
 }
 
 /// Badge earned dal sistema
+
 class BwBadge {
   final String emoji;
   final String name;
   final String description;
   const BwBadge(this.emoji, this.name, this.description);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/bw_scaffold.dart';
@@ -94,7 +95,7 @@ class _FocusScreenState extends State<FocusScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      isAmb ? 'concentrazione' : 'Focus',
+                      isAmb ? context.sL.focusTitle.toLowerCase() : context.sL.focusTitle,
                       style: TextStyle(
                         fontSize: isAmb ? 28 : 22,
                         fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
@@ -110,7 +111,7 @@ class _FocusScreenState extends State<FocusScreen>
                         color: p.primaryLight,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text('Pomodoro',
+                      child: Text(context.sL.focusPomodoro,
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -150,7 +151,7 @@ class _FocusScreenState extends State<FocusScreen>
                               ),
                             ),
                             Text(
-                              'rimanenti',
+                              context.sL.focusRemaining,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: p.textSec,
@@ -174,7 +175,7 @@ class _FocusScreenState extends State<FocusScreen>
                 // Info sessione
                 Text(
                   _state == _TimerState.done
-                      ? 'Sessione completata!'
+                      ? context.sL.focusDone
                       : 'Blocco 1 di 4 · pausa tra ${_remaining ~/ 60} min',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -189,7 +190,7 @@ class _FocusScreenState extends State<FocusScreen>
                 // ── Bottoni ──────────────────────────────────────────────
                 if (_state == _TimerState.idle) ...[
                   _BigButton(
-                    label: 'Inizia sessione',
+                    label: context.sL.focusNewSession,
                     color: p.btn,
                     textColor: p.btnText,
                     onTap: _start,
@@ -199,7 +200,7 @@ class _FocusScreenState extends State<FocusScreen>
                   Row(children: [
                     Expanded(
                       child: _BigButton(
-                        label: 'Pausa',
+                        label: context.sL.focusPause,
                         color: p.bg2,
                         textColor: p.textSec,
                         onTap: _pause,
@@ -209,7 +210,7 @@ class _FocusScreenState extends State<FocusScreen>
                     const SizedBox(width: 12),
                     Expanded(
                       child: _BigButton(
-                        label: 'Stop',
+                        label: context.sL.focusStop,
                         color: p.btn,
                         textColor: p.btnText,
                         onTap: _stop,
@@ -221,7 +222,7 @@ class _FocusScreenState extends State<FocusScreen>
                   Row(children: [
                     Expanded(
                       child: _BigButton(
-                        label: 'Riprendi',
+                        label: context.sL.focusResume,
                         color: p.btn,
                         textColor: p.btnText,
                         onTap: _resume,
@@ -231,7 +232,7 @@ class _FocusScreenState extends State<FocusScreen>
                     const SizedBox(width: 12),
                     Expanded(
                       child: _BigButton(
-                        label: 'Stop',
+                        label: context.sL.focusStop,
                         color: p.bg2,
                         textColor: p.textSec,
                         onTap: _stop,
@@ -241,7 +242,7 @@ class _FocusScreenState extends State<FocusScreen>
                   ]),
                 ] else ...[
                   _BigButton(
-                    label: 'Nuova sessione',
+                    label: context.sL.focusNewSession,
                     color: p.btn,
                     textColor: p.btnText,
                     onTap: _stop,
@@ -266,18 +267,18 @@ class _FocusScreenState extends State<FocusScreen>
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      _AmbStat(label: 'sessioni', value: '3', p: p),
-                      _AmbStat(label: 'min focus', value: '75', p: p),
-                      _AmbStat(label: 'streak', value: '7', p: p),
+                      _AmbStat(label: context.sL.focusSessions, value: '3', p: p),
+                      _AmbStat(label: context.sL.focusMinutes, value: '75', p: p),
+                      _AmbStat(label: context.sL.focusStreak, value: '7', p: p),
                     ],
                   ),
                 ] else ...[
                   Row(children: [
-                    Expanded(child: _StatCard(label: 'Sessioni', value: '3', p: p)),
+                    Expanded(child: _StatCard(label: context.sL.focusSessions, value: '3', p: p)),
                     const SizedBox(width: 10),
-                    Expanded(child: _StatCard(label: 'Min focus', value: '75', p: p)),
+                    Expanded(child: _StatCard(label: context.sL.focusMinutes, value: '75', p: p)),
                     const SizedBox(width: 10),
-                    Expanded(child: _StatCard(label: 'Streak', value: '7 gg', p: p)),
+                    Expanded(child: _StatCard(label: context.sL.focusStreak, value: '7 gg', p: p)),
                   ]),
                 ],
               ],
@@ -457,3 +458,7 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(_RingPainter old) =>
       old.progress != progress || old.ambient != ambient;
 }
+
+
+
+

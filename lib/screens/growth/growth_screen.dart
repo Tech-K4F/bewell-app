@@ -5,6 +5,9 @@ import '../../providers/progression_provider.dart';
 import '../../models/habit_library.dart';
 import '../../widgets/companion/companion_widget.dart';
 import '../../widgets/bw_scaffold.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/app_localizations.dart';
 
 class GrowthScreen extends StatelessWidget {
   const GrowthScreen({super.key});
@@ -15,6 +18,7 @@ class GrowthScreen extends StatelessWidget {
       builder: (context, theme, progression, _) {
         final p = theme.paletteData;
         final isAmb = theme.isAmbient;
+        final s = context.sL;
 
         return BwScaffold(
           appBar: AppBar(
@@ -25,7 +29,7 @@ class GrowthScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(
-              isAmb ? 'il tuo percorso' : 'Il tuo percorso',
+              isAmb ? context.sL.yourJourney : context.sL.yourJourney,
               style: TextStyle(
                 color: p.text,
                 fontSize: isAmb ? 22 : 17,
@@ -53,7 +57,7 @@ class GrowthScreen extends StatelessWidget {
               const SizedBox(height: 24),
 
               // ── Abitudini attive ────────────────────────────────────────
-              _SectionLabel(label: 'Abitudini attive', p: p),
+              _SectionLabel(label: context.sL.activeHabits, p: p),
               const SizedBox(height: 12),
               ...progression.activeHabits.map((h) =>
                 Padding(
@@ -76,7 +80,7 @@ class GrowthScreen extends StatelessWidget {
               const SizedBox(height: 24),
 
               // ── Badge ───────────────────────────────────────────────────
-              _SectionLabel(label: 'Badge', p: p),
+              _SectionLabel(label: context.sL.badges, p: p),
               const SizedBox(height: 12),
               _BadgeGrid(p: p, progression: progression),
             ],
@@ -102,8 +106,9 @@ class _CompanionHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final phase = progression.currentPhase;
+    final s = context.sL;
     final phaseLabel = [
-      'Seme', 'Germoglio', 'Giovane', 'Maturo', 'Fiorente'
+      s.phase1, s.phase2, s.phase3, s.phase4, s.phase5
     ][phase - 1];
     final totalDays = progression.totalDaysCompleted;
 
@@ -345,6 +350,7 @@ class _NextUnlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final next = progression.nextHabitToUnlock;
+    final s = context.sL;
     if (next == null) return const SizedBox();
 
     final daysLeft = progression.daysUntilUnlock(next.id);
@@ -352,7 +358,7 @@ class _NextUnlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel(label: 'In arrivo', p: p),
+        _SectionLabel(label: context.sL.nextUnlock, p: p),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(14),
@@ -417,7 +423,7 @@ class _NextUnlock extends StatelessWidget {
                     Text(
                       daysLeft > 0
                           ? 'Tra $daysLeft giorni'
-                          : 'Quasi pronta...',
+                          : s.almostReady,
                       style: TextStyle(fontSize: 11, color: p.textMut),
                     ),
                   ],
@@ -444,7 +450,7 @@ class _BadgeGrid extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text(
-          'I tuoi badge appariranno qui man mano che progredisci.',
+          context.sL.noBadgesYet,
           style: TextStyle(fontSize: 13, color: p.textMut),
         ),
       );
@@ -526,5 +532,12 @@ class _SectionLabel extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
+
+
 
 

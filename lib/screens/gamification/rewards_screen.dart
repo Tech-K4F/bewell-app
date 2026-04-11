@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/bw_scaffold.dart';
-import 'package:provider/provider.dart';
-import '../../providers/theme_provider.dart';
-import '../../widgets/bw_scaffold.dart';
-import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../models/badge_model.dart' as bw;
 
@@ -35,16 +32,16 @@ class _RewardsScreenState extends State<RewardsScreen>
   Widget build(BuildContext context) {
     return BwScaffold(
       appBar: AppBar(
-        title: Text('Premi & Sfide'),
+        title: Text(context.sL.rewards),
         bottom: TabBar(
           controller: _tabCtrl,
           indicatorColor: const Color(0xFFF5F1EA),
           labelColor: const Color(0xFFF5F1EA),
           unselectedLabelColor: context.read<ThemeProvider>().paletteData.textSec,
           tabs: [
-            Tab(text: 'Badge'),
-            Tab(text: 'Sfide'),
-            Tab(text: 'Classifica'),
+            Tab(text: context.sL.badges),
+            Tab(text: context.sL.navRewards),
+            Tab(text: 'Top'),
           ],
         ),
       ),
@@ -103,7 +100,7 @@ class _BadgesTab extends StatelessWidget {
                           fontSize: 28,
                           fontWeight: FontWeight.w700),
                     ),
-                    Text('badge sbloccati',
+                    Text(context.sL.badges,
                         style: TextStyle(
                             color: Colors.white.withOpacity(.5),
                             fontSize: 13)),
@@ -406,7 +403,7 @@ class _LeaderboardTab extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         fontSize: 16)),
                 SizedBox(height: 8),
-                Text('Questa settimana',
+                Text(context.sL.planToday,
                     style: TextStyle(
                         color: Colors.white.withOpacity(.4), fontSize: 12)),
               ],
@@ -489,6 +486,9 @@ class _LeaderboardTab extends StatelessWidget {
     });
   }
 }
+
+
+
 
 
 

@@ -169,8 +169,8 @@ const Map<BwPalette, BwPaletteData> kPalettes = {
 
 // ── ThemeProvider ────────────────────────────────────────────────────────────
 class ThemeProvider extends ChangeNotifier {
-  BwStyle _style = BwStyle.card;
-  BwPalette _palette = BwPalette.naturaCalma;
+  BwStyle _style = BwStyle.ambient;
+  BwPalette _palette = BwPalette.ambientaleNotte;
 
   BwStyle get style => _style;
   BwPalette get palette => _palette;
@@ -234,4 +234,5 @@ class ThemeProvider extends ChangeNotifier {
     );
   }
 }
+
 

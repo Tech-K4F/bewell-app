@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
 import 'package:bewell/utils/validators.dart';
 
 // ── Palette colori auth ────────────────────────────────────────────────────
@@ -43,7 +45,7 @@ class SsoButtonRow extends StatelessWidget {
         Expanded(
           child: _SsoButton(
             label: 'Apple',
-            icon: const Icon(Icons.apple, color: Colors.white, size: 20),
+            icon: Icon(Icons.apple, color: context.read<ThemeProvider>().paletteData.text, size: 20),
             onTap: enabled ? onApple : null,
           ),
         ),
@@ -61,6 +63,10 @@ class _SsoButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
+    final textColor = p.text;
+    final bgColor = p.card;
+    final borderColor = p.cardBorder;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedOpacity(
@@ -69,9 +75,9 @@ class _SsoButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: bgColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _panelBorder),
+            border: Border.all(color: borderColor),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -80,8 +86,8 @@ class _SsoButton extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 label,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: textColor,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
@@ -110,7 +116,7 @@ class OrDivider extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Text(
             'oppure con email',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12),
+            style: TextStyle(color: Colors.black87.withValues(alpha: 0.3), fontSize: 12),
           ),
         ),
         Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
@@ -643,3 +649,5 @@ class _GooglePainter extends CustomPainter {
   @override
   bool shouldRepaint(_) => false;
 }
+
+

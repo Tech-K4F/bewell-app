@@ -464,6 +464,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> onLoginComplete() async {
+    await init();
     _syncFirebaseUser();
     notifyListeners();
   }
@@ -543,6 +544,7 @@ class AppProvider extends ChangeNotifier {
         ),
       ];
 }
+
 
 
 

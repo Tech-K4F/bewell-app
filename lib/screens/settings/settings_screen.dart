@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../widgets/locale_selector.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -31,7 +33,7 @@ class SettingsScreen extends StatelessWidget {
             children: [
 
               // ── ASPETTO ────────────────────────────────────────────────────
-              _SectionHeader(label: 'Aspetto', p: p),
+              _SectionHeader(label: context.sL.themeTitle, p: p),
               _SettingsCard(p: p, children: [
                 _NavRow(
                   icon: Icons.palette_outlined,
@@ -56,7 +58,7 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.contrast,
                   iconBg: const Color(0x1A2B5EA7),
                   iconColor: const Color(0xFF2B5EA7),
-                  label: 'Alto contrasto',
+                  label: context.sL.highContrast,
                   subtitle: 'Aumenta il contrasto dei testi',
                   value: settings.highContrast,
                   onChanged: (v) => settings.setHighContrast(v),
@@ -66,7 +68,7 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.text_fields,
                   iconBg: const Color(0x1AC47E3A),
                   iconColor: const Color(0xFFC47E3A),
-                  label: 'Testo grande',
+                  label: context.sL.largeText,
                   subtitle: 'Aumenta la dimensione dei caratteri',
                   value: settings.largeText,
                   onChanged: (v) => settings.setLargeText(v),
@@ -77,7 +79,7 @@ class SettingsScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               // ── NOTIFICHE ──────────────────────────────────────────────────
-              _SectionHeader(label: 'Notifiche', p: p),
+              _SectionHeader(label: context.sL.notifications, p: p),
               _SettingsCard(p: p, children: [
                 _ToggleRow(
                   icon: Icons.notifications_outlined,
@@ -93,8 +95,8 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.local_drink_outlined,
                   iconBg: const Color(0x1A2B5EA7),
                   iconColor: const Color(0xFF2B5EA7),
-                  label: 'Promemoria acqua',
-                  subtitle: 'Ricordami di bere ogni ora',
+                  label: context.sL.waterReminder,
+                  subtitle: context.sL.waterReminderDesc,
                   value: settings.soundEnabled,
                   onChanged: (v) => settings.setSound(v),
                   p: p,
@@ -110,7 +112,7 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.privacy_tip_outlined,
                   iconBg: const Color(0x1AB87333),
                   iconColor: const Color(0xFFB87333),
-                  label: 'Privacy e dati',
+                  label: context.sL.privacy,
                   p: p,
                   onTap: () {},
                 ),
@@ -118,7 +120,7 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.help_outline,
                   iconBg: const Color(0x1A7090AA),
                   iconColor: const Color(0xFF7090AA),
-                  label: 'Supporto',
+                  label: context.sL.support,
                   p: p,
                   onTap: () {},
                 ),
@@ -296,5 +298,10 @@ class _ToggleRow extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
 
 

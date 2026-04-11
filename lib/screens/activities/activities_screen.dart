@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/bw_scaffold.dart';
@@ -17,7 +18,7 @@ class ActivitiesScreen extends StatelessWidget {
     return Scaffold(
       // FIX: era BeWellColors.darkPanel → corretto in context.read<ThemeProvider>().paletteData.bg
       backgroundColor: context.read<ThemeProvider>().paletteData.bg,
-      appBar: AppBar(title: Text('Il mio Piano')),
+      appBar: AppBar(title: Text(context.sL.navPlan)),
       body: Consumer<AppProvider>(
         builder: (context, provider, _) {
           final activities = provider.todayPlan;
@@ -38,6 +39,7 @@ class ActivitiesScreen extends StatelessWidget {
     );
   }
 }
+
 
 
 

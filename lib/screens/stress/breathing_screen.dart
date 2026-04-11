@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/bw_scaffold.dart';
@@ -189,7 +190,7 @@ class _BreathingScreenState extends State<BreathingScreen>
               ..pop(),
             style: ElevatedButton.styleFrom(
                 minimumSize: Size.fromHeight(44)),
-            child: Text('Fatto'),
+            child: Text(context.sL.confirm),
           ),
           TextButton(
             onPressed: () {
@@ -208,7 +209,7 @@ class _BreathingScreenState extends State<BreathingScreen>
   Widget build(BuildContext context) {
     return BwScaffold(
       appBar: AppBar(
-        title: Text('Respirazione'),
+        title: Text(context.sL.habitBreathingBoxName),
         leading: const BackButton(),
       ),
       body: SingleChildScrollView(
@@ -474,6 +475,7 @@ class _BreathingScreenState extends State<BreathingScreen>
     );
   }
 }
+
 
 
 

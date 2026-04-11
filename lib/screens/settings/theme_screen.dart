@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 
@@ -33,13 +34,13 @@ class ThemeScreen extends StatelessWidget {
             children: [
 
               // ── Sezione stile ─────────────────────────────────────────────
-              _SectionLabel(label: 'Stile', color: p.textSec),
+              _SectionLabel(label: context.sL.themeTitle, color: p.textSec),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: _StyleCard(
-                      label: 'Card',
+                      label: context.sL.themeCard,
                       description: 'Contenuti in schede,\ntipografia chiara',
                       selected: theme.style == BwStyle.card,
                       palette: theme.palette,
@@ -51,7 +52,7 @@ class ThemeScreen extends StatelessWidget {
                   const SizedBox(width: 14),
                   Expanded(
                     child: _StyleCard(
-                      label: 'Ambientale',
+                      label: context.sL.themeAmbient,
                       description: 'Paesaggio atmosferico,\nfont editoriale',
                       selected: theme.style == BwStyle.ambient,
                       palette: theme.palette,
@@ -519,5 +520,7 @@ class _RingPainter extends CustomPainter {
   @override
   bool shouldRepaint(_RingPainter old) => old.p != p;
 }
+
+
 
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/app_provider.dart';
 import '../../models/auth_result.dart';
 import '../../utils/validators.dart';
 import '../../widgets/auth/auth_widgets.dart';
@@ -271,14 +272,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  void _handleNavigation(BuildContext context, AuthProvider auth) {
+  Future<void> _handleNavigation(BuildContext context, AuthProvider auth) async {
     final nav = auth.pendingNavigation;
     auth.consumeNavigation();
     switch (nav) {
       case AuthNavigation.toOnboarding:
         Navigator.of(context).pushReplacementNamed('/onboarding');
       case AuthNavigation.toHome:
-        Navigator.of(context).pushReplacementNamed('/home');
+        await context.read<AppProvider>().onLoginComplete();
+        if (context.mounted) Navigator.of(context).pushReplacementNamed('/home');
       default:
         break;
     }
@@ -347,4 +349,7 @@ class _TosCheckbox extends StatelessWidget {
     );
   }
 }
+
+
+
 

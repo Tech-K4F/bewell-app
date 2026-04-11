@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/progression_provider.dart';
@@ -135,3 +136,4 @@ class CompanionHomeCard extends StatelessWidget {
         date.day == now.day;
   }
 }
+
