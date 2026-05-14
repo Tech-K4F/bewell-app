@@ -706,7 +706,7 @@ class HabitLibrary {
           'Non pensare — muoviti, poi ricomincia.',
       category: HabitCategory.movement,
       effort: HabitEffort.low,
-      imageAsset: 'assets/images/habits/habit_micro_walk.jpg',
+      imageAsset: 'assets/images/habits/micro_walk.jpg',
       unlock: UnlockCondition(
         requiredHabitId: 'focus_25',
         requiredDaysCompleted: 14,
@@ -739,7 +739,7 @@ class HabitLibrary {
           'Scegli il confine — poi tienilo.',
       category: HabitCategory.sleep,
       effort: HabitEffort.medium,
-      imageAsset: 'assets/images/habits/habit_digital_sunset.jpg',
+      imageAsset: 'assets/images/habits/digital_sunset.jpg',
       unlock: UnlockCondition(
         requiredTotalDays: 42,
         // Stesso threshold di walk_lunch/lunch_no_screen:
