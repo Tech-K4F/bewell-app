@@ -35,6 +35,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _knownPhase = 1;
   bool _knownFocusUnlocked = false;
   int _knownStreak = -1; // -1 = not yet seeded
+  // Evita popup di fase/sblocco al primo caricamento (progression.init() è asincrono
+  // e il seeding iniziale avviene prima che gli stati siano caricati da prefs).
+  bool _progressionSeeded = false;
 
   @override
   void initState() {
@@ -47,15 +50,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         ..addListener(_onProgressionChange);
       _appRef = context.read<AppProvider>()
         ..addListener(_onAppChange);
-      // Seed known IDs to avoid spurious notifications on first load
-      _knownActiveIds =
-          _progressionRef!.activeHabits.map((h) => h.id).toSet();
-      // Seed known phase + focus state so we don't fire on first load
-      _knownPhase = _progressionRef!.currentPhase;
-      _knownFocusUnlocked =
-          _progressionRef!.activeHabits.any((h) => h.id == 'focus_25');
-      // _knownStreak = -1 → primo _checkStreakTutorials lo inizializzerà senza sparare
-      _onProgressionChange();
+      // NON seminare qui: progression.init() è ancora in corso (asincrono) e _states
+      // è vuoto → currentPhase = 1 anche se l'utente è già a fase 3.
+      // Il seeding reale avviene in _onProgressionChange() al primo isInitialized=true.
+      // _knownStreak = -1 → primo _checkStreakTutorials lo inizializzerà senza sparare.
       // Controlla inattività al primo avvio (una tantum — TutorialProvider deduplica)
       _checkInactivityTutorial();
     });
@@ -91,6 +89,18 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   // ── Listener callbacks ────────────────────────────────────────────────────
 
   void _onProgressionChange() {
+    if (!mounted) return;
+    final prog = context.read<ProgressionProvider>();
+    // Prima notifica dopo il completamento di init(): ri-seminare i valori noti
+    // con i dati reali (prima del completamento init, _states è vuoto → fase = 1).
+    // Senza questo, qualunque fase > 1 provocherebbe un popup fasullo all'avvio.
+    if (!_progressionSeeded && prog.isInitialized) {
+      _progressionSeeded = true;
+      _knownPhase = prog.currentPhase;
+      _knownActiveIds = prog.activeHabits.map((h) => h.id).toSet();
+      _knownFocusUnlocked = prog.activeHabits.any((h) => h.id == 'focus_25');
+      return; // Non sparare alcun popup/toast sul primo caricamento
+    }
     _checkPendingChoice();
     _checkNewHabits();
     _checkProgressionTutorials();
@@ -163,13 +173,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       }
     }
 
-    // Settimana perfetta: streak appena diventato ≥ 7
-    // Accodiamo con 800 ms di ritardo perché milestone_7_days va prima
-    if (prev < 7 && curr >= 7) {
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) tutorial.trigger('perfect_week', context);
-      });
-    }
+    // Nota: perfect_week non viene triggerato qui perché coinciderebbe esattamente con
+    // milestone_7_days (stesso evento: streak che raggiunge 7).
+    // perfect_week è riservato a un futuro tracciamento di "7/7 abitudini in una settimana".
 
     _knownStreak = curr;
   }
@@ -279,20 +285,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   static String _habitEmoji(String habitId) {
     const map = {
-      'focus_25': '⏱',
-      'neck_stretch': '🧘',
-      'postura': '🪑',
-      'breathing_box': '🌬',
-      'walk_lunch': '🚶',
-      'desk_exercise': '💪',
-      'water_morn': '🌅',
-      'stretching_active': '🤸',
-      'lunch_park': '🌳',
-      'breathing_478': '🌬',
-      'focus_50': '🎯',
-      'meditation': '🧘',
-      'sleep_routine': '🌙',
-      'nap': '😴',
+      'focus_25':         '⏱',
+      'neck_stretch':     '🧘',
+      'posture':          '🪑',
+      'breathing_box':    '🌬',
+      'walk_lunch':       '🚶',
+      'desk_exercise':    '💪',
+      'water_morning':    '🌅',
+      'stretching_active':'🤸',
+      'lunch_park':       '🌳',
+      'breathing_478':    '🌬',
+      'focus_50':         '🎯',
+      'meditation':       '🧘',
+      'sleep_routine':    '🌙',
+      'nap':              '😴',
+      'snack':            '🍎',
+      'lunch_no_screen':  '📵',
+      'focus_no_phone':   '🔇',
+      'stairs':           '🪜',
+      'wake_consistent':  '⏰',
     };
     return map[habitId] ?? '✨';
   }

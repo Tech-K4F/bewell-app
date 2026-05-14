@@ -185,21 +185,6 @@ class _CompanionHero extends StatelessWidget {
           style: TextStyle(fontSize: 12, color: p.textSec),
         ),
         const SizedBox(height: 12),
-        // Messaggio narrativo di Welly
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            progression.getLocalizedMessage(s),
-            style: TextStyle(
-              fontSize: isAmb ? 15 : 13,
-              fontWeight: isAmb ? FontWeight.w300 : FontWeight.w400,
-              fontStyle: isAmb ? FontStyle.italic : FontStyle.normal,
-              color: p.textSec,
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
       ],
     );
   }

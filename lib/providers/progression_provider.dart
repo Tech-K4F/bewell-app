@@ -130,6 +130,8 @@ class ProgressionProvider extends ChangeNotifier {
     return DateTime.now().difference(_installDate!).inDays + _debugDayOffset;
   }
 
+  bool get isInitialized => _initialized;
+
   HabitState? stateOf(String habitId) => _states[habitId];
 
   HabitStatus statusOf(String habitId) =>
@@ -593,14 +595,13 @@ extension ProgressionProviderUI on ProgressionProvider {
   }
 
   /// Completamenti cumulativi dell'abitudine più praticata.
-  /// Usato per badge e display dei giorni — indipendente dalle fasi.
-  /// Fallback ai giorni di calendario (cappato a 6) se nessun completamento.
+  /// Usato per badge e display dei giorni — basato esclusivamente su completamenti reali.
   int get totalDaysCompleted {
     int maxDays = 0;
     for (final state in _states.values) {
       if (state.daysCompleted > maxDays) maxDays = state.daysCompleted;
     }
-    return maxDays > 0 ? maxDays : appDayNumber.clamp(0, 6);
+    return maxDays;
   }
 
   /// Progresso verso prossima fase (0.0 - 1.0) — basato su abitudini assimilate.
@@ -739,18 +740,17 @@ extension ProgressionProviderUI on ProgressionProvider {
     if (focusHabit != null) {
       final def = HabitLibrary.findById(focusHabit.id);
       if (def != null) {
-        // Giorni milestone: messaggio celebrativo/motivazionale localizzato
+        // Tutti i messaggi usano BwStrings — localizzati nelle 5 lingue.
+        // coachIntro/coachDaily sono solo in italiano e non vanno mai mostrati direttamente.
         if (minDays == 0) {
           if (def.id == 'water') return s.firstHabitBody2;
-          return def.coachIntro; // Primo giorno: usa il messaggio di intro dell'abitudine
+          return s.habitDesc(def.id); // Primo giorno: descrizione abitudine localizzata
         }
         if (minDays == 1)  return s.coachDay1;
         if (minDays == 3)  return s.coachDay3;
         if (minDays == 7)  return s.coachDay7;
         if (minDays == 14) return s.coachDay14;
-        // Default: mostra il coachDaily dell'abitudine — messaggio giornaliero reale,
-        // non la semplice descrizione. Più specifico, più motivante.
-        return def.coachDaily;
+        return s.habitDesc(def.id); // Default: descrizione localizzata
       }
     }
     return s.coachGeneral;

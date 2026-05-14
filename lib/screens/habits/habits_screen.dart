@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -13,8 +14,31 @@ import 'habit_calendar.dart';
 import '../../providers/tutorial_provider.dart';
 import '../../services/analytics_service.dart';
 
-class HabitsScreen extends StatelessWidget {
+class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
+
+  @override
+  State<HabitsScreen> createState() => _HabitsScreenState();
+}
+
+class _HabitsScreenState extends State<HabitsScreen> {
+  // Timer per aggiornare titolo, ordinamento e calendario ogni minuto
+  // sincronizzandosi con l'orologio reale del telefono.
+  Timer? _clockTick;
+
+  @override
+  void initState() {
+    super.initState();
+    _clockTick = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTick?.cancel();
+    super.dispose();
+  }
 
   // ── Titolo dinamico per ora ───────────────────────────────────────────────
   static String _habitsTitle(BwStrings s, int hour) {
@@ -710,9 +734,8 @@ class _HabitCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          // coachDaily: messaggio giornaliero specifico dell'abitudine.
-                          // Più motivante della semplice descrizione — è il "perché farlo oggi".
-                          done ? '✓ ${s.completedToday}' : habit.coachDaily,
+                          // Usa la descrizione localizzata (BwStrings) — coachDaily è in italiano.
+                          done ? '✓ ${s.completedToday}' : s.habitDesc(habit.id),
                           style: TextStyle(fontSize: 11, color: p.textSec),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

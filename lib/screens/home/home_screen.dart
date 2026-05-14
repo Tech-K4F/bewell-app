@@ -30,7 +30,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _wellyName = 'Welly';
   bool _showWorkBanner = false;
   bool _slowdownDismissed = false;
-  bool _neverMissTwiceDismissed = false;
+  // Persistito in prefs come 'never_miss_twice_dismissed_date' (YYYY-M-D)
+  // così sopravvive alle ricreazioni del widget quando si cambia tab.
+  String _neverMissTwiceDismissedDate = '';
   ProgressionProvider? _progressionRef;
   WellyMood _wellyMood = WellyMood.calm;
   Timer? _drinkTimer;
@@ -39,7 +41,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _waterCooldownTimer;
   DateTime? _lastGlassAddedAt; // null se non sono stati aggiunti bicchieri (o dopo undo)
   int? _lastGlassPoints;        // punti dell'ultimo bicchiere (per rimuoverli in undo)
-  static const _cooldownDuration = Duration(minutes: 30);
+  // 2 minuti: abbastanza per evitare tap accidentali rapidi,
+  // non così lungo da bloccare chi vuole davvero aggiungere un bicchiere.
+  static const _cooldownDuration = Duration(minutes: 2);
 
   @override
   void initState() {
@@ -126,6 +130,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ? DateTime.fromMillisecondsSinceEpoch(lastGlassMs)
         : null;
     final lastGlassPts = prefs.getInt('water_last_glass_pts');
+    final neverMissDismissed = prefs.getString('never_miss_twice_dismissed_date') ?? '';
 
     if (mounted) {
       setState(() {
@@ -133,6 +138,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _wellyName = prefs.getString('welly_name') ?? 'Welly';
         _waterTargetN = prefs.getInt('water_target_n') ?? 8;
         _containerMl = prefs.getInt('water_container_ml') ?? 250;
+        _neverMissTwiceDismissedDate = neverMissDismissed;
         _containerType = prefs.getString('water_container_type') ?? 'glass';
         _showWorkBanner = userType == 'worker' && !scheduleConfirmed && appDay >= 2;
         _waterCooldownActive = cooldownActive;
@@ -427,17 +433,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 // ── Banner "never miss twice" (James Clear) ──────────
                 // Mostrato quando ieri E oggi non ci sono completamenti.
                 // Scopo: intervento gentile prima che il secondo skip diventi abitudine.
+                // Dismissione persistita in prefs per sopravvivere ai tab switch.
                 if (user != null &&
                     context.watch<AppProvider>().shouldShowNeverMissTwiceBanner &&
                     _waterCount == 0 &&
-                    !_neverMissTwiceDismissed) ...[
+                    _neverMissTwiceDismissedDate != '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}') ...[
                   _NeverMissTwiceBanner(
                     p: p,
-                    onAddWater: () {
-                      setState(() => _neverMissTwiceDismissed = true);
+                    onAddWater: () async {
+                      final todayStr = '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}';
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString('never_miss_twice_dismissed_date', todayStr);
+                      if (mounted) setState(() => _neverMissTwiceDismissedDate = todayStr);
                       _addWater();
                     },
-                    onDismiss: () => setState(() => _neverMissTwiceDismissed = true),
+                    onDismiss: () async {
+                      final todayStr = '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}';
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString('never_miss_twice_dismissed_date', todayStr);
+                      if (mounted) setState(() => _neverMissTwiceDismissedDate = todayStr);
+                    },
                   ),
                   const SizedBox(height: 16),
                 ],
