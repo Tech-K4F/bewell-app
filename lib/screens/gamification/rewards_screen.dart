@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/tutorial_provider.dart';
 import '../../widgets/bw_scaffold.dart';
 import '../../providers/app_provider.dart';
 import '../../models/badge_model.dart' as bw;
@@ -20,6 +21,11 @@ class _RewardsScreenState extends State<RewardsScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<TutorialProvider>().trigger('rewards_first_visit', context);
+      }
+    });
   }
 
   @override
@@ -30,14 +36,15 @@ class _RewardsScreenState extends State<RewardsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final p = context.watch<ThemeProvider>().paletteData;
     return BwScaffold(
       appBar: AppBar(
         title: Text(context.sL.rewards),
         bottom: TabBar(
           controller: _tabCtrl,
-          indicatorColor: const Color(0xFFF5F1EA),
-          labelColor: const Color(0xFFF5F1EA),
-          unselectedLabelColor: context.read<ThemeProvider>().paletteData.textSec,
+          indicatorColor: p.accent,
+          labelColor: p.accent,
+          unselectedLabelColor: p.textSec,
           tabs: [
             Tab(text: context.sL.badges),
             Tab(text: context.sL.navRewards),
@@ -47,7 +54,7 @@ class _RewardsScreenState extends State<RewardsScreen>
       ),
       body: TabBarView(
         controller: _tabCtrl,
-        children: [
+        children: const [
           _BadgesTab(),
           _ChallengesTab(),
           _LeaderboardTab(),
@@ -57,13 +64,16 @@ class _RewardsScreenState extends State<RewardsScreen>
   }
 }
 
+// ── Badges ────────────────────────────────────────────────────────────────────
+
 class _BadgesTab extends StatelessWidget {
   const _BadgesTab();
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(builder: (context, p, _) {
-      final earned = p.user?.earnedBadgeIds ?? [];
+    final p = context.watch<ThemeProvider>().paletteData;
+    return Consumer<AppProvider>(builder: (_, app, __) {
+      final earned = app.user?.earnedBadgeIds ?? [];
 
       final groups = <String, List<bw.BwBadge>>{};
       for (final b in bw.allBadges) {
@@ -71,45 +81,39 @@ class _BadgesTab extends StatelessWidget {
       }
 
       return ListView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         children: [
-          // Header summary
+          // Header summary card
           Container(
-            padding: EdgeInsets.all(18),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFFF5F1EA).withOpacity(.15),
-                  const Color(0xFFF5F1EA).withOpacity(.05),
-                ],
-              ),
+              color: p.card,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFF5F1EA).withOpacity(.25)),
+              border: Border.all(
+                  color: p.accent.withValues(alpha: 0.3), width: 1),
             ),
             child: Row(
               children: [
-                Text('🏅', style: TextStyle(fontSize: 40)),
-                SizedBox(width: 16),
+                const Text('🏅', style: TextStyle(fontSize: 40)),
+                const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '${earned.length} / ${bw.allBadges.length}',
                       style: TextStyle(
-                          color: Colors.white,
+                          color: p.text,
                           fontSize: 28,
                           fontWeight: FontWeight.w700),
                     ),
                     Text(context.sL.badges,
-                        style: TextStyle(
-                            color: Colors.white.withOpacity(.5),
-                            fontSize: 13)),
+                        style: TextStyle(color: p.textSec, fontSize: 13)),
                   ],
                 ),
               ],
             ),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
 
           ...groups.entries.map((entry) {
             return Column(
@@ -120,10 +124,10 @@ class _BadgesTab extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white.withOpacity(.3),
+                      color: p.textMut,
                       letterSpacing: .5),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 GridView.count(
                   crossAxisCount: 3,
                   shrinkWrap: true,
@@ -134,36 +138,35 @@ class _BadgesTab extends StatelessWidget {
                   children: entry.value.map((badge) {
                     final isEarned = earned.contains(badge.id);
                     return GestureDetector(
-                      onTap: () => _showBadgeDetail(context, badge, isEarned),
+                      onTap: () =>
+                          _showBadgeDetail(context, badge, isEarned, p),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         decoration: BoxDecoration(
                           color: isEarned
-                              ? const Color(0xFFF5F1EA)
-                              : Colors.white.withOpacity(.04),
+                              ? p.accent.withValues(alpha: 0.10)
+                              : p.card,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: isEarned
-                                ? const Color(0xFFF5F1EA).withOpacity(.4)
-                                : Colors.white.withOpacity(.08),
+                                ? p.accent.withValues(alpha: 0.40)
+                                : p.cardBorder,
                           ),
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              badge.emoji,
-                              style: TextStyle(
-                                fontSize: 32,
-                                color: isEarned
-                                    ? null
-                                    : Colors.white.withOpacity(.15),
+                            Opacity(
+                              opacity: isEarned ? 1.0 : 0.25,
+                              child: Text(
+                                badge.emoji,
+                                style: const TextStyle(fontSize: 32),
                               ),
                             ),
-                            SizedBox(height: 6),
+                            const SizedBox(height: 6),
                             Padding(
                               padding:
-                                  EdgeInsets.symmetric(horizontal: 6),
+                                  const EdgeInsets.symmetric(horizontal: 6),
                               child: Text(
                                 badge.name,
                                 textAlign: TextAlign.center,
@@ -172,9 +175,7 @@ class _BadgesTab extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
-                                  color: isEarned
-                                      ? const Color(0xFFF5F1EA)
-                                      : Colors.white.withOpacity(.25),
+                                  color: isEarned ? p.text : p.textMut,
                                 ),
                               ),
                             ),
@@ -184,7 +185,7 @@ class _BadgesTab extends StatelessWidget {
                     );
                   }).toList(),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
               ],
             );
           }),
@@ -193,47 +194,53 @@ class _BadgesTab extends StatelessWidget {
     });
   }
 
-  void _showBadgeDetail(
-      BuildContext context, bw.BwBadge badge, bool isEarned) {
+  static void _showBadgeDetail(
+    BuildContext context,
+    bw.BwBadge badge,
+    bool isEarned,
+    BwPaletteData p,
+  ) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFFF5F1EA),
+        backgroundColor: p.card,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(badge.emoji,
-                style: TextStyle(
-                    fontSize: 56,
-                    color: isEarned ? null : Colors.white.withOpacity(.2))),
-            SizedBox(height: 12),
-            Text(badge.name,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: isEarned
-                        ? const Color(0xFFF5F1EA)
-                        : Colors.white.withOpacity(.5),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16)),
-            SizedBox(height: 8),
-            Text(badge.description,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: Colors.white.withOpacity(.5), fontSize: 13)),
+            Opacity(
+              opacity: isEarned ? 1.0 : 0.3,
+              child: Text(badge.emoji,
+                  style: const TextStyle(fontSize: 56)),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              badge.name,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: isEarned ? p.text : p.textSec,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              badge.description,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: p.textSec, fontSize: 13),
+            ),
             if (!isEarned) ...[
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Container(
                 padding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(.05),
+                    color: p.cardBorder,
                     borderRadius: BorderRadius.circular(8)),
-                child: Text('🔒 Non ancora sbloccato',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(.4))),
+                child: Text(
+                  '🔒 Non ancora sbloccato',
+                  style: TextStyle(fontSize: 12, color: p.textSec),
+                ),
               ),
             ],
           ],
@@ -241,8 +248,7 @@ class _BadgesTab extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Chiudi',
-                style: TextStyle(color: const Color(0xFF4A7C59))),
+            child: Text('Chiudi', style: TextStyle(color: p.accent)),
           ),
         ],
       ),
@@ -250,27 +256,30 @@ class _BadgesTab extends StatelessWidget {
   }
 }
 
+// ── Challenges ────────────────────────────────────────────────────────────────
+
 class _ChallengesTab extends StatelessWidget {
   const _ChallengesTab();
 
-  static final _challenges = [
+  // (emoji, title, description, targetCount, points)
+  static const _challenges = [
     ('🔥', '7 giorni di streak',
-        'Completa almeno un\'attività per 7 giorni consecutivi',
-        7, const Color(0xFFF5F1EA), 100),
+        'Completa almeno un\'attività per 7 giorni consecutivi', 7, 100),
     ('💧', 'Settimana idratata',
-        'Bevi acqua ogni giorno per 7 giorni', 7, const Color(0xFF4A7C59), 70),
+        'Bevi acqua ogni giorno per 7 giorni', 7, 70),
     ('🧘', 'Respira ogni giorno',
-        '5 sessioni di respirazione questa settimana', 5, const Color(0xFFF5F1EA), 75),
+        '5 sessioni di respirazione questa settimana', 5, 75),
     ('⏱', 'Focus Master',
-        '10 sessioni focus questa settimana', 10, const Color(0xFFF5F1EA), 150),
+        '10 sessioni focus questa settimana', 10, 150),
     ('🌿', 'Piano perfetto',
-        'Completa il piano giornaliero 3 volte', 3, const Color(0xFFF5F1EA), 90),
+        'Completa il piano giornaliero 3 volte', 3, 90),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final p = context.watch<ThemeProvider>().paletteData;
     return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 40),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       itemCount: _challenges.length,
       itemBuilder: (_, i) {
         final c = _challenges[i];
@@ -278,12 +287,12 @@ class _ChallengesTab extends StatelessWidget {
         final current = (progress * c.$4).round();
 
         return Container(
-          margin: EdgeInsets.only(bottom: 12),
-          padding: EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF5F1EA),
+            color: p.card,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFF5F1EA)),
+            border: Border.all(color: p.cardBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,48 +300,53 @@ class _ChallengesTab extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: c.$5.withOpacity(.15),
+                      color: p.accent.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(c.$1,
-                        style: TextStyle(fontSize: 22)),
+                        style: const TextStyle(fontSize: 22)),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(c.$2,
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14)),
-                        Text(c.$3,
-                            style: TextStyle(
-                                color: Colors.white.withOpacity(.4),
-                                fontSize: 11),
-                            maxLines: 2),
+                        Text(
+                          c.$2,
+                          style: TextStyle(
+                              color: p.text,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14),
+                        ),
+                        Text(
+                          c.$3,
+                          style: TextStyle(
+                              color: p.textSec, fontSize: 11),
+                          maxLines: 2,
+                        ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(
+                    padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5F1EA),
+                      color: p.accent.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text('+${c.$6} pt',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFFF5F1EA))),
+                    child: Text(
+                      '+${c.$5} pt',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: p.accent),
+                    ),
                   ),
                 ],
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -340,18 +354,20 @@ class _ChallengesTab extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: progress,
-                        backgroundColor: Colors.white.withOpacity(.07),
-                        valueColor: AlwaysStoppedAnimation(c.$5),
+                        backgroundColor: p.cardBorder,
+                        valueColor: AlwaysStoppedAnimation(p.accent),
                         minHeight: 6,
                       ),
                     ),
                   ),
-                  SizedBox(width: 10),
-                  Text('$current/${c.$4}',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: c.$5)),
+                  const SizedBox(width: 10),
+                  Text(
+                    '$current/${c.$4}',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: p.accent),
+                  ),
                 ],
               ),
             ],
@@ -362,122 +378,136 @@ class _ChallengesTab extends StatelessWidget {
   }
 }
 
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+
 class _LeaderboardTab extends StatelessWidget {
   const _LeaderboardTab();
 
   static const _entries = [
-    ('Sara M.', 2840, '🌲', 12),
-    ('Marco R.', 2310, '🌳', 7),
-    ('Tu', 0, '🌿', 0),
-    ('Elena B.', 1180, '🌿', 4),
-    ('Luca P.', 980, '🌿', 3),
-    ('Anna F.', 760, '🌱', 2),
+    ('Sara M.', 2840, '🌲'),
+    ('Marco R.', 2310, '🌳'),
+    ('Tu', 0, '🌿'),
+    ('Elena B.', 1180, '🌿'),
+    ('Luca P.', 980, '🌿'),
+    ('Anna F.', 760, '🌱'),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(builder: (context, p, _) {
-      final userPoints = p.user?.points ?? 0;
-      final userName = p.user?.name ?? 'Tu';
+    final p = context.watch<ThemeProvider>().paletteData;
+    final s = context.sL;
+    return Consumer<AppProvider>(builder: (_, app, __) {
+      final userPoints = app.user?.points ?? 0;
+      final userName = app.user?.name ?? 'Tu';
 
       return ListView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         children: [
+          // Header
           Container(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFFF5F1EA).withOpacity(.1),
-                  const Color(0xFFF5F1EA).withOpacity(.05),
-                ],
-              ),
+              color: p.card,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFF5F1EA).withOpacity(.2)),
+              border: Border.all(color: p.cardBorder),
             ),
             child: Column(
               children: [
-                Text('🏆 Classifica',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16)),
-                SizedBox(height: 8),
-                Text(context.sL.planToday,
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(.4), fontSize: 12)),
+                Text(
+                  '🏆 Classifica',
+                  style: TextStyle(
+                      color: p.text,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  s.planToday,
+                  style: TextStyle(color: p.textSec, fontSize: 12),
+                ),
               ],
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
 
-          ..._entries.asMap().entries.map((entry) {
-            final i = entry.key;
-            final e = entry.value;
+          ..._entries.asMap().entries.map((mapEntry) {
+            final i = mapEntry.key;
+            final e = mapEntry.value;
             final isMe = e.$1 == 'Tu';
             final name = isMe ? userName : e.$1;
             final points = isMe ? userPoints : e.$2;
-            final emoji = isMe ? (p.user?.levelEmoji ?? '🌿') : e.$3;
-            final rankEmoji =
-                i == 0 ? '🥇' : i == 1 ? '🥈' : i == 2 ? '🥉' : '${i + 1}.';
+            final emoji =
+                isMe ? (app.user?.levelEmoji ?? '🌿') : e.$3;
+            final rankEmoji = i == 0
+                ? '🥇'
+                : i == 1
+                    ? '🥈'
+                    : i == 2
+                        ? '🥉'
+                        : '${i + 1}.';
 
             return AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              margin: EdgeInsets.only(bottom: 8),
-              padding: EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isMe ? const Color(0xFF4A7C59).withValues(alpha: 0.15) : const Color(0xFFF5F1EA),
+                color: isMe
+                    ? p.accent.withValues(alpha: 0.10)
+                    : p.card,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: isMe
-                      ? const Color(0xFF4A7C59).withOpacity(.4)
-                      : const Color(0xFFF5F1EA),
+                      ? p.accent.withValues(alpha: 0.40)
+                      : p.cardBorder,
                 ),
               ),
               child: Row(
                 children: [
                   SizedBox(
                     width: 36,
-                    child: Text(rankEmoji,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 18)),
+                    child: Text(
+                      rankEmoji,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 18),
+                    ),
                   ),
-                  SizedBox(width: 10),
-                  Text(emoji, style: TextStyle(fontSize: 20)),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
+                  Text(emoji, style: const TextStyle(fontSize: 20)),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(name,
-                        style: TextStyle(
-                            color: isMe ? const Color(0xFF4A7C59) : Colors.white,
-                            fontWeight: isMe
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            fontSize: 14)),
-                  ),
-                  Text('$points pt',
+                    child: Text(
+                      name,
                       style: TextStyle(
-                          color: isMe
-                              ? const Color(0xFF4A7C59)
-                              : Colors.white.withOpacity(.5),
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13)),
+                          color: isMe ? p.accent : p.text,
+                          fontWeight: isMe
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          fontSize: 14),
+                    ),
+                  ),
+                  Text(
+                    '$points pt',
+                    style: TextStyle(
+                        color: isMe ? p.accent : p.textSec,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13),
+                  ),
                 ],
               ),
             );
           }),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Container(
-            padding: EdgeInsets.all(14),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.03),
+              color: p.card,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFF5F1EA)),
+              border: Border.all(color: p.cardBorder),
             ),
             child: Text(
               '💡 La classifica si aggiorna ogni settimana. Completa le attività per scalare la classifica!',
-              style: TextStyle(
-                  color: Colors.white.withOpacity(.4), fontSize: 12),
+              style: TextStyle(color: p.textSec, fontSize: 12),
               textAlign: TextAlign.center,
             ),
           ),
@@ -486,11 +516,3 @@ class _LeaderboardTab extends StatelessWidget {
     });
   }
 }
-
-
-
-
-
-
-
-

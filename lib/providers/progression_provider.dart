@@ -9,6 +9,8 @@ import 'package:flutter/material.dart' hide Badge;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/habit_library.dart';
 import '../l10n/app_localizations.dart';
+import '../services/notification_service.dart';
+import '../services/analytics_service.dart';
 
 // ── Stato di una singola abitudine ───────────────────────────────────────────
 enum HabitStatus {
@@ -30,6 +32,7 @@ class HabitState {
   DateTime? activatedAt;
   DateTime? lastCompletedAt;
   bool isChoicePending;    // True = in attesa di scelta popup
+  List<String> completionDates; // 'YYYY-MM-DD' — ultimi 70 giorni
 
   HabitState({
     required this.habitId,
@@ -40,7 +43,8 @@ class HabitState {
     this.activatedAt,
     this.lastCompletedAt,
     this.isChoicePending = false,
-  });
+    List<String>? completionDates,
+  }) : completionDates = completionDates ?? [];
 
   Map<String, dynamic> toJson() => {
     'habitId': habitId,
@@ -51,6 +55,7 @@ class HabitState {
     'activatedAt': activatedAt?.toIso8601String(),
     'lastCompletedAt': lastCompletedAt?.toIso8601String(),
     'isChoicePending': isChoicePending,
+    'completionDates': completionDates,
   };
 
   factory HabitState.fromJson(Map<String, dynamic> j) => HabitState(
@@ -65,6 +70,8 @@ class HabitState {
     lastCompletedAt: j['lastCompletedAt'] != null
         ? DateTime.parse(j['lastCompletedAt'] as String) : null,
     isChoicePending: j['isChoicePending'] as bool? ?? false,
+    completionDates: (j['completionDates'] as List<dynamic>?)
+        ?.cast<String>() ?? [],
   );
 
   // Helper per l'icona di stato
@@ -81,30 +88,42 @@ class HabitState {
   }
 }
 
-// ── Coach Message ─────────────────────────────────────────────────────────────
-class CoachMessage {
-  final String text;
-  final String? habitId; // null = messaggio generale
-  final DateTime date;
-
-  const CoachMessage({
-    required this.text,
-    this.habitId,
-    required this.date,
-  });
-}
 
 // ── ProgressionProvider ───────────────────────────────────────────────────────
 class ProgressionProvider extends ChangeNotifier {
   final Map<String, HabitState> _states = {};
   DateTime? _installDate;
+  DateTime? _lastUnlockDate;       // Anti-overload: data dell'ultimo sblocco
+  DateTime? _slowdownActiveUntil;  // Rallentamento attivo fino a questa data
+  DateTime? _lastEvaluateDate;     // Evita valutazioni multiple nello stesso giorno
   int _debugDayOffset = 0;
-  CoachMessage? _todayMessage;
   bool _initialized = false;
 
   // ── Getters ────────────────────────────────────────────────────────────────
 
   bool get initialized => _initialized;
+  DateTime? get installDatePublic => _installDate;
+
+  /// True se almeno un'abitudine attiva ha un tasso di completamento < 60%
+  /// (calcolato sul totale dei giorni dall'attivazione).
+  bool get needsSlowdown {
+    final now = DateTime.now();
+    for (final h in activeHabits) {
+      if (h.id == 'water') continue; // acqua tracciata separatamente
+      final state = _states[h.id];
+      if (state == null || state.activatedAt == null) continue;
+      final daysActive = now.difference(state.activatedAt!).inDays + 1;
+      if (daysActive < 7) continue; // troppo presto per giudicare
+      final rate = state.daysCompleted / daysActive;
+      if (rate < 0.6) return true;
+    }
+    return false;
+  }
+
+  /// True se il rallentamento volontario è ancora attivo.
+  bool get isSlowdownActive =>
+      _slowdownActiveUntil != null &&
+      DateTime.now().isBefore(_slowdownActiveUntil!);
 
   int get appDayNumber {
     if (_installDate == null) return 0;
@@ -118,8 +137,6 @@ class ProgressionProvider extends ChangeNotifier {
 
   int daysCompletedFor(String habitId) =>
       _states[habitId]?.daysCompleted ?? 0;
-
-  CoachMessage? get todayMessage => _todayMessage;
 
   /// Abitudini attualmente attive (in corso)
   List<HabitDefinition> get activeHabits {
@@ -140,22 +157,35 @@ class ProgressionProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Coppia di scelta pendente (per il popup)
+  /// Primi due habit con isChoicePending=true (coppia dinamica, senza coppie fisse)
   (HabitDefinition, HabitDefinition)? get pendingChoicePair {
-    for (final pair in HabitLibrary.choicePairs) {
-      final stateA = _states[pair.$1.id];
-      final stateB = _states[pair.$2.id];
-      if (stateA?.isChoicePending == true || stateB?.isChoicePending == true) {
-        return pair;
-      }
-    }
+    final pending = HabitLibrary.all
+        .where((h) => _states[h.id]?.isChoicePending == true)
+        .take(2)
+        .toList();
+    if (pending.length >= 2) return (pending[0], pending[1]);
     return null;
+  }
+
+  /// Lista di coppie pendenti (prese a due a due nell'ordine di HabitLibrary.all)
+  List<(HabitDefinition, HabitDefinition)> get pendingChoicePairs {
+    final pending = HabitLibrary.all
+        .where((h) => _states[h.id]?.isChoicePending == true)
+        .toList();
+    final result = <(HabitDefinition, HabitDefinition)>[];
+    for (int i = 0; i + 1 < pending.length; i += 2) {
+      result.add((pending[i], pending[i + 1]));
+    }
+    return result;
   }
 
   // ── Init ───────────────────────────────────────────────────────────────────
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Debug day offset (persisted for multi-session testing)
+    _debugDayOffset = prefs.getInt('debug_day_offset') ?? 0;
 
     // Install date
     final installDateStr = prefs.getString('install_date');
@@ -165,6 +195,24 @@ class ProgressionProvider extends ChangeNotifier {
           'install_date', _installDate!.toIso8601String());
     } else {
       _installDate = DateTime.parse(installDateStr);
+    }
+
+    // Last unlock date (anti-overload)
+    final lastUnlockStr = prefs.getString('last_unlock_date');
+    if (lastUnlockStr != null) {
+      _lastUnlockDate = DateTime.tryParse(lastUnlockStr);
+    }
+
+    // Ultima data di valutazione sblocchi (una per giorno)
+    final lastEvalStr = prefs.getString('last_evaluate_date');
+    if (lastEvalStr != null) {
+      _lastEvaluateDate = DateTime.tryParse(lastEvalStr);
+    }
+
+    // Slowdown attivo
+    final slowdownStr = prefs.getString('slowdown_active_until');
+    if (slowdownStr != null) {
+      _slowdownActiveUntil = DateTime.tryParse(slowdownStr);
     }
 
     // Load states
@@ -191,9 +239,6 @@ class ProgressionProvider extends ChangeNotifier {
     // Calcola sblocchi
     _evaluateUnlocks();
 
-    // Genera messaggio coach del giorno
-    _generateTodayMessage();
-
     _initialized = true;
     notifyListeners();
   }
@@ -217,11 +262,32 @@ class ProgressionProvider extends ChangeNotifier {
 
     state.daysCompleted++;
     state.lastCompletedAt = now;
+    AnalyticsService.instance.logHabitCompleted(habitId, state.daysCompleted, currentPhase);
+    // Registra la data per la heatmap (max 70 giorni)
+    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    if (!state.completionDates.contains(dateStr)) {
+      state.completionDates.add(dateStr);
+      if (state.completionDates.length > 70) state.completionDates.removeAt(0);
+    }
     _updateHabitStatus(state);
 
     await _saveStates();
+    // NON chiamiamo _evaluateUnlocks() qui: i nuovi sblocchi vengono
+    // valutati una volta al giorno (all'apertura/ripresa dell'app).
+    notifyListeners();
+  }
+
+  /// Valuta sblocchi solo se oggi non è già stato fatto (chiamare dall'UI
+  /// su resume o apertura app — non su ogni completamento).
+  Future<void> evaluateIfNewDay() async {
+    final today = DateTime.now();
+    if (_lastEvaluateDate != null &&
+        _lastEvaluateDate!.year == today.year &&
+        _lastEvaluateDate!.month == today.month &&
+        _lastEvaluateDate!.day == today.day) return;
+    _lastEvaluateDate = today;
     _evaluateUnlocks();
-    _generateTodayMessage();
+    await _saveStates();
     notifyListeners();
   }
 
@@ -238,22 +304,25 @@ class ProgressionProvider extends ChangeNotifier {
   // ── Accettazione scelta popup ─────────────────────────────────────────────
 
   Future<void> acceptHabit(String habitId) async {
-    if (!_states.containsKey(habitId)) {
-      _states[habitId] = HabitState(habitId: habitId);
-    }
-    final state = _states[habitId]!;
+    final state = _getOrCreate(habitId);
     state.status = HabitStatus.active;
     state.activatedAt = DateTime.now();
+    state.unlockedAt = DateTime.now();
     state.isChoicePending = false;
 
-    // Rifiuta l'alternativa della stessa coppia
-    for (final pair in HabitLibrary.choicePairs) {
-      if (pair.$1.id == habitId) {
-        _states[pair.$2.id]?.isChoicePending = false;
-        _states[pair.$2.id]?.status = HabitStatus.locked;
-      } else if (pair.$2.id == habitId) {
-        _states[pair.$1.id]?.isChoicePending = false;
-        _states[pair.$1.id]?.status = HabitStatus.locked;
+    // Registra la scelta con l'alternativa scartata (prima di rimuoverla)
+    final alternativeId = _states.entries
+        .where((e) => e.key != habitId && e.value.isChoicePending)
+        .map((e) => e.key)
+        .firstOrNull ?? 'none';
+    AnalyticsService.instance.logHabitChoiceMade(habitId, alternativeId);
+
+    // Tutti gli altri habit rimasti "pending" nella stessa sessione tornano a
+    // locked: verranno riproposti al prossimo ciclo di valutazione giornaliera.
+    for (final entry in _states.entries) {
+      if (entry.key != habitId && entry.value.isChoicePending) {
+        entry.value.isChoicePending = false;
+        entry.value.status = HabitStatus.locked;
       }
     }
 
@@ -261,65 +330,122 @@ class ProgressionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> dismissChoice(String habitId) async {
-    // L'utente vuole vedere altre opzioni — rimanda di 2 giorni
-    _states[habitId]?.isChoicePending = false;
+  /// Rimanda la scelta: le habit rimangono "available+pending" e
+  /// verranno riproposte alla prossima sessione.
+  Future<void> dismissChoice() async {
+    // Non facciamo nulla: lo stato isChoicePending persiste, il banner
+    // in home mostrerà di nuovo la card di scelta alla prossima apertura.
+    // Resettiamo _lastEvaluateDate per non bloccare la prossima valutazione.
+    _lastEvaluateDate = null;
     await _saveStates();
     notifyListeners();
   }
 
   // ── Valutazione sblocchi ──────────────────────────────────────────────────
 
-  void _evaluateUnlocks() {
-    bool changed = false;
+  bool _isActiveStatus(HabitStatus s) =>
+      s == HabitStatus.active ||
+      s == HabitStatus.sprouting ||
+      s == HabitStatus.growing ||
+      s == HabitStatus.consolidated ||
+      s == HabitStatus.automatic;
 
-    for (final habit in HabitLibrary.all) {
-      if (habit.isStarter) continue;
-      final currentStatus = statusOf(habit.id);
-      if (currentStatus != HabitStatus.locked) continue;
+  // ── Giorni dall'ultimo sblocco (anti-overload) ───────────────────────────
+  int _daysSinceLastUnlock() {
+    if (_lastUnlockDate == null) return 999;
+    return DateTime.now().difference(_lastUnlockDate!).inDays + _debugDayOffset;
+  }
 
-      final unlock = habit.unlock;
-      bool conditionMet = false;
+  /// Controlla se le condizioni di sblocco di un habit sono soddisfatte.
+  bool _conditionMet(HabitDefinition habit) {
+    final unlock = habit.unlock;
+    final totalDays = appDayNumber;
+    bool conditionMet = false;
 
-      // Controlla prerequisito abitudine
-      if (unlock.requiredHabitId != null) {
-        final prereqDays = daysCompletedFor(unlock.requiredHabitId!);
-        conditionMet = prereqDays >= unlock.requiredDaysCompleted;
-      }
-
-      // Controlla giorno app (in alternativa o in aggiunta)
-      if (unlock.appDayMin != null) {
-        final dayCondition = appDayNumber >= unlock.appDayMin!;
-        conditionMet = unlock.requiredHabitId != null
-            ? conditionMet && dayCondition
-            : dayCondition;
-      }
-
-      if (conditionMet) {
-        // Controlla se fa parte di una coppia di scelta
-        bool isInPair = false;
-        for (final pair in HabitLibrary.choicePairs) {
-          if (pair.$1.id == habit.id || pair.$2.id == habit.id) {
-            isInPair = true;
-            // Segna entrambe come "scelta pendente"
-            _getOrCreate(pair.$1.id).isChoicePending = true;
-            _getOrCreate(pair.$1.id).status = HabitStatus.available;
-            _getOrCreate(pair.$2.id).isChoicePending = true;
-            _getOrCreate(pair.$2.id).status = HabitStatus.available;
-            break;
-          }
-        }
-
-        if (!isInPair) {
-          _getOrCreate(habit.id).status = HabitStatus.available;
-          _getOrCreate(habit.id).unlockedAt = DateTime.now();
-        }
-
-        changed = true;
-      }
+    if (unlock.requiredTotalDays != null) {
+      conditionMet = totalDays >= unlock.requiredTotalDays!;
+      if (!conditionMet) return false;
     }
 
-    if (changed) _saveStates();
+    if (unlock.requiredHabitId != null) {
+      final prereqDays = daysCompletedFor(unlock.requiredHabitId!);
+      final habitCond = prereqDays >= unlock.requiredDaysCompleted;
+      final altCond = unlock.altRequiredHabitId != null
+          ? daysCompletedFor(unlock.altRequiredHabitId!) >= unlock.requiredDaysCompleted
+          : false;
+      final prereqMet = habitCond || altCond;
+      conditionMet = unlock.requiredTotalDays != null
+          ? conditionMet && prereqMet
+          : prereqMet;
+    }
+
+    if (unlock.appDayMin != null) {
+      final dayCondition = appDayNumber >= unlock.appDayMin!;
+      conditionMet = unlock.requiredHabitId != null
+          ? conditionMet && dayCondition
+          : dayCondition;
+    }
+
+    return conditionMet;
+  }
+
+  /// Valutazione dinamica: niente coppie fisse.
+  /// Trova tutti gli habit bloccati con condizione soddisfatta, prende i
+  /// PRIMI DUE dall'ordine di HabitLibrary.all e li propone come scelta.
+  /// Se è rimasto solo un habit pronto, si auto-accetta.
+  void _evaluateUnlocks() {
+    // SLOWDOWN VOLONTARIO
+    if (isSlowdownActive) return;
+
+    // Se ci sono già habit pending non aggiungerne altri
+    final hasPending = _states.values.any((s) => s.isChoicePending);
+    if (hasPending) return;
+
+    // Raccogli tutti gli habit pronti (locked + condizione soddisfatta)
+    final readyToUnlock = <HabitDefinition>[];
+    for (final habit in HabitLibrary.all) {
+      if (habit.isStarter) continue;
+      if (statusOf(habit.id) != HabitStatus.locked) continue;
+      if (_conditionMet(habit)) readyToUnlock.add(habit);
+    }
+
+    if (readyToUnlock.isEmpty) return;
+
+    // ANTI-OVERLOAD: min 7 giorni dall'ultimo sblocco EFFETTIVO
+    // (non blocca la valutazione quando è la prima volta)
+    if (_lastUnlockDate != null && _daysSinceLastUnlock() < 7) return;
+
+    if (readyToUnlock.length == 1) {
+      // Un solo habit pronto → auto-accept (nessuna scelta da fare)
+      final habit = readyToUnlock.first;
+      final st = _getOrCreate(habit.id);
+      st.status = HabitStatus.active;
+      st.activatedAt = DateTime.now();
+      st.unlockedAt = DateTime.now();
+      AnalyticsService.instance.logHabitUnlocked(habit.id);
+      // Notifica fuori app (solo se in background — gestito dal service)
+      NotificationService.instance.showHabitUnlocked(
+        habitId: habit.id,
+        habitName: habit.name,
+        message: habit.coachIntro,
+      );
+    } else {
+      // Due o più pronti → popup di scelta con i PRIMI DUE
+      final toShow = readyToUnlock.take(2).toList();
+      for (final habit in toShow) {
+        _getOrCreate(habit.id)
+          ..isChoicePending = true
+          ..status = HabitStatus.available;
+        AnalyticsService.instance.logHabitUnlocked(habit.id);
+      }
+      NotificationService.instance.showNotification(
+        id: 99998,
+        title: '✨ Nuova abitudine disponibile',
+        body: 'Apri Be Well per scegliere la tua prossima abitudine.',
+      );
+    }
+
+    _lastUnlockDate = DateTime.now();
   }
 
   HabitState _getOrCreate(String habitId) {
@@ -327,56 +453,6 @@ class ProgressionProvider extends ChangeNotifier {
       _states[habitId] = HabitState(habitId: habitId);
     }
     return _states[habitId]!;
-  }
-
-  // ── Coach messages ────────────────────────────────────────────────────────
-
-  void _generateTodayMessage() {
-    final activeList = activeHabits;
-    if (activeList.isEmpty) {
-      _todayMessage = CoachMessage(
-        text: 'Inizia con un bicchiere d\'acqua. Adesso.',
-        date: DateTime.now(),
-      );
-      return;
-    }
-
-    // Trova l'abitudine con meno giorni completati (la più in difficoltà)
-    HabitDefinition? focusHabit;
-    int minDays = 9999;
-    for (final h in activeList) {
-      final days = daysCompletedFor(h.id);
-      if (days < minDays) {
-        minDays = days;
-        focusHabit = h;
-      }
-    }
-
-    if (focusHabit != null) {
-      final def = HabitLibrary.findById(focusHabit.id);
-      if (def != null) {
-        _todayMessage = CoachMessage(
-          text: _contextualMessage(def, minDays),
-          habitId: def.id,
-          date: DateTime.now(),
-        );
-        return;
-      }
-    }
-
-    _todayMessage = CoachMessage(
-      text: 'Ogni giorno conta. Anche i giorni difficili.',
-      date: DateTime.now(),
-    );
-  }
-
-  String _contextualMessage(HabitDefinition habit, int daysCompleted) {
-    if (daysCompleted == 0) return habit.coachIntro;
-    if (daysCompleted == 1) return '${habit.name}: primo giorno. Il più importante.';
-    if (daysCompleted == 3) return '3 giorni. Il corpo inizia a registrarlo.';
-    if (daysCompleted == 7) return '7 giorni consecutivi. Stai costruendo qualcosa.';
-    if (daysCompleted == 14) return '2 settimane. Questa abitudine è tua adesso.';
-    return habit.coachDaily;
   }
 
   // ── Persistenza ───────────────────────────────────────────────────────────
@@ -388,28 +464,71 @@ class ProgressionProvider extends ChangeNotifier {
         entry.key: entry.value.toJson()
     };
     await prefs.setString('habit_states', jsonEncode(map));
+    await prefs.setInt('debug_day_offset', _debugDayOffset);
+    if (_lastUnlockDate != null) {
+      await prefs.setString('last_unlock_date', _lastUnlockDate!.toIso8601String());
+    }
+    if (_lastEvaluateDate != null) {
+      await prefs.setString('last_evaluate_date', _lastEvaluateDate!.toIso8601String());
+    } else {
+      await prefs.remove('last_evaluate_date');
+    }
+    if (_slowdownActiveUntil != null) {
+      await prefs.setString('slowdown_active_until', _slowdownActiveUntil!.toIso8601String());
+    }
+  }
+
+  /// Applica il rallentamento: blocca nuovi sblocchi per 14 giorni.
+  Future<void> applySlowdown() async {
+    _slowdownActiveUntil = DateTime.now().add(const Duration(days: 14));
+    await _saveStates();
+    notifyListeners();
   }
 
 
   // -- Debug methods --------------------------------------------------------
   Future<void> debugSimulateDays(int days) async {
-    // Sposta indietro la data di installazione
     _debugDayOffset += days;
-    final prefs = await SharedPreferences.getInstance();
-    // offset only, no prefs change
+    _lastEvaluateDate = null; // forza ri-valutazione sblocchi
 
-    // Aggiunge giorni completati a tutte le abitudini attive
+    // Usa ieri come lastCompletedAt: il giorno simulato è "passato",
+    // non "oggi" — così il check isWaterDoneToday non scatta
+    final yesterday = DateTime.now().subtract(const Duration(hours: 36));
     for (final state in _states.values) {
       if (state.status != HabitStatus.locked) {
         state.daysCompleted += days;
-        state.lastCompletedAt = DateTime.now();
+        state.lastCompletedAt = yesterday;
         _updateHabitStatus(state);
       }
     }
 
+    // Reset tracker acqua del giorno corrente
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('water_count', 0);
+    await prefs.remove('water_date');
+
     await _saveStates();
     _evaluateUnlocks();
-    _generateTodayMessage();
+    notifyListeners();
+  }
+
+  /// Resetta solo i completamenti di oggi — utile per ri-testare il flusso
+  /// giornaliero senza perdere la progressione accumulata.
+  Future<void> debugResetToday() async {
+    final now = DateTime.now();
+    for (final state in _states.values) {
+      final last = state.lastCompletedAt;
+      if (last != null &&
+          last.year == now.year &&
+          last.month == now.month &&
+          last.day == now.day) {
+        state.lastCompletedAt = last.subtract(const Duration(days: 1));
+      }
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('water_count', 0);
+    await prefs.remove('water_date');
+    await _saveStates();
     notifyListeners();
   }
 
@@ -424,7 +543,6 @@ class ProgressionProvider extends ChangeNotifier {
     }
     _debugDayOffset = 30;
     await _saveStates();
-    _evaluateUnlocks();
     notifyListeners();
   }
   Future<void> forceEvaluate() async {
@@ -435,10 +553,13 @@ class ProgressionProvider extends ChangeNotifier {
 
   Future<void> resetAll() async {
     _states.clear();
+    _debugDayOffset = 0;
+    _installDate = null;
+    _initialized = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('habit_states');
     await prefs.remove('install_date');
-    _installDate = null;
+    await prefs.remove('debug_day_offset');
     notifyListeners();
   }
 }
@@ -446,31 +567,46 @@ class ProgressionProvider extends ChangeNotifier {
 // ── Metodi aggiuntivi per GrowthScreen ───────────────────────────────────────
 extension ProgressionProviderUI on ProgressionProvider {
 
-  /// Fase corrente 1-5 basata su totalDaysCompleted
+  /// Numero di abitudini consolidate (≥7 giorni completati) o automatiche.
+  /// È il metro principale per le fasi di crescita del companion.
+  int get consolidatedHabitsCount => _states.values.where((s) =>
+      s.status == HabitStatus.consolidated ||
+      s.status == HabitStatus.automatic).length;
+
+  /// Fase corrente 1-5 basata sulle abitudini assimilate (consolidate/automatiche).
+  ///   Fase 2 →  1 abitudine assimilata  (la prima routine è nata)
+  ///   Fase 3 →  3 abitudini assimilate  (routine solida multi-habit)
+  ///   Fase 4 →  7 abitudini assimilate  (stile di vita ben radicato)
+  ///   Fase 5 → 12 abitudini assimilate  (maestria)
   int get currentPhase {
-    final days = totalDaysCompleted;
-    if (days >= 90) return 5;
-    if (days >= 42) return 4;
-    if (days >= 21) return 3;
-    if (days >= 7)  return 2;
+    final n = consolidatedHabitsCount;
+    if (n >= 12) return 5;
+    if (n >=  7) return 4;
+    if (n >=  3) return 3;
+    if (n >=  1) return 2;
     return 1;
   }
 
-  /// Totale giorni completati su tutte le abitudini
+  /// Completamenti cumulativi dell'abitudine più praticata.
+  /// Usato per badge e display dei giorni — indipendente dalle fasi.
+  /// Fallback ai giorni di calendario (cappato a 6) se nessun completamento.
   int get totalDaysCompleted {
-    return _states.values
-        .fold(0, (sum, s) => sum + s.daysCompleted);
+    int maxDays = 0;
+    for (final state in _states.values) {
+      if (state.daysCompleted > maxDays) maxDays = state.daysCompleted;
+    }
+    return maxDays > 0 ? maxDays : appDayNumber.clamp(0, 6);
   }
 
-  /// Progresso verso prossima fase (0.0 - 1.0)
+  /// Progresso verso prossima fase (0.0 - 1.0) — basato su abitudini assimilate.
   double get phaseProgress {
-    final days = totalDaysCompleted;
-    final thresholds = [0, 7, 21, 42, 90];
+    const thresholds = [0, 1, 3, 7, 12];
     final phase = currentPhase;
     if (phase >= 5) return 1.0;
+    final n    = consolidatedHabitsCount;
     final from = thresholds[phase - 1];
     final to   = thresholds[phase];
-    return ((days - from) / (to - from)).clamp(0.0, 1.0);
+    return ((n - from) / (to - from)).clamp(0.0, 1.0);
   }
 
   /// Prossima abitudine che si sbloccherà
@@ -497,41 +633,90 @@ extension ProgressionProviderUI on ProgressionProvider {
     return 0;
   }
 
-  /// Badge guadagnati
-  List<BwBadge> get earnedBadges {
+  /// Badge guadagnati (localizzati)
+  List<BwBadge> earnedBadges(BwStrings s) {
     final badges = <BwBadge>[];
     final total = totalDaysCompleted;
     final active = activeHabits;
 
-    if (total >= 1)  badges.add(BwBadge('🌱', 'Primo passo', 'Primo giorno completato'));
-    if (total >= 7)  badges.add(BwBadge('💧', 'Una settimana', '7 giorni di abitudini'));
-    if (total >= 21) badges.add(BwBadge('🌿', 'Tre settimane', '21 giorni completati'));
-    if (total >= 42) badges.add(BwBadge('🌳', 'Un mese e mezzo', '42 giorni completati'));
-    if (total >= 90) badges.add(BwBadge('✨', 'Tre mesi', '90 giorni di crescita'));
+    if (total >= 1)  badges.add(BwBadge('🌱', s.badgeFirstStep, s.badgeFirstStepDesc));
+    if (total >= 7)  badges.add(BwBadge('💧', s.badgeOneWeek, s.badgeOneWeekDesc));
+    if (total >= 21) badges.add(BwBadge('🌿', s.badgeThreeWeeks, s.badgeThreeWeeksDesc));
+    if (total >= 42) badges.add(BwBadge('🌳', s.badgeSixWeeks, s.badgeSixWeeksDesc));
+    if (total >= 90) badges.add(BwBadge('✨', s.badgeThreeMonths, s.badgeThreeMonthsDesc));
 
-    if (active.length >= 2) badges.add(BwBadge('🔗', 'In sincronia', '2 abitudini attive'));
-    if (active.length >= 4) badges.add(BwBadge('🎯', 'Multihabit', '4 abitudini attive'));
+    if (active.length >= 2) badges.add(BwBadge('🔗', s.badgeInSync, s.badgeInSyncDesc));
+    if (active.length >= 4) badges.add(BwBadge('🎯', s.badgeMultihabit, s.badgeMultihabitDesc));
 
-    // Abitudini specifiche consolidate
     if (statusOf('water') == HabitStatus.consolidated ||
         statusOf('water') == HabitStatus.automatic) {
-      badges.add(BwBadge('💧', 'Ben idratato', 'Acqua consolidata'));
+      badges.add(BwBadge('💧', s.badgeHydrated, s.badgeHydratedDesc));
     }
     if (statusOf('focus_25') == HabitStatus.consolidated ||
         statusOf('focus_25') == HabitStatus.automatic) {
-      badges.add(BwBadge('🎯', 'In focus', 'Focus 25 min consolidato'));
+      badges.add(BwBadge('🎯', s.badgeFocused, s.badgeFocusedDesc));
     }
     if (statusOf('walk_lunch') == HabitStatus.consolidated ||
         statusOf('walk_lunch') == HabitStatus.automatic) {
-      badges.add(BwBadge('🚶', 'Camminatore', 'Passeggiata pranzo consolidata'));
+      badges.add(BwBadge('🚶', s.badgeWalker, s.badgeWalkerDesc));
     }
     if (statusOf('breathing_box') == HabitStatus.consolidated ||
         statusOf('breathing_box') == HabitStatus.automatic) {
-      badges.add(BwBadge('🧘', 'Respiro', 'Respirazione consolidata'));
+      badges.add(BwBadge('🧘', s.badgeBreath, s.badgeBreathDesc));
     }
 
     return badges;
   }
+
+  /// Heatmap: per ogni giorno degli ultimi 35 giorni → numero di habit completate.
+  /// [filterHabitId]: se non null, conta solo quella specifica abitudine (0 o 1).
+  /// Ritorna una lista di 35 valori (dal più vecchio al più recente).
+  /// Fallback: se completionDates è vuoto, usa lastCompletedAt per il giorno più recente.
+  List<int> heatmapData({String? filterHabitId}) {
+    final today = DateTime.now();
+    final data = <int>[];
+    for (int i = 34; i >= 0; i--) {
+      final day = today.subtract(Duration(days: i));
+      final dateStr = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+      if (filterHabitId != null) {
+        final state = _states[filterHabitId];
+        data.add(_habitCompletedOn(state, dateStr) ? 1 : 0);
+      } else {
+        int count = 0;
+        for (final state in _states.values) {
+          if (_habitCompletedOn(state, dateStr)) count++;
+        }
+        data.add(count);
+      }
+    }
+    return data;
+  }
+
+  /// Controlla se un'abitudine è stata completata in un dato giorno.
+  /// Prima controlla completionDates, poi cade su lastCompletedAt come fallback.
+  bool _habitCompletedOn(HabitState? state, String dateStr) {
+    if (state == null) return false;
+    if (state.completionDates.contains(dateStr)) return true;
+    // Fallback: usa lastCompletedAt per dati migrati senza completionDates
+    final last = state.lastCompletedAt;
+    if (last == null) return false;
+    final lastStr = '${last.year}-${last.month.toString().padLeft(2, '0')}-${last.day.toString().padLeft(2, '0')}';
+    return lastStr == dateStr;
+  }
+
+  /// Data di raggiungimento di una fase (approssimata dall'installDate + threshold)
+  DateTime? phaseReachedDate(int phase) {
+    final install = installDate;
+    if (install == null) return null;
+    const thresholds = [0, 7, 21, 42, 90];
+    if (phase < 1 || phase > 5) return null;
+    final daysNeeded = thresholds[phase - 1];
+    final reached = install.add(Duration(days: daysNeeded));
+    // Solo se è già passata
+    return reached.isBefore(DateTime.now()) ? reached : null;
+  }
+
+  DateTime? get installDate => installDatePublic;
 
   String getLocalizedMessage(BwStrings s) {
     final activeList = activeHabits;
@@ -549,29 +734,14 @@ extension ProgressionProviderUI on ProgressionProvider {
       final def = HabitLibrary.findById(focusHabit.id);
       if (def != null) {
         if (minDays == 0) {
-        if (def.id == 'water') return s.firstHabitBody2;
-        return def.coachIntro;
-      }
+          if (def.id == 'water') return s.firstHabitBody2;
+          return s.habitDesc(def.id);
+        }
         if (minDays == 1) return s.coachDay1;
         if (minDays == 3) return s.coachDay3;
         if (minDays == 7) return s.coachDay7;
         if (minDays == 14) return s.coachDay14;
-        // Usa la descrizione localizzata come messaggio giornaliero
-        switch (def.id) {
-          case 'water': return s.habitWaterDesc;
-          case 'focus_25': return s.habitFocus25Desc;
-          case 'eyes_20_20_20': return s.habitEyes2020Desc;
-          case 'neck_stretch': return s.habitNeckDesc;
-          case 'breathing_box': return s.habitBreathingBoxDesc;
-          case 'walk_lunch': return s.habitWalkLunchDesc;
-          case 'desk_exercise': return s.habitDeskExDesc;
-          case 'water_morning': return s.habitWaterMornDesc;
-          case 'posture': return s.habitPostureDesc;
-          case 'sleep_routine': return s.habitSleepDesc;
-          case 'focus_50': return s.habitFocus50Desc;
-          case 'meditation': return s.habitMeditationDesc;
-          default: return def.coachDaily;
-        }
+        return s.habitDesc(def.id);
       }
     }
     return s.coachGeneral;

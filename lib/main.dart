@@ -11,7 +11,8 @@ import 'providers/onboarding_provider.dart';
 import 'providers/theme_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/progression_provider.dart';
-import 'models/habit_library.dart';
+import 'providers/schedule_provider.dart';
+import 'providers/tutorial_provider.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -39,6 +40,8 @@ void main() async {
   ));
 
   await NotificationService.instance.init();
+  // I reminder giornalieri vengono pianificati da LocaleProvider.init()
+  // con le stringhe nella lingua dell'utente.
 
   runApp(
     MultiProvider(
@@ -50,6 +53,8 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()..init()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()..init()),
         ChangeNotifierProvider(create: (_) => ProgressionProvider()..init()),
+        ChangeNotifierProvider(create: (_) => ScheduleProvider()..init()),
+        ChangeNotifierProvider(create: (_) => TutorialProvider()..init()),
       ],
       child: const BewellApp(),
     ),
@@ -67,11 +72,9 @@ class BewellApp extends StatelessWidget {
         return MaterialApp(
           title: 'Be Well',
           // Il MaterialTheme viene generato dalla palette attiva
-          theme: theme.buildMaterialTheme().copyWith(
-            // Manteniamo le opzioni accessibilità
-            textTheme: theme.buildMaterialTheme().textTheme.apply(
-              fontSizeFactor: settings.largeText ? 1.2 : 1.0,
-            ),
+          theme: theme.buildMaterialTheme(
+            largeText: settings.largeText,
+            highContrast: settings.highContrast,
           ),
           debugShowCheckedModeBanner: false,
           builder: (context, child) {

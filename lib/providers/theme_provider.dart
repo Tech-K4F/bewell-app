@@ -203,11 +203,25 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   // Helper per ottenere il MaterialColor theme dell'app
-  ThemeData buildMaterialTheme() {
+  ThemeData buildMaterialTheme({
+    bool largeText = false,
+    bool highContrast = false,
+  }) {
     final p = paletteData;
     final isAmb = _style == BwStyle.ambient;
+    final fontFamily = isAmb ? 'CormorantGaramond' : 'DM Sans';
+    final fs = largeText ? 1.20 : 1.0;
+
+    // High contrast overrides text colors if enabled
+    final textColor = highContrast
+        ? (p.isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000))
+        : p.text;
+    final textSecColor = highContrast
+        ? (p.isDark ? const Color(0xFFCCCCCC) : const Color(0xFF333333))
+        : p.textSec;
+
     return ThemeData(
-      fontFamily: isAmb ? 'CormorantGaramond' : 'DM Sans',
+      fontFamily: fontFamily,
       brightness: p.isDark ? Brightness.dark : Brightness.light,
       scaffoldBackgroundColor: p.bg,
       colorScheme: ColorScheme(
@@ -217,18 +231,33 @@ class ThemeProvider extends ChangeNotifier {
         secondary: p.accent,
         onSecondary: p.btnText,
         surface: p.card,
-        onSurface: p.text,
+        onSurface: textColor,
         error: const Color(0xFFE05640),
         onError: Colors.white,
       ),
+      textTheme: TextTheme(
+        headlineLarge:  TextStyle(color: textColor,    fontSize: 28 * fs, fontWeight: FontWeight.w700, fontFamily: fontFamily),
+        headlineMedium: TextStyle(color: textColor,    fontSize: 22 * fs, fontWeight: FontWeight.w700, fontFamily: fontFamily),
+        headlineSmall:  TextStyle(color: textColor,    fontSize: 18 * fs, fontWeight: FontWeight.w600, fontFamily: fontFamily),
+        bodyLarge:      TextStyle(color: textColor,    fontSize: 16 * fs, fontFamily: fontFamily),
+        bodyMedium:     TextStyle(color: textColor,    fontSize: 14 * fs, fontFamily: fontFamily),
+        bodySmall:      TextStyle(color: textSecColor, fontSize: 12 * fs, fontFamily: fontFamily),
+        labelLarge:     TextStyle(color: textColor,    fontSize: 14 * fs, fontWeight: FontWeight.w600, fontFamily: fontFamily),
+        labelMedium:    TextStyle(color: textSecColor, fontSize: 12 * fs, fontFamily: fontFamily),
+        labelSmall:     TextStyle(color: textSecColor, fontSize: 10 * fs, fontFamily: fontFamily),
+        titleLarge:     TextStyle(color: textColor,    fontSize: 18 * fs, fontWeight: FontWeight.w600, fontFamily: fontFamily),
+        titleMedium:    TextStyle(color: textColor,    fontSize: 15 * fs, fontWeight: FontWeight.w500, fontFamily: fontFamily),
+        titleSmall:     TextStyle(color: textColor,    fontSize: 13 * fs, fontWeight: FontWeight.w500, fontFamily: fontFamily),
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: p.bg,
-        foregroundColor: p.text,
+        foregroundColor: textColor,
         elevation: 0,
         titleTextStyle: TextStyle(
-          color: p.text,
-          fontSize: 17,
+          color: textColor,
+          fontSize: 17 * fs,
           fontWeight: FontWeight.w600,
+          fontFamily: fontFamily,
         ),
       ),
     );

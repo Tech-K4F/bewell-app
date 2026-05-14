@@ -24,15 +24,23 @@ enum HabitEffort {
 class UnlockCondition {
   /// ID dell'abitudine prerequisita (null = nessun prerequisito)
   final String? requiredHabitId;
+  /// Prerequisito alternativo (OR logic): si sblocca se l'uno O l'altro
+  /// ha raggiunto requiredDaysCompleted. Utile quando due abitudini gemelle
+  /// possono entrambe far da "bridge" alla fase successiva.
+  final String? altRequiredHabitId;
   /// Giorni cumulativi completati del prerequisito prima di sbloccare
   final int requiredDaysCompleted;
   /// Giorno dall'installazione dell'app (alternativo al prerequisito)
   final int? appDayMin;
+  /// Giorni totali completati su TUTTE le abitudini (soglia globale)
+  final int? requiredTotalDays;
 
   const UnlockCondition({
     this.requiredHabitId,
+    this.altRequiredHabitId,
     this.requiredDaysCompleted = 0,
     this.appDayMin,
+    this.requiredTotalDays,
   });
 }
 
@@ -123,7 +131,7 @@ class HabitLibrary {
       ],
     ),
 
-    // ── FASE 1: Giorno 4 — dopo 3 giorni di acqua ───────────────────────────
+    // ── FASE 1: Dopo 14 giorni di acqua ─────────────────────────────────────
 
     HabitDefinition(
       id: 'focus_25',
@@ -139,7 +147,7 @@ class HabitLibrary {
       imageAsset: 'assets/images/habits/habit_focus_25.jpg',
       unlock: UnlockCondition(
         requiredHabitId: 'water',
-        requiredDaysCompleted: 3,
+        requiredDaysCompleted: 14,  // V2: 2 settimane di acqua
       ),
       defaultFrequencyMinutes: 0, // on-demand, non reminder automatico
       ifThenRules: [
@@ -170,48 +178,7 @@ class HabitLibrary {
       ],
     ),
 
-    // ── FASE 2: Settimana 3 — dopo 7 giorni di focus ────────────────────────
-
-    HabitDefinition(
-      id: 'eyes_20_20_20',
-      name: 'Regola 20-20-20',
-      description:
-          'Ogni 20 minuti, guarda a 6 metri di distanza per 20 secondi',
-      coachIntro:
-          'I tuoi occhi lavorano sodo. '
-          'Ogni 20 minuti, stacca dallo schermo per 20 secondi. '
-          'Guarda fuori dalla finestra.',
-      coachDaily: 'I tuoi occhi ti ringrazieranno stasera.',
-      category: HabitCategory.eyes,
-      effort: HabitEffort.low,
-      imageAsset: 'assets/images/habits/habit_eyes_20_20_20.jpg',
-      unlock: UnlockCondition(
-        requiredHabitId: 'focus_25',
-        requiredDaysCompleted: 7,
-      ),
-      defaultFrequencyMinutes: 20,
-      ifThenRules: [
-        // Q17: screen time >8h → reminder ogni 20 min obbligatorio
-        IfThenRule(
-          questionId: 'Q17',
-          answerValue: '8-10h',
-          effect: 'frequency_mandatory_20min',
-        ),
-        IfThenRule(
-          questionId: 'Q17',
-          answerValue: '>10h',
-          effect: 'frequency_mandatory_20min_critical',
-        ),
-        // Q17: screen time <4h → reminder ogni 30 min
-        IfThenRule(
-          questionId: 'Q17',
-          answerValue: '<4h',
-          effect: 'frequency_30min',
-        ),
-      ],
-    ),
-
-    // ── FASE 2: Settimana 4 — dopo 5 giorni 20-20-20 ────────────────────────
+    // ── FASE 2: Dopo 21 giorni di acqua — coppia neck_stretch / desk_exercise ─
 
     HabitDefinition(
       id: 'neck_stretch',
@@ -225,12 +192,11 @@ class HabitLibrary {
       effort: HabitEffort.low,
       imageAsset: 'assets/images/habits/habit_neck_stretch.jpg',
       unlock: UnlockCondition(
-        requiredHabitId: 'eyes_20_20_20',
-        requiredDaysCompleted: 5,
+        requiredHabitId: 'water',
+        requiredDaysCompleted: 21,  // V2: 3 settimane di acqua (soglia radicamento)
       ),
       defaultFrequencyMinutes: 60,
       ifThenRules: [
-        // Q2: lavora in ufficio → reminder discreto (no audio)
         IfThenRule(
           questionId: 'Q2',
           answerValue: 'Office/University',
@@ -239,7 +205,7 @@ class HabitLibrary {
       ],
     ),
 
-    // ── FASE 3: Settimana 5 — dopo 7 giorni stretching ──────────────────────
+    // ── FASE 3: Dopo 21 giorni di focus_25 ──────────────────────────────────
 
     HabitDefinition(
       id: 'breathing_box',
@@ -253,8 +219,8 @@ class HabitLibrary {
       effort: HabitEffort.low,
       imageAsset: 'assets/images/habits/habit_breathing_box.jpg',
       unlock: UnlockCondition(
-        requiredHabitId: 'neck_stretch',
-        requiredDaysCompleted: 7,
+        requiredHabitId: 'focus_25',
+        requiredDaysCompleted: 21,  // V2: 21 giorni — focus consolidato prima di pratica cognitiva nuova
       ),
       defaultFrequencyMinutes: 120,
       ifThenRules: [
@@ -278,8 +244,7 @@ class HabitLibrary {
       ],
     ),
 
-    // ── FASE 3: Settimana 6 — scelta utente (popup) ──────────────────────────
-    // Proposta come prima scelta visuale: walk_lunch vs desk_exercise
+    // ── FASE 4: Dopo 42 giorni totali — coppia walk_lunch / lunch_no_screen ───
 
     HabitDefinition(
       id: 'walk_lunch',
@@ -293,9 +258,7 @@ class HabitLibrary {
       effort: HabitEffort.medium,
       imageAsset: 'assets/images/habits/habit_walk_lunch.jpg',
       unlock: UnlockCondition(
-        requiredHabitId: 'breathing_box',
-        requiredDaysCompleted: 5,
-        appDayMin: 28, // minimo 4 settimane nell'app
+        requiredTotalDays: 42,  // V2: 6 settimane di consistenza comprovata
       ),
       defaultFrequencyMinutes: 0, // triggered da pranzo
       ifThenRules: [
@@ -338,9 +301,8 @@ class HabitLibrary {
       effort: HabitEffort.low,
       imageAsset: 'assets/images/habits/habit_desk_exercise.jpg',
       unlock: UnlockCondition(
-        requiredHabitId: 'breathing_box',
-        requiredDaysCompleted: 5,
-        appDayMin: 28,
+        requiredHabitId: 'water',
+        requiredDaysCompleted: 21,  // V2: coppia con neck_stretch — stessa condizione
       ),
       defaultFrequencyMinutes: 120,
       ifThenRules: [
@@ -353,7 +315,7 @@ class HabitLibrary {
       ],
     ),
 
-    // ── FASE 4: Settimana 7-8 ────────────────────────────────────────────────
+    // ── FASE 3b: Dopo 21 giorni di acqua — coppia water_morning / snack ──────
 
     HabitDefinition(
       id: 'water_morning',
@@ -368,7 +330,7 @@ class HabitLibrary {
       imageAsset: 'assets/images/habits/habit_water_morning.jpg',
       unlock: UnlockCondition(
         requiredHabitId: 'water',
-        requiredDaysCompleted: 14,
+        requiredDaysCompleted: 21,  // V2: evoluzione naturale abitudine acqua
       ),
       defaultFrequencyMinutes: 0, // solo mattina
     ),
@@ -386,7 +348,8 @@ class HabitLibrary {
       imageAsset: 'assets/images/habits/habit_posture.jpg',
       unlock: UnlockCondition(
         requiredHabitId: 'neck_stretch',
-        requiredDaysCompleted: 10,
+        altRequiredHabitId: 'desk_exercise',
+        requiredDaysCompleted: 21,  // V2: evoluzione naturale delle abitudini di movimento
       ),
       defaultFrequencyMinutes: 60,
       ifThenRules: [
@@ -411,7 +374,7 @@ class HabitLibrary {
       imageAsset: 'assets/images/habits/habit_lunch_park.jpg',
       unlock: UnlockCondition(
         requiredHabitId: 'walk_lunch',
-        requiredDaysCompleted: 7,
+        requiredDaysCompleted: 21,  // V2: proposta dopo che la passeggiata è consolidata
       ),
       defaultFrequencyMinutes: 0,
       ifThenRules: [
@@ -428,7 +391,7 @@ class HabitLibrary {
       ],
     ),
 
-    // ── FASE 5: Mese 2 ──────────────────────────────────────────────────────
+    // ── FASE 5: Dopo consolidamento breathing_box ────────────────────────────
 
     HabitDefinition(
       id: 'breathing_478',
@@ -443,7 +406,7 @@ class HabitLibrary {
       imageAsset: 'assets/images/habits/habit_breathing_478.jpg',
       unlock: UnlockCondition(
         requiredHabitId: 'breathing_box',
-        requiredDaysCompleted: 14,
+        requiredDaysCompleted: 21,  // V2: upgrade solo quando la base è consolidata
       ),
       defaultFrequencyMinutes: 0, // on-demand o dopo stress check
       ifThenRules: [
@@ -472,8 +435,9 @@ class HabitLibrary {
       effort: HabitEffort.low,
       imageAsset: 'assets/images/habits/habit_stretching_active.jpg',
       unlock: UnlockCondition(
-        requiredHabitId: 'desk_exercise',
-        requiredDaysCompleted: 10,
+        requiredHabitId: 'neck_stretch',
+        altRequiredHabitId: 'desk_exercise',
+        requiredDaysCompleted: 42,  // V2: evoluzione abitudini movimento dopo 6 settimane
       ),
       defaultFrequencyMinutes: 240,
     ),
@@ -490,9 +454,8 @@ class HabitLibrary {
       effort: HabitEffort.low,
       imageAsset: 'assets/images/habits/habit_snack.jpg',
       unlock: UnlockCondition(
-        appDayMin: 21,
         requiredHabitId: 'water',
-        requiredDaysCompleted: 14,
+        requiredDaysCompleted: 21,  // V2: coppia con water_morning — stessa condizione
       ),
       defaultFrequencyMinutes: 0,
     ),
@@ -509,14 +472,12 @@ class HabitLibrary {
       effort: HabitEffort.medium,
       imageAsset: 'assets/images/habits/habit_lunch_no_screen.jpg',
       unlock: UnlockCondition(
-        appDayMin: 28,
-        requiredHabitId: 'snack',
-        requiredDaysCompleted: 7,
+        requiredTotalDays: 42,  // V2: coppia con walk_lunch — stessa condizione globale
       ),
       defaultFrequencyMinutes: 0,
     ),
 
-    // ── FASE 6: Mese 3 ──────────────────────────────────────────────────────
+    // ── FASE 6: Mese 3+ ─────────────────────────────────────────────────────
 
     HabitDefinition(
       id: 'focus_50',
@@ -532,7 +493,7 @@ class HabitLibrary {
       imageAsset: 'assets/images/habits/habit_focus_50.jpg',
       unlock: UnlockCondition(
         requiredHabitId: 'focus_25',
-        requiredDaysCompleted: 21,
+        requiredDaysCompleted: 42,  // V2: 6 settimane di Pomodoro prima dei cicli lunghi
       ),
       defaultFrequencyMinutes: 0,
       ifThenRules: [
@@ -561,8 +522,9 @@ class HabitLibrary {
       effort: HabitEffort.medium,
       imageAsset: 'assets/images/habits/habit_meditation.jpg',
       unlock: UnlockCondition(
-        requiredHabitId: 'breathing_478',
-        requiredDaysCompleted: 14,
+        requiredHabitId: 'breathing_box',
+        altRequiredHabitId: 'breathing_478',
+        requiredDaysCompleted: 42,  // V2: evoluzione mindfulness dopo 6 settimane
       ),
       defaultFrequencyMinutes: 0,
       ifThenRules: [
@@ -593,7 +555,7 @@ class HabitLibrary {
       imageAsset: 'assets/images/habits/habit_stairs.jpg',
       unlock: UnlockCondition(
         requiredHabitId: 'walk_lunch',
-        requiredDaysCompleted: 14,
+        requiredDaysCompleted: 21,  // V2: evoluzione del movimento quotidiano
       ),
       defaultFrequencyMinutes: 0,
       ifThenRules: [
@@ -618,9 +580,7 @@ class HabitLibrary {
       effort: HabitEffort.high,
       imageAsset: 'assets/images/habits/habit_sleep_routine.jpg',
       unlock: UnlockCondition(
-        appDayMin: 42, // 6 settimane
-        requiredHabitId: 'breathing_box',
-        requiredDaysCompleted: 21,
+        requiredTotalDays: 60,  // V2: 60 giorni totali — abitudine avanzata per chi ha dimostrato consistenza
       ),
       defaultFrequencyMinutes: 0,
       ifThenRules: [
@@ -651,7 +611,7 @@ class HabitLibrary {
       imageAsset: 'assets/images/habits/habit_wake_consistent.jpg',
       unlock: UnlockCondition(
         requiredHabitId: 'sleep_routine',
-        requiredDaysCompleted: 14,
+        requiredDaysCompleted: 21,  // V2: solo dopo che la routine serale è stabile
       ),
       defaultFrequencyMinutes: 0,
     ),
@@ -668,9 +628,7 @@ class HabitLibrary {
       effort: HabitEffort.medium,
       imageAsset: 'assets/images/habits/habit_nap.jpg',
       unlock: UnlockCondition(
-        appDayMin: 56, // 2 mesi
-        requiredHabitId: 'sleep_routine',
-        requiredDaysCompleted: 7,
+        requiredTotalDays: 60,  // V2: abitudine avanzata — solo per chi ha dimostrato lunga consistenza
       ),
       defaultFrequencyMinutes: 0,
       ifThenRules: [
@@ -700,7 +658,7 @@ class HabitLibrary {
       imageAsset: 'assets/images/habits/habit_focus_no_phone.jpg',
       unlock: UnlockCondition(
         requiredHabitId: 'focus_25',
-        requiredDaysCompleted: 10,
+        requiredDaysCompleted: 21,  // V2: potenziamento naturale del focus
       ),
       defaultFrequencyMinutes: 0,
       ifThenRules: [
@@ -737,21 +695,52 @@ class HabitLibrary {
 
   /// Restituisce le coppie di scelta per il popup introduttivo
   /// (due abitudini della stessa categoria con lo stesso unlock prerequisito)
+  // V2: coppie aggiornate secondo distanze scientifiche
   static List<(HabitDefinition, HabitDefinition)> get choicePairs => [
-    // Scelta 1: Movimento dopo breathing_box
+    // Coppia 1: Movimento base — dopo 21 giorni di acqua
     (
-      findById('walk_lunch')!,
+      findById('neck_stretch')!,
       findById('desk_exercise')!,
     ),
-    // Scelta 2: Focus avanzato vs Meditazione
+    // Coppia 2: Nutrizione mattutina — dopo 21 giorni di acqua
+    (
+      findById('water_morning')!,
+      findById('snack')!,
+    ),
+    // Coppia 3: Pausa pranzo attiva — dopo 42 giorni totali
+    (
+      findById('walk_lunch')!,
+      findById('lunch_no_screen')!,
+    ),
+    // Coppia 4: Focus avanzato vs Meditazione — dopo 42 giorni
     (
       findById('focus_50')!,
       findById('meditation')!,
     ),
-    // Scelta 3: Sonno
+    // Coppia 5: Sonno — dopo 60 giorni totali
     (
       findById('sleep_routine')!,
       findById('nap')!,
+    ),
+    // Coppia 6: Respirazione vs Focus senza telefono — stesso prereq: 21g focus_25
+    (
+      findById('breathing_box')!,
+      findById('focus_no_phone')!,
+    ),
+    // Coppia 7: Postura vs Stretching attivo — stesso prereq: neck/desk
+    (
+      findById('posture')!,
+      findById('stretching_active')!,
+    ),
+    // Coppia 8: Pranzo al parco vs Scale — stesso prereq: 21g walk_lunch
+    (
+      findById('lunch_park')!,
+      findById('stairs')!,
+    ),
+    // Coppia 9: Respirazione 4-7-8 vs Sveglia costante — abitudini avanzate fase 5+
+    (
+      findById('breathing_478')!,
+      findById('wake_consistent')!,
     ),
   ];
 }

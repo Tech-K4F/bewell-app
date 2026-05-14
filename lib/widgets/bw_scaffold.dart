@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/progression_provider.dart';
 
 /// Sostituto di [Scaffold] che applica automaticamente il tema BeWell.
 /// - Stile Card: sfondo piatto con colori della palette
@@ -41,6 +42,13 @@ class BwScaffold extends StatelessWidget {
         }
 
         // ── Stile Ambient: Cormorant come font di default per tutti i Text ──
+        // Leggi la fase corrente per il glow adattivo (fallback silenzioso)
+        double glowFactor = 0.0;
+        try {
+          final progression = Provider.of<ProgressionProvider>(context, listen: false);
+          glowFactor = (progression.currentPhase - 1) / 4.0; // fase 1→0.0, fase 5→1.0
+        } catch (_) {}
+
         return Theme(
           data: Theme.of(context).copyWith(
             textTheme: Theme.of(context).textTheme.apply(
@@ -55,12 +63,17 @@ class BwScaffold extends StatelessWidget {
           resizeToAvoidBottomInset: resizeToAvoidBottomInset,
           body: Stack(
             children: [
-              // Paesaggio atmosferico in cima
+              // Paesaggio atmosferico in cima — glow adattivo per fase
               Positioned(
                 top: 0, left: 0, right: 0,
                 height: 100,
                 child: CustomPaint(
-                  painter: HorizonPainter(dark: p.isDark, bgColor: p.bg),
+                  painter: HorizonPainter(
+                    dark: p.isDark,
+                    bgColor: p.bg,
+                    glowFactor: glowFactor,
+                    primaryColor: p.primary,
+                  ),
                 ),
               ),
               // Contenuto scrollabile sopra
@@ -91,11 +104,20 @@ class _AmbientAppBar extends StatelessWidget implements PreferredSizeWidget {
 }
 
 // ── Horizon Painter ───────────────────────────────────────────────────────────
+/// [glowFactor] 0.0 = fase 1 (base), 1.0 = fase 5 (radioso).
+/// Interpola colori più caldi / luminosi all'aumentare della fase.
 class HorizonPainter extends CustomPainter {
   final bool dark;
   final Color bgColor;
+  final double glowFactor;     // 0.0 – 1.0
+  final Color primaryColor;
 
-  const HorizonPainter({required this.dark, required this.bgColor});
+  const HorizonPainter({
+    required this.dark,
+    required this.bgColor,
+    this.glowFactor = 0.0,
+    this.primaryColor = const Color(0xFF6B9E78),
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -104,7 +126,39 @@ class HorizonPainter extends CustomPainter {
     } else {
       _paintDawn(canvas, size);
     }
+    _paintGlow(canvas, size);
     _paintFade(canvas, size);
+  }
+
+  /// Sovrimpressione calda basata su glowFactor (visibile solo in fase 2+)
+  void _paintGlow(Canvas canvas, Size size) {
+    if (glowFactor <= 0.0) return;
+    // Alone caldo sull'orizzonte — usa il colore primary del tema
+    final warmAlpha = glowFactor * 0.18;
+    final glowPaint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment.topCenter,
+        radius: 1.2,
+        colors: [
+          primaryColor.withValues(alpha: warmAlpha * 1.5),
+          primaryColor.withValues(alpha: warmAlpha * 0.5),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), glowPaint);
+
+    // Fase 4+: piccoli punti luminosi sull'orizzonte
+    if (glowFactor >= 0.75) {
+      final dotAlpha = (glowFactor - 0.75) * 4 * 0.5; // 0→0.5 per fase 4-5
+      final dotPaint = Paint()..color = primaryColor.withValues(alpha: dotAlpha);
+      final rng = math.Random(7);
+      for (int i = 0; i < 5; i++) {
+        final x = size.width * (0.1 + rng.nextDouble() * 0.8);
+        final y = size.height * (0.55 + rng.nextDouble() * 0.25);
+        canvas.drawCircle(Offset(x, y), 1.5 + rng.nextDouble(), dotPaint);
+      }
+    }
   }
 
   void _paintDawn(Canvas canvas, Size size) {
@@ -235,7 +289,8 @@ class HorizonPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(HorizonPainter old) =>
-      old.dark != dark || old.bgColor != bgColor;
+      old.dark != dark || old.bgColor != bgColor ||
+      old.glowFactor != glowFactor || old.primaryColor != primaryColor;
 }
 
 

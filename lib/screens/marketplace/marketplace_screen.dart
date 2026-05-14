@@ -33,14 +33,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     return BwScaffold(
       appBar: AppBar(
         title: Text(context.sL.rewards),
         bottom: TabBar(
           controller: _tab,
-          indicatorColor: context.read<ThemeProvider>().paletteData.primary,
-          labelColor: context.read<ThemeProvider>().paletteData.primary,
-          unselectedLabelColor: context.read<ThemeProvider>().paletteData.textSec,
+          indicatorColor: p.primary,
+          labelColor: p.primary,
+          unselectedLabelColor: p.textSec,
           tabs: [
             Tab(text: context.sL.rewards),
             Tab(text: context.sL.rewardsPoints),
@@ -105,16 +106,18 @@ class _CatalogTabState extends State<_CatalogTab> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
+
     // Loading state
     if (_loading) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(color: context.read<ThemeProvider>().paletteData.primary),
-            SizedBox(height: 16),
+            CircularProgressIndicator(color: p.primary),
+            const SizedBox(height: 16),
             Text(context.sL.rewardsLockedDesc,
-                style: TextStyle(color: context.read<ThemeProvider>().paletteData.textSec, fontSize: 13)),
+                style: TextStyle(color: p.textSec, fontSize: 13)),
           ],
         ),
       );
@@ -126,11 +129,11 @@ class _CatalogTabState extends State<_CatalogTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('⚠️', style: TextStyle(fontSize: 40)),
-            SizedBox(height: 12),
+            const Text('⚠️', style: TextStyle(fontSize: 40)),
+            const SizedBox(height: 12),
             Text(context.sL.errorGeneral,
-                style: TextStyle(color: Colors.white.withOpacity(.6), fontSize: 14)),
-            SizedBox(height: 8),
+                style: TextStyle(color: p.textSec, fontSize: 14)),
+            const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _loadCatalog,
               child: Text(context.sL.confirm),
@@ -149,40 +152,40 @@ class _CatalogTabState extends State<_CatalogTab> {
       return matchCat && matchSearch;
     }).toList();
 
-    return Consumer<AppProvider>(builder: (context, p, _) {
-      final userPoints = p.user?.points ?? 0;
+    return Consumer<AppProvider>(builder: (context, ap, _) {
+      final userPoints = ap.user?.points ?? 0;
 
       return Column(
         children: [
           // Points banner
           Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 gradient: LinearGradient(colors: [
-                  context.read<ThemeProvider>().paletteData.bg.withOpacity(.18),
-                  context.read<ThemeProvider>().paletteData.bg.withOpacity(.06),
+                  p.primary.withOpacity(.14),
+                  p.primary.withOpacity(.05),
                 ]),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: context.read<ThemeProvider>().paletteData.bg.withOpacity(.3)),
+                border: Border.all(color: p.primary.withOpacity(.25)),
               ),
               child: Row(
                 children: [
-                  Text('⭐', style: TextStyle(fontSize: 24)),
-                  SizedBox(width: 10),
+                  const Text('⭐', style: TextStyle(fontSize: 24)),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('$userPoints punti disponibili',
                             style: TextStyle(
-                                color: context.read<ThemeProvider>().paletteData.bg,
+                                color: p.text,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 16)),
                         Text('Completa attività per guadagnarne altri',
                             style: TextStyle(
-                                color: Colors.white.withOpacity(.4),
+                                color: p.textMut,
                                 fontSize: 11)),
                       ],
                     ),
@@ -191,29 +194,29 @@ class _CatalogTabState extends State<_CatalogTab> {
               ),
             ),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           // Search
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               onChanged: widget.onSearchChanged,
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(color: p.text),
               decoration: InputDecoration(
                 hintText: context.sL.rewards,
-                prefixIcon: Icon(Icons.search, color: context.read<ThemeProvider>().paletteData.bg),
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                prefixIcon: Icon(Icons.search, color: p.textMut),
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
               ),
             ),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           // Category chips
           SizedBox(
             height: 36,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: rewardCategories.length,
               itemBuilder: (_, i) {
                 final cat = rewardCategories[i];
@@ -222,12 +225,10 @@ class _CatalogTabState extends State<_CatalogTab> {
                   onTap: () => widget.onCategoryChanged(cat),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    margin: EdgeInsets.only(right: 8),
-                    padding: EdgeInsets.symmetric(horizontal: 14),
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
-                      color: sel
-                          ? context.read<ThemeProvider>().paletteData.primary
-                          : Colors.white.withOpacity(.07),
+                      color: sel ? p.primary : p.bg2,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Center(
@@ -235,16 +236,14 @@ class _CatalogTabState extends State<_CatalogTab> {
                           style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: sel
-                                  ? Colors.white
-                                  : Colors.white.withOpacity(.45))),
+                              color: sel ? Colors.white : p.textSec)),
                     ),
                   ),
                 );
               },
             ),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           // Grid
           Expanded(
@@ -253,20 +252,20 @@ class _CatalogTabState extends State<_CatalogTab> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('🔍', style: TextStyle(fontSize: 40)),
-                        SizedBox(height: 10),
+                        const Text('🔍', style: TextStyle(fontSize: 40)),
+                        const SizedBox(height: 10),
                         Text(context.sL.rewardsLocked,
                             style: TextStyle(
-                                color: Colors.white.withOpacity(.4),
+                                color: p.textMut,
                                 fontSize: 14)),
                       ],
                     ),
                   )
                 : RefreshIndicator(
                     onRefresh: _loadCatalog,
-                    color: context.read<ThemeProvider>().paletteData.primary,
+                    color: p.primary,
                     child: GridView.builder(
-                      padding: EdgeInsets.fromLTRB(16, 0, 16, 40),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
@@ -278,7 +277,7 @@ class _CatalogTabState extends State<_CatalogTab> {
                       itemBuilder: (_, i) => _RewardCard(
                         reward: filtered[i],
                         userPoints: userPoints,
-                        onTap: () => _showDetail(context, filtered[i], p),
+                        onTap: () => _showDetail(context, filtered[i], ap),
                       ),
                     ),
                   ),
@@ -288,15 +287,16 @@ class _CatalogTabState extends State<_CatalogTab> {
     });
   }
 
-  void _showDetail(BuildContext context, RewardItem reward, AppProvider p) {
+  void _showDetail(BuildContext context, RewardItem reward, AppProvider ap) {
+    final p = context.read<ThemeProvider>().paletteData;
     showModalBottomSheet(
       context: context,
-      backgroundColor: context.read<ThemeProvider>().paletteData.bg,
+      backgroundColor: p.card,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => ChangeNotifierProvider.value(
-        value: p,
+        value: ap,
         child: _RewardDetailSheet(reward: reward),
       ),
     );
@@ -320,17 +320,18 @@ class _RewardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color: context.read<ThemeProvider>().paletteData.bg,
+          color: p.card,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: _canAfford
-                ? context.read<ThemeProvider>().paletteData.bg
-                : Colors.white.withOpacity(.05),
+                ? p.primary.withOpacity(.3)
+                : p.cardBorder,
           ),
         ),
         child: Column(
@@ -340,9 +341,9 @@ class _RewardCard extends StatelessWidget {
             Container(
               height: 90,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(_canAfford ? .06 : .03),
+                color: _canAfford ? p.bg2 : p.bg2.withOpacity(.6),
                 borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(16)),
+                    const BorderRadius.vertical(top: Radius.circular(16)),
               ),
               child: Stack(
                 children: [
@@ -352,24 +353,24 @@ class _RewardCard extends StatelessWidget {
                             fontSize: 42,
                             color: _canAfford
                                 ? null
-                                : Colors.white.withOpacity(.3))),
+                                : p.textMut)),
                   ),
                   if (reward.originalValue != null)
                     Positioned(
                       top: 8,
                       right: 8,
                       child: Container(
-                        padding: EdgeInsets.symmetric(
+                        padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
-                          color: context.read<ThemeProvider>().paletteData.primaryLight,
+                          color: p.primaryLight,
                           borderRadius: BorderRadius.circular(5),
                         ),
                         child: Text(reward.originalValue!,
                             style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
-                                color: context.read<ThemeProvider>().paletteData.primary)),
+                                color: p.primary)),
                       ),
                     ),
                   if (!_canAfford)
@@ -377,13 +378,13 @@ class _RewardCard extends StatelessWidget {
                       top: 8,
                       left: 8,
                       child: Container(
-                        padding: EdgeInsets.symmetric(
+                        padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(.08),
+                          color: p.bg2,
                           borderRadius: BorderRadius.circular(5),
                         ),
-                        child: Text('🔒',
+                        child: const Text('🔒',
                             style: TextStyle(fontSize: 10)),
                       ),
                     ),
@@ -394,7 +395,7 @@ class _RewardCard extends StatelessWidget {
             // Info
             Expanded(
               child: Padding(
-                padding: EdgeInsets.all(10),
+                padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -402,34 +403,32 @@ class _RewardCard extends StatelessWidget {
                         style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(.4))),
-                    SizedBox(height: 2),
+                            color: p.textMut)),
+                    const SizedBox(height: 2),
                     Text(reward.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: _canAfford
-                                ? Colors.white
-                                : Colors.white.withOpacity(.4))),
+                            color: _canAfford ? p.text : p.textMut)),
                     const Spacer(),
                     Row(
                       children: [
-                        Text('⭐', style: TextStyle(fontSize: 11)),
-                        SizedBox(width: 3),
+                        const Text('⭐', style: TextStyle(fontSize: 11)),
+                        const SizedBox(width: 3),
                         Text('${reward.pointsCost}',
                             style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                                 color: _canAfford
-                                    ? context.read<ThemeProvider>().paletteData.bg
-                                    : Colors.white.withOpacity(.3))),
-                        SizedBox(width: 3),
+                                    ? p.primary
+                                    : p.textMut)),
+                        const SizedBox(width: 3),
                         Text('pt',
                             style: TextStyle(
                                 fontSize: 10,
-                                color: Colors.white.withOpacity(.3))),
+                                color: p.textMut)),
                       ],
                     ),
                   ],
@@ -451,8 +450,9 @@ class _RewardDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(builder: (context, p, _) {
-      final userPoints = p.user?.points ?? 0;
+    final p = context.read<ThemeProvider>().paletteData;
+    return Consumer<AppProvider>(builder: (context, ap, _) {
+      final userPoints = ap.user?.points ?? 0;
       final canAfford = userPoints >= reward.pointsCost;
       final pointsAfter = userPoints - reward.pointsCost;
 
@@ -461,7 +461,7 @@ class _RewardDetailSheet extends StatelessWidget {
             EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: SingleChildScrollView(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(24, 16, 24, 40),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -470,12 +470,12 @@ class _RewardDetailSheet extends StatelessWidget {
                   child: Container(
                     width: 36, height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.2),
+                      color: p.cardBorder,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                 // Header
                 Row(
@@ -483,86 +483,86 @@ class _RewardDetailSheet extends StatelessWidget {
                     Container(
                       width: 72, height: 72,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(.06),
+                        color: p.bg2,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Center(
                           child: Text(reward.emoji,
-                              style: TextStyle(fontSize: 38))),
+                              style: const TextStyle(fontSize: 38))),
                     ),
-                    SizedBox(width: 16),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(reward.brand,
                               style: TextStyle(
-                                  color: Colors.white.withOpacity(.4),
+                                  color: p.textSec,
                                   fontSize: 12)),
                           Text(reward.title,
                               style: TextStyle(
-                                  color: Colors.white,
+                                  color: p.text,
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700)),
-                          SizedBox(height: 4),
-                          _typePill(context, reward.type),
+                          const SizedBox(height: 4),
+                          _typePill(context, reward.type, p),
                         ],
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                 Text(reward.description,
                     style: TextStyle(
-                        color: Colors.white.withOpacity(.6),
+                        color: p.textSec,
                         fontSize: 14,
                         height: 1.5)),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                 // Cost breakdown
                 Container(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: context.read<ThemeProvider>().paletteData.bg,
+                    color: p.bg2,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: context.read<ThemeProvider>().paletteData.bg),
+                    border: Border.all(color: p.cardBorder),
                   ),
                   child: Column(
                     children: [
-                      _costRow('I tuoi punti', '$userPoints ⭐', Colors.white),
-                      SizedBox(height: 8),
+                      _costRow('I tuoi punti', '$userPoints ⭐', p.text, p),
+                      const SizedBox(height: 8),
                       _costRow('Costo premio', '- ${reward.pointsCost} ⭐',
-                          context.read<ThemeProvider>().paletteData.bg),
+                          p.textSec, p),
                       Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Divider(color: context.read<ThemeProvider>().paletteData.bg, height: 1),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(color: p.cardBorder, height: 1),
                       ),
                       _costRow('Punti rimanenti', '$pointsAfter ⭐',
-                          canAfford ? context.read<ThemeProvider>().paletteData.primary : context.read<ThemeProvider>().paletteData.bg,
-                          bold: true),
+                          canAfford ? p.primary : p.textMut,
+                          p, bold: true),
                     ],
                   ),
                 ),
 
                 if (!canAfford) ...[
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Container(
-                    padding: EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: context.read<ThemeProvider>().paletteData.bg,
+                      color: p.bg2,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: context.read<ThemeProvider>().paletteData.bg.withOpacity(.3)),
+                      border: Border.all(color: p.cardBorder),
                     ),
                     child: Row(
                       children: [
-                        Text('⚠️', style: TextStyle(fontSize: 16)),
-                        SizedBox(width: 10),
+                        const Text('⚠️', style: TextStyle(fontSize: 16)),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Ti mancano ${reward.pointsCost - userPoints} punti. Completa altre attività!',
                             style: TextStyle(
-                                color: context.read<ThemeProvider>().paletteData.bg,
+                                color: p.text,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500),
                           ),
@@ -571,23 +571,23 @@ class _RewardDetailSheet extends StatelessWidget {
                     ),
                   ),
                 ],
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 ElevatedButton(
                   onPressed:
-                      canAfford ? () => _confirmRedeem(context, p) : null,
+                      canAfford ? () => _confirmRedeem(context, ap, p) : null,
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size.fromHeight(54),
                     backgroundColor: canAfford
-                        ? context.read<ThemeProvider>().paletteData.primary
-                        : Colors.white.withOpacity(.1),
-                    disabledForegroundColor: Colors.white.withOpacity(.3),
+                        ? p.primary
+                        : p.bg2,
+                    disabledForegroundColor: p.textMut,
                   ),
                   child: Text(
                     canAfford
                         ? 'Riscatta per ${reward.pointsCost} pt ⭐'
                         : 'Punti insufficienti',
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -599,34 +599,34 @@ class _RewardDetailSheet extends StatelessWidget {
     });
   }
 
-  Widget _typePill(BuildContext context, String type) {
+  Widget _typePill(BuildContext context, String type, dynamic p) {
     final labels = {
-      'voucher': ('🎟️', 'Voucher', context.read<ThemeProvider>().paletteData.bg),
-      'discount': ('🏷️', 'Sconto', context.read<ThemeProvider>().paletteData.bg),
-      'experience': ('✨', 'Esperienza', context.read<ThemeProvider>().paletteData.bg),
-      'digital': ('💻', 'Digitale', context.read<ThemeProvider>().paletteData.primary),
+      'voucher': ('🎟️', 'Voucher', p.primary),
+      'discount': ('🏷️', 'Sconto', p.primary),
+      'experience': ('✨', 'Esperienza', p.accent),
+      'digital': ('💻', 'Digitale', p.primary),
     };
-    final l = labels[type] ?? ('🎁', type, context.read<ThemeProvider>().paletteData.primary);
+    final l = labels[type] ?? ('🎁', type, p.primary);
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: l.$3.withOpacity(.15),
+        color: (l.$3 as Color).withOpacity(.15),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text('${l.$1} ${l.$2}',
           style: TextStyle(
-              fontSize: 10, fontWeight: FontWeight.w600, color: l.$3)),
+              fontSize: 10, fontWeight: FontWeight.w600, color: l.$3 as Color)),
     );
   }
 
-  Widget _costRow(String label, String value, Color valueColor,
+  Widget _costRow(String label, String value, Color valueColor, dynamic p,
       {bool bold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
             style: TextStyle(
-                color: Colors.white.withOpacity(.5), fontSize: 13)),
+                color: (p.textSec) as Color, fontSize: 13)),
         Text(value,
             style: TextStyle(
                 color: valueColor,
@@ -636,33 +636,34 @@ class _RewardDetailSheet extends StatelessWidget {
     );
   }
 
-  void _confirmRedeem(BuildContext context, AppProvider p) {
+  void _confirmRedeem(BuildContext context, AppProvider ap, dynamic p) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: context.read<ThemeProvider>().paletteData.bg,
+        backgroundColor: p.card as Color,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Riscatta ${reward.emoji} ${reward.title}?',
             style: TextStyle(
-                color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                color: p.text as Color,
+                fontWeight: FontWeight.w700,
+                fontSize: 16)),
         content: Text(
           'Verranno scalati ${reward.pointsCost} punti dal tuo saldo.\nRiceverai un codice da utilizzare subito.',
-          style:
-              TextStyle(color: Colors.white.withOpacity(.5), fontSize: 13),
+          style: TextStyle(color: p.textSec as Color, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Annulla',
-                style: TextStyle(color: Colors.white.withOpacity(.4))),
+                style: TextStyle(color: p.textMut as Color)),
           ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
               Navigator.pop(context);
-              final ok = await p.redeemReward(reward);
-              if (ok && context.mounted) _showSuccessDialog(context, p);
+              final ok = await ap.redeemReward(reward);
+              if (ok && context.mounted) _showSuccessDialog(context, ap, p);
             },
             child: Text(context.sL.confirm),
           ),
@@ -671,57 +672,56 @@ class _RewardDetailSheet extends StatelessWidget {
     );
   }
 
-  void _showSuccessDialog(BuildContext context, AppProvider p) {
-    final redeemed = p.redeemedRewards.first;
+  void _showSuccessDialog(BuildContext context, AppProvider ap, dynamic p) {
+    final redeemed = ap.redeemedRewards.first;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        backgroundColor: context.read<ThemeProvider>().paletteData.bg,
+        backgroundColor: p.card as Color,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('🎉', style: TextStyle(fontSize: 56)),
-            SizedBox(height: 12),
+            const Text('🎉', style: TextStyle(fontSize: 56)),
+            const SizedBox(height: 12),
             Text(context.sL.rewardsPoints,
                 style: TextStyle(
-                    color: Colors.white,
+                    color: p.text as Color,
                     fontWeight: FontWeight.w700,
                     fontSize: 18)),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(reward.title,
-                style: TextStyle(
-                    color: Colors.white.withOpacity(.5), fontSize: 13)),
-            SizedBox(height: 20),
+                style: TextStyle(color: p.textSec as Color, fontSize: 13)),
+            const SizedBox(height: 20),
             // Code box
             Container(
               width: double.infinity,
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: context.read<ThemeProvider>().paletteData.primaryLight,
+                color: (p.primaryLight) as Color,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: context.read<ThemeProvider>().paletteData.primary.withOpacity(.4)),
+                border: Border.all(color: (p.primary as Color).withOpacity(.4)),
               ),
               child: Column(
                 children: [
                   Text('Il tuo codice',
                       style: TextStyle(
-                          color: Colors.white.withOpacity(.5), fontSize: 11)),
-                  SizedBox(height: 6),
+                          color: p.textSec as Color, fontSize: 11)),
+                  const SizedBox(height: 6),
                   Text(redeemed.code,
                       style: TextStyle(
-                          color: context.read<ThemeProvider>().paletteData.primary,
+                          color: p.primary as Color,
                           fontWeight: FontWeight.w800,
                           fontSize: 20,
                           letterSpacing: 2)),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   GestureDetector(
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: redeemed.code));
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('?'),
+                          content: Text('Codice copiato!'),
                           duration: Duration(seconds: 2)));
                     },
                     child: Row(
@@ -729,12 +729,12 @@ class _RewardDetailSheet extends StatelessWidget {
                       children: [
                         Icon(Icons.copy,
                             size: 14,
-                            color: context.read<ThemeProvider>().paletteData.primary.withOpacity(.6)),
-                        SizedBox(width: 4),
+                            color: (p.primary as Color).withOpacity(.6)),
+                        const SizedBox(width: 4),
                         Text('Copia codice',
                             style: TextStyle(
                                 fontSize: 11,
-                                color: context.read<ThemeProvider>().paletteData.primary.withOpacity(.6))),
+                                color: (p.primary as Color).withOpacity(.6))),
                       ],
                     ),
                   ),
@@ -763,78 +763,79 @@ class _WalletTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(builder: (context, p, _) {
-      final redeemed = p.redeemedRewards;
+    final p = context.read<ThemeProvider>().paletteData;
+    return Consumer<AppProvider>(builder: (context, ap, _) {
+      final redeemed = ap.redeemedRewards;
 
       if (redeemed.isEmpty) {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('🎁', style: TextStyle(fontSize: 56)),
-              SizedBox(height: 16),
+              const Text('🎁', style: TextStyle(fontSize: 56)),
+              const SizedBox(height: 16),
               Text(context.sL.rewardsLocked,
                   style: TextStyle(
-                      color: Colors.white,
+                      color: p.text,
                       fontSize: 16,
                       fontWeight: FontWeight.w600)),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(context.sL.rewardsLockedDesc,
                   style: TextStyle(
-                      color: Colors.white.withOpacity(.4), fontSize: 13)),
+                      color: p.textMut, fontSize: 13)),
             ],
           ),
         );
       }
 
       return ListView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         children: [
           // Summary
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(colors: [
-                context.read<ThemeProvider>().paletteData.primary.withOpacity(.12),
-                context.read<ThemeProvider>().paletteData.bg.withOpacity(.06),
+                p.primary.withOpacity(.12),
+                p.bg2.withOpacity(.5),
               ]),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: context.read<ThemeProvider>().paletteData.primary.withOpacity(.2)),
+              border: Border.all(color: p.primary.withOpacity(.2)),
             ),
             child: Row(
               children: [
-                Text('🎟️', style: TextStyle(fontSize: 28)),
-                SizedBox(width: 12),
+                const Text('🎟️', style: TextStyle(fontSize: 28)),
+                const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('${redeemed.length} premi riscattati',
                         style: TextStyle(
-                            color: Colors.white,
+                            color: p.text,
                             fontWeight: FontWeight.w700,
                             fontSize: 16)),
                     Text(
                         '${redeemed.where((r) => !r.isUsed).length} ancora disponibili',
                         style: TextStyle(
-                            color: Colors.white.withOpacity(.4),
+                            color: p.textMut,
                             fontSize: 12)),
                   ],
                 ),
               ],
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           if (redeemed.any((r) => !r.isUsed)) ...[
-            _sectionLabel('Disponibili'),
-            SizedBox(height: 8),
+            _sectionLabel('Disponibili', p),
+            const SizedBox(height: 8),
             ...redeemed.where((r) => !r.isUsed).map((r) => _RedeemedCard(reward: r)),
           ],
 
           if (redeemed.any((r) => r.isUsed)) ...[
-            SizedBox(height: 16),
-            _sectionLabel('Utilizzati'),
-            SizedBox(height: 8),
+            const SizedBox(height: 16),
+            _sectionLabel('Utilizzati', p),
+            const SizedBox(height: 8),
             ...redeemed.where((r) => r.isUsed).map((r) => _RedeemedCard(reward: r)),
           ],
         ],
@@ -842,11 +843,11 @@ class _WalletTab extends StatelessWidget {
     });
   }
 
-  Widget _sectionLabel(String t) => Text(t.toUpperCase(),
+  Widget _sectionLabel(String t, dynamic p) => Text(t.toUpperCase(),
       style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w700,
-          color: Colors.white.withOpacity(.3),
+          color: p.textMut as Color,
           letterSpacing: .5));
 }
 
@@ -856,20 +857,21 @@ class _RedeemedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     final isUsed = reward.isUsed;
     final date =
         '${reward.redeemedAt.day}/${reward.redeemedAt.month}/${reward.redeemedAt.year}';
 
     return Container(
-      margin: EdgeInsets.only(bottom: 10),
-      padding: EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isUsed ? Colors.white.withOpacity(.03) : context.read<ThemeProvider>().paletteData.bg,
+        color: isUsed ? p.bg2 : p.card,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isUsed
-              ? Colors.white.withOpacity(.06)
-              : context.read<ThemeProvider>().paletteData.primary.withOpacity(.25),
+              ? p.cardBorder
+              : p.primary.withOpacity(.25),
         ),
       ),
       child: Column(
@@ -880,24 +882,22 @@ class _RedeemedCard extends StatelessWidget {
               Text(reward.rewardEmoji,
                   style: TextStyle(
                       fontSize: 28,
-                      color: isUsed ? Colors.white.withOpacity(.3) : null)),
-              SizedBox(width: 12),
+                      color: isUsed ? p.textMut : null)),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(reward.rewardTitle,
                         style: TextStyle(
-                            color: isUsed
-                                ? Colors.white.withOpacity(.35)
-                                : Colors.white,
+                            color: isUsed ? p.textMut : p.text,
                             fontWeight: FontWeight.w600,
                             fontSize: 13,
                             decoration:
                                 isUsed ? TextDecoration.lineThrough : null)),
                     Text('Riscattato il $date · ${reward.pointsSpent} pt',
                         style: TextStyle(
-                            color: Colors.white.withOpacity(.3),
+                            color: p.textMut,
                             fontSize: 11)),
                   ],
                 ),
@@ -905,35 +905,35 @@ class _RedeemedCard extends StatelessWidget {
               if (isUsed)
                 Container(
                   padding:
-                      EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(.07),
+                    color: p.bg2,
                     borderRadius: BorderRadius.circular(5),
                   ),
                   child: Text('Usato',
                       style: TextStyle(
                           fontSize: 10,
-                          color: Colors.white54,
+                          color: p.textMut,
                           fontWeight: FontWeight.w600)),
                 ),
             ],
           ),
           if (!isUsed) ...[
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Container(
               padding:
-                  EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: context.read<ThemeProvider>().paletteData.primaryLight,
+                color: p.primaryLight,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: context.read<ThemeProvider>().paletteData.primary.withOpacity(.3)),
+                border: Border.all(color: p.primary.withOpacity(.3)),
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(reward.code,
                         style: TextStyle(
-                            color: context.read<ThemeProvider>().paletteData.primary,
+                            color: p.primary,
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
                             letterSpacing: 1.5)),
@@ -942,15 +942,15 @@ class _RedeemedCard extends StatelessWidget {
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: reward.code));
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('?'),
+                          content: Text('Codice copiato!'),
                           duration: Duration(seconds: 2)));
                     },
-                    child: Icon(Icons.copy, size: 16, color: context.read<ThemeProvider>().paletteData.primary),
+                    child: Icon(Icons.copy, size: 16, color: p.primary),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             GestureDetector(
               onTap: () =>
                   context.read<AppProvider>().markRewardUsed(reward.code),
@@ -958,11 +958,11 @@ class _RedeemedCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.check_circle_outline,
-                      size: 14, color: Colors.white.withOpacity(.3)),
-                  SizedBox(width: 4),
+                      size: 14, color: p.textMut),
+                  const SizedBox(width: 4),
                   Text('Segna come utilizzato',
                       style: TextStyle(
-                          fontSize: 11, color: Colors.white.withOpacity(.3))),
+                          fontSize: 11, color: p.textMut)),
                 ],
               ),
             ),
@@ -972,12 +972,3 @@ class _RedeemedCard extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-
-
-

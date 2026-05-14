@@ -3,36 +3,63 @@ import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/progression_provider.dart';
 import '../../models/habit_library.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Popup di introduzione nuova abitudine.
 /// Mostra due opzioni illustrate affiancate — l'utente sceglie una.
-class HabitIntroSheet extends StatelessWidget {
-  final HabitDefinition habitA;
-  final HabitDefinition habitB;
+/// Supporta ciclo su più coppie via "altre opzioni".
+class HabitIntroSheet extends StatefulWidget {
+  /// Coppie da mostrare (di solito una, ma possono essere più).
+  /// La prima è quella "corrente", le altre accessibili via "altre opzioni".
+  final List<(HabitDefinition, HabitDefinition)> pairs;
+
+  /// Callback chiamata con l'ID dell'abitudine scelta (prima del pop).
+  final void Function(String habitId)? onHabitChosen;
 
   const HabitIntroSheet({
     super.key,
-    required this.habitA,
-    required this.habitB,
+    required this.pairs,
+    this.onHabitChosen,
   });
 
   static Future<void> show(
     BuildContext context, {
     required HabitDefinition habitA,
     required HabitDefinition habitB,
+    List<(HabitDefinition, HabitDefinition)>? allPairs,
+    void Function(String habitId)? onHabitChosen,
   }) {
+    final pairs = allPairs ?? [(habitA, habitB)];
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => HabitIntroSheet(habitA: habitA, habitB: habitB),
+      builder: (_) => HabitIntroSheet(pairs: pairs, onHabitChosen: onHabitChosen),
     );
+  }
+
+  @override
+  State<HabitIntroSheet> createState() => _HabitIntroSheetState();
+}
+
+class _HabitIntroSheetState extends State<HabitIntroSheet> {
+  int _currentIndex = 0;
+
+  (HabitDefinition, HabitDefinition) get _currentPair =>
+      widget.pairs[_currentIndex];
+
+  void _nextPair() {
+    setState(() {
+      _currentIndex = (_currentIndex + 1) % widget.pairs.length;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.read<ThemeProvider>().paletteData;
     final isAmb = context.read<ThemeProvider>().isAmbient;
+    final s = context.sL;
+    final (habitA, habitB) = _currentPair;
 
     return Container(
       decoration: BoxDecoration(
@@ -55,7 +82,7 @@ class HabitIntroSheet extends StatelessWidget {
 
           // Titolo
           Text(
-            'È il momento di aggiungere\nqualcosa di nuovo.',
+            s.habitChoiceTitle,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: isAmb ? 22 : 18,
@@ -69,7 +96,7 @@ class HabitIntroSheet extends StatelessWidget {
           const SizedBox(height: 8),
 
           Text(
-            'Scegli dove concentrarti adesso.',
+            s.habitChoiceSub,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: p.textSec),
           ),
@@ -101,22 +128,23 @@ class HabitIntroSheet extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // "Altre opzioni" sottotitolo
-          GestureDetector(
-            onTap: () => _showOthers(context),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'mostrami altre opzioni ›',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: p.textSec,
-                  decoration: TextDecoration.underline,
-                  decorationColor: p.textSec,
+          // "Altre opzioni" — visibile solo se ci sono più coppie da mostrare
+          if (widget.pairs.length > 1)
+            GestureDetector(
+              onTap: _nextPair,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  s.habitChoiceShowOther,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: p.textSec,
+                    decoration: TextDecoration.underline,
+                    decorationColor: p.textSec,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -124,29 +152,12 @@ class HabitIntroSheet extends StatelessWidget {
 
   void _choose(BuildContext context, String habitId) {
     context.read<ProgressionProvider>().acceptHabit(habitId);
+    // Notifica il chiamante PRIMA del pop così può usare il proprio contesto
+    // per triggerare il tutorial (il contesto dello sheet viene invalidato dal pop).
+    widget.onHabitChosen?.call(habitId);
     Navigator.pop(context);
-    // Mostra conferma
-    final habit = HabitLibrary.findById(habitId);
-    if (habit != null) {
-      final p = context.read<ThemeProvider>().paletteData;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(habit.coachIntro),
-          backgroundColor: p.primary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-  }
-
-  void _showOthers(BuildContext context) {
-    context.read<ProgressionProvider>().dismissChoice(habitA.id);
-    Navigator.pop(context);
-    // TODO: mostra la prossima coppia disponibile
+    // La conferma visiva è gestita dal BwBanner in home_shell.dart
+    // tramite _checkNewHabits() — nessun SnackBar duplicato qui.
   }
 }
 
@@ -165,6 +176,7 @@ class _HabitOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.sL;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -196,14 +208,14 @@ class _HabitOption extends StatelessWidget {
               ),
             ),
 
-            // Nome e descrizione
+            // Nome e descrizione — LOCALIZZATI
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    habit.name,
+                    s.habitName(habit.id),
                     style: TextStyle(
                       fontSize: isAmb ? 16 : 14,
                       fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
@@ -214,7 +226,7 @@ class _HabitOption extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    habit.description,
+                    s.habitDesc(habit.id),
                     style: TextStyle(
                       fontSize: 11,
                       color: p.textSec,
@@ -241,7 +253,7 @@ class _HabitOption extends StatelessWidget {
                       )),
                       const SizedBox(width: 4),
                       Text(
-                        _effortLabel(habit.effort),
+                        _effortLabel(s, habit.effort),
                         style: TextStyle(fontSize: 9, color: p.textSec),
                       ),
                     ],
@@ -255,11 +267,11 @@ class _HabitOption extends StatelessWidget {
     );
   }
 
-  String _effortLabel(HabitEffort e) {
+  String _effortLabel(BwStrings s, HabitEffort e) {
     switch (e) {
-      case HabitEffort.low:    return 'facile';
-      case HabitEffort.medium: return 'moderato';
-      case HabitEffort.high:   return 'impegnativo';
+      case HabitEffort.low:    return s.habitEffortLow;
+      case HabitEffort.medium: return s.habitEffortMedium;
+      case HabitEffort.high:   return s.habitEffortHigh;
     }
   }
 }

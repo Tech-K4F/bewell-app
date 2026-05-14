@@ -3,10 +3,11 @@ import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/theme_provider.dart';
-import '../../providers/app_provider.dart';
 import '../../providers/progression_provider.dart';
 import '../../widgets/companion/companion_widget.dart';
 import '../../widgets/locale_selector.dart';
+import '../../services/notification_service.dart';
+import '../../services/analytics_service.dart';
 
 class WellyWelcomeScreen extends StatefulWidget {
   const WellyWelcomeScreen({super.key});
@@ -19,8 +20,17 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
   final PageController _pageCtrl = PageController();
   int _page = 0;
   String _wellyName = 'Welly';
+  String _userType = 'worker'; // 'student' | 'worker' — default: worker
   final _nameCtrl = TextEditingController(text: 'Welly');
   bool _firstDrinkDone = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<ProgressionProvider>().init();
+    });
+  }
 
   @override
   void dispose() {
@@ -30,7 +40,7 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
   }
 
   void _next() {
-    if (_page < 3) {
+    if (_page < 4) {
       _pageCtrl.nextPage(
         duration: const Duration(milliseconds: 380),
         curve: Curves.easeOutCubic,
@@ -42,14 +52,24 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
   Future<void> _finish() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('welly_name', _wellyName);
+    await prefs.setString('user_type', _userType);
     await prefs.setBool('welly_welcomed', true);
+    AnalyticsService.instance.logOnboardingCompleted(_userType);
     if (mounted) {
       Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
   Future<void> _drinkFirst() async {
-    await context.read<ProgressionProvider>().markCompleted('water');
+    // Registra il primo bicchiere nel contatore giornaliero
+    // senza marcare l'abitudine come completata: servono 8 bicchieri.
+    // La home screen gestirà il completamento quando il target è raggiunto.
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month}-${today.day}';
+    await prefs.setString('water_date', todayStr);
+    await prefs.setInt('water_count', 1);
+
     setState(() => _firstDrinkDone = true);
     await Future.delayed(const Duration(milliseconds: 600));
     _next();
@@ -57,7 +77,6 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final s = context.sL;
     final theme = context.watch<ThemeProvider>();
     final p = theme.paletteData;
 
@@ -71,7 +90,7 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
               child: Row(
-                children: List.generate(4, (i) => Expanded(
+                children: List.generate(5, (i) => Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 3),
                     height: 2,
@@ -94,12 +113,15 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
                   _Page2(
                     p: p,
                     nameCtrl: _nameCtrl,
+                    userType: _userType,
+                    onUserTypeChanged: (t) => setState(() => _userType = t),
                     onNext: () {
                       FocusScope.of(context).unfocus();
-                      setState(() =>
-                        _wellyName = _nameCtrl.text.trim().isEmpty
-                            ? 'Welly'
-                            : _nameCtrl.text.trim());
+                      final name = _nameCtrl.text.trim().isEmpty
+                          ? 'Welly'
+                          : _nameCtrl.text.trim();
+                      setState(() => _wellyName = name);
+                      AnalyticsService.instance.logWellyNamed(name);
                       _next();
                     },
                   ),
@@ -109,7 +131,8 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
                     done: _firstDrinkDone,
                     onDrink: _drinkFirst,
                   ),
-                  _Page4(p: p, onFinish: _finish),
+                  _Page4(p: p, onNext: _next),
+                  _Page5(p: p, onFinish: _finish),
                 ],
               ),
             ),
@@ -134,7 +157,7 @@ class _Page1 extends StatelessWidget {
       child: Column(
         children: [
           // Welly grande
-          CompanionWidget(size: 180, mood: CompanionMood.idle),
+          CompanionWidget(size: 180, mood: WellyMood.calm),
           const SizedBox(height: 32),
 
           Text(
@@ -172,14 +195,18 @@ class _Page1 extends StatelessWidget {
   }
 }
 
-// ── Pagina 2: Nome Welly ──────────────────────────────────────────────────────
+// ── Pagina 2: Nome Welly + Tipo utente ───────────────────────────────────────
 class _Page2 extends StatelessWidget {
   final BwPaletteData p;
   final TextEditingController nameCtrl;
+  final String userType;
+  final ValueChanged<String> onUserTypeChanged;
   final VoidCallback onNext;
   const _Page2({
     required this.p,
     required this.nameCtrl,
+    required this.userType,
+    required this.onUserTypeChanged,
     required this.onNext,
   });
 
@@ -192,7 +219,7 @@ class _Page2 extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CompanionWidget(size: 140, mood: CompanionMood.idle),
+          CompanionWidget(size: 140, mood: WellyMood.calm),
           const SizedBox(height: 32),
 
           Text(
@@ -246,12 +273,113 @@ class _Page2 extends StatelessWidget {
 
           const SizedBox(height: 32),
 
+          // ── Separatore tipo utente ──────────────────────────────────────
+          Row(
+            children: [
+              Expanded(child: Divider(color: p.cardBorder, thickness: 0.5)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  s.onboardingUserTypeTitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: p.textSec,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              Expanded(child: Divider(color: p.cardBorder, thickness: 0.5)),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Scelta student / worker ─────────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: _UserTypeCard(
+                  emoji: '🎓',
+                  label: s.onboardingStudent,
+                  selected: userType == 'student',
+                  p: p,
+                  onTap: () => onUserTypeChanged('student'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _UserTypeCard(
+                  emoji: '💼',
+                  label: s.onboardingWorker,
+                  selected: userType == 'worker',
+                  p: p,
+                  onTap: () => onUserTypeChanged('worker'),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 32),
+
           _WellyButton(
             label: s.perfect,
             p: p,
             onTap: onNext,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Card tipo utente ──────────────────────────────────────────────────────────
+class _UserTypeCard extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final bool selected;
+  final BwPaletteData p;
+  final VoidCallback onTap;
+
+  const _UserTypeCard({
+    required this.emoji,
+    required this.label,
+    required this.selected,
+    required this.p,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: selected ? p.primaryLight : p.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? p.primary : p.cardBorder,
+            width: selected ? 1.5 : 0.5,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 32)),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: selected ? p.primary : p.text,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -279,7 +407,7 @@ class _Page3 extends StatelessWidget {
         children: [
           CompanionWidget(
             size: 130,
-            mood: done ? CompanionMood.happy : CompanionMood.encourage,
+            mood: done ? WellyMood.radiant : WellyMood.returning,
           ),
           const SizedBox(height: 28),
 
@@ -349,8 +477,8 @@ class _Page3 extends StatelessWidget {
 // ── Pagina 4: Premi preview ───────────────────────────────────────────────────
 class _Page4 extends StatelessWidget {
   final BwPaletteData p;
-  final VoidCallback onFinish;
-  const _Page4({required this.p, required this.onFinish});
+  final VoidCallback onNext;
+  const _Page4({required this.p, required this.onNext});
 
   @override
   Widget build(BuildContext context) {
@@ -359,7 +487,7 @@ class _Page4 extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(28, 32, 28, 40),
       child: Column(
         children: [
-          CompanionWidget(size: 130, mood: CompanionMood.happy),
+          CompanionWidget(size: 130, mood: WellyMood.radiant),
           const SizedBox(height: 28),
 
           Text(
@@ -389,9 +517,75 @@ class _Page4 extends StatelessWidget {
           const Spacer(),
 
           _WellyButton(
-            label: s.goToHome,
+            label: s.letsGo,
             p: p,
+            onTap: onNext,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Pagina 5: Permesso notifiche ──────────────────────────────────────────────
+class _Page5 extends StatelessWidget {
+  final BwPaletteData p;
+  final VoidCallback onFinish;
+  const _Page5({required this.p, required this.onFinish});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.sL;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 32, 28, 40),
+      child: Column(
+        children: [
+          CompanionWidget(size: 150, mood: WellyMood.welcoming),
+          const SizedBox(height: 28),
+
+          Text(
+            s.notifPermTitle,
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: p.text,
+              height: 1.2,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            s.notifPermBody,
+            style: TextStyle(
+              fontSize: 15,
+              color: p.textSec,
+              height: 1.7,
+            ),
+            textAlign: TextAlign.center,
+          ),
+
+          const Spacer(),
+
+          _WellyButton(
+            label: s.notifPermAllow,
+            p: p,
+            onTap: () async {
+              await NotificationService.instance.requestPermission();
+              onFinish();
+            },
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
             onTap: onFinish,
+            child: Text(
+              s.notifPermSkip,
+              style: TextStyle(
+                fontSize: 14,
+                color: p.textMut,
+                decoration: TextDecoration.underline,
+                decorationColor: p.textMut,
+              ),
+            ),
           ),
         ],
       ),
@@ -512,7 +706,6 @@ class _WellyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = context.sL;
     return GestureDetector(
       onTap: onTap,
       child: Container(

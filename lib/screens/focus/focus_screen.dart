@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/bw_scaffold.dart';
+import '../../services/analytics_service.dart';
 
 enum _TimerState { idle, running, paused, done }
 
@@ -40,6 +41,9 @@ class _FocusScreenState extends State<FocusScreen>
   }
 
   void _start() {
+    if (_state == _TimerState.idle) {
+      AnalyticsService.instance.logFocusSessionStarted(_totalSeconds ~/ 60);
+    }
     setState(() => _state = _TimerState.running);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
@@ -48,6 +52,7 @@ class _FocusScreenState extends State<FocusScreen>
         } else {
           _state = _TimerState.done;
           _timer?.cancel();
+          AnalyticsService.instance.logFocusSessionCompleted(_totalSeconds ~/ 60);
         }
       });
     });

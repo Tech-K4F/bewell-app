@@ -6,39 +6,21 @@ import '../../providers/progression_provider.dart';
 import '../../models/habit_library.dart';
 
 // ── Config globale debug ──────────────────────────────────────────────────────
-// Questi valori vengono letti da SharedPreferences al runtime
-// e modificati dal pannello debug. In produzione sono sempre default.
 class DebugConfig {
   static bool enabled = false;
-  static double timeAccelerator = 1.0; // 1.0 = tempo reale, 144.0 = 1gg=10min
 
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     enabled = prefs.getBool('debug_enabled') ?? false;
-    timeAccelerator = prefs.getDouble('debug_time_accelerator') ?? 1.0;
   }
 
   static Future<void> save() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('debug_enabled', enabled);
-    await prefs.setDouble('debug_time_accelerator', timeAccelerator);
-  }
-
-  // Converte giorni reali in giorni simulati
-  static int simulatedDays(int realDays) {
-    if (!enabled || timeAccelerator <= 1.0) return realDays;
-    return (realDays * timeAccelerator).floor();
-  }
-
-  // Converte minuti reali in minuti simulati per i reminder
-  static int simulatedMinutes(int realMinutes) {
-    if (!enabled || timeAccelerator <= 1.0) return realMinutes;
-    return (realMinutes / timeAccelerator).ceil().clamp(1, realMinutes);
   }
 }
 
 // ── Trigger nascosto ──────────────────────────────────────────────────────────
-// Wrappa qualsiasi widget — 7 tap aprono il pannello
 class DebugTrigger extends StatefulWidget {
   final Widget child;
   const DebugTrigger({super.key, required this.child});
@@ -95,28 +77,24 @@ class DebugPanel extends StatefulWidget {
 
 class _DebugPanelState extends State<DebugPanel> {
   bool _enabled = DebugConfig.enabled;
-  double _accelerator = DebugConfig.timeAccelerator;
-
-  final _acceleratorOptions = [
-    (1.0, 'Tempo reale'),
-    (12.0, '1 ora = 12 ore'),
-    (24.0, '1 ora = 1 giorno'),
-    (144.0, '10 min = 1 giorno'),
-    (1440.0, '1 min = 1 giorno'),
-  ];
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.read<ThemeProvider>();
-    final p = theme.paletteData;
     final progression = context.read<ProgressionProvider>();
+    final now = DateTime.now();
+
+    // Abitudini completate oggi
+    final completedToday = HabitLibrary.all.where((h) {
+      final last = progression.stateOf(h.id)?.lastCompletedAt;
+      if (last == null) return false;
+      return last.year == now.year && last.month == now.month && last.day == now.day;
+    }).toList();
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.88,
       decoration: BoxDecoration(
         color: const Color(0xFF0D1520),
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         border: Border.all(
             color: const Color(0xFF1D9E75).withValues(alpha: 0.3)),
       ),
@@ -128,8 +106,7 @@ class _DebugPanelState extends State<DebugPanel> {
             child: Column(
               children: [
                 Container(
-                  width: 36,
-                  height: 4,
+                  width: 36, height: 4,
                   decoration: BoxDecoration(
                     color: Colors.white24,
                     borderRadius: BorderRadius.circular(2),
@@ -138,46 +115,34 @@ class _DebugPanelState extends State<DebugPanel> {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    const Text('🛠️',
-                        style: TextStyle(fontSize: 20)),
+                    const Text('🛠️', style: TextStyle(fontSize: 20)),
                     const SizedBox(width: 10),
                     const Text(
                       'Debug Panel',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
+                        color: Colors.white, fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const Spacer(),
-                    // Toggle debug mode
-                    Row(
-                      children: [
-                        Text(
-                          _enabled ? 'ON' : 'OFF',
-                          style: TextStyle(
-                            color: _enabled
-                                ? const Color(0xFF1D9E75)
-                                : Colors.white38,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Switch(
-                          value: _enabled,
-                          onChanged: (v) async {
-                            setState(() => _enabled = v);
-                            DebugConfig.enabled = v;
-                            if (!v) {
-                              _accelerator = 1.0;
-                              DebugConfig.timeAccelerator = 1.0;
-                            }
-                            await DebugConfig.save();
-                          },
-                          activeColor: const Color(0xFF1D9E75),
-                        ),
-                      ],
+                    Text(
+                      _enabled ? 'ON' : 'OFF',
+                      style: TextStyle(
+                        color: _enabled
+                            ? const Color(0xFF1D9E75)
+                            : Colors.white38,
+                        fontSize: 12, fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: _enabled,
+                      onChanged: (v) async {
+                        setState(() => _enabled = v);
+                        DebugConfig.enabled = v;
+                        await DebugConfig.save();
+                      },
+                      activeColor: const Color(0xFF1D9E75),
                     ),
                   ],
                 ),
@@ -192,94 +157,120 @@ class _DebugPanelState extends State<DebugPanel> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
               children: [
 
-                // ── Acceleratore tempo ──────────────────────────────
+                // ── Stato progressione ──────────────────────────────
                 _Section(
-                  title: '⏱ Velocità tempo',
+                  title: '📅 Stato',
                   child: Column(
-                    children: _acceleratorOptions.map((opt) {
-                      final selected =
-                          (_accelerator - opt.$1).abs() < 0.1;
-                      return GestureDetector(
-                        onTap: _enabled
-                            ? () async {
-                                setState(
-                                    () => _accelerator = opt.$1);
-                                DebugConfig.timeAccelerator = opt.$1;
-                                await DebugConfig.save();
-                              }
-                            : null,
-                        child: Container(
-                          margin:
-                              const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? const Color(0xFF1D9E75)
-                                    .withValues(alpha: 0.2)
-                                : Colors.white.withValues(alpha: 0.04),
-                            borderRadius:
-                                BorderRadius.circular(10),
-                            border: Border.all(
-                              color: selected
-                                  ? const Color(0xFF1D9E75)
-                                  : Colors.white12,
-                              width: selected ? 1 : 0.5,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                opt.$2,
-                                style: TextStyle(
-                                  color: selected
-                                      ? const Color(0xFF1D9E75)
-                                      : Colors.white60,
-                                  fontSize: 13,
-                                  fontWeight: selected
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                ),
-                              ),
-                              const Spacer(),
-                              if (selected)
-                                const Icon(
-                                    Icons.check_circle_rounded,
-                                    color: Color(0xFF1D9E75),
-                                    size: 16),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                    children: [
+                      _InfoRow(label: 'Giorno app',      value: '${progression.appDayNumber}'),
+                      _InfoRow(label: 'Fase',            value: '${progression.currentPhase} / 5'),
+                      _InfoRow(label: 'Giorni totali',   value: '${progression.totalDaysCompleted}'),
+                      _InfoRow(label: 'Abitudini attive',value: '${progression.activeHabits.length}'),
+                      _InfoRow(
+                        label: 'Completate oggi',
+                        value: completedToday.isEmpty
+                            ? 'nessuna'
+                            : completedToday.map((h) => h.id).join(', '),
+                      ),
+                      _InfoRow(
+                        label: 'Nav sbloccate',
+                        value: progression.appDayNumber >= 14
+                            ? 'home / habits / growth / profile'
+                            : progression.appDayNumber >= 4
+                                ? 'home / habits / profile'
+                                : 'home / profile',
+                      ),
+                    ],
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                // ── Stato app ───────────────────────────────────────
+                // ── Simula giorni ───────────────────────────────────
                 _Section(
-                  title: '📅 Stato progressione',
+                  title: '📆 Simula giorni',
                   child: Column(
                     children: [
-                      _InfoRow(
-                        label: 'Giorno app',
-                        value:
-                            '${progression.appDayNumber} (simulato: ${DebugConfig.simulatedDays(progression.appDayNumber)})',
+                      const Text(
+                        'Avanza il giorno app. Giorno 4 sblocca Habits, giorno 14 sblocca Growth. '
+                        'I completamenti simulati vengono marcati come "ieri" così puoi testare il flusso di oggi.',
+                        style: TextStyle(color: Colors.white38, fontSize: 11, height: 1.4),
                       ),
-                      _InfoRow(
-                        label: 'Fase attuale',
-                        value: '${progression.currentPhase} / 5',
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [1, 3, 7, 14].map((days) =>
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () async {
+                                await progression.debugSimulateDays(days);
+                                if (!mounted) return;
+                                setState(() {});
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '+$days giorni → giorno ${progression.appDayNumber} | fase ${progression.currentPhase}'),
+                                    backgroundColor: const Color(0xFF1D9E75),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(right: 6),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white12, width: 0.5),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '+$days gg',
+                                    style: const TextStyle(
+                                      color: Colors.white60,
+                                      fontSize: 12, fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ).toList(),
                       ),
-                      _InfoRow(
-                        label: 'Giorni totali',
-                        value:
-                            '${progression.totalDaysCompleted}',
-                      ),
-                      _InfoRow(
-                        label: 'Abitudini attive',
-                        value:
-                            '${progression.activeHabits.length}',
+                      const SizedBox(height: 8),
+                      // Reset solo oggi — utile per ri-testare senza perdere progressione
+                      GestureDetector(
+                        onTap: () async {
+                          await progression.debugResetToday();
+                          if (!mounted) return;
+                          setState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Completamenti di oggi azzerati — puoi ri-testare il flusso'),
+                              backgroundColor: Color(0xFF1D9E75),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: Colors.orange.withValues(alpha: 0.3),
+                                width: 0.5),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Reset completamenti di oggi',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontSize: 12, fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -295,24 +286,19 @@ class _DebugPanelState extends State<DebugPanel> {
                         .where((h) => !h.isStarter)
                         .map((h) {
                       final status = progression.statusOf(h.id);
-                      final isActive =
-                          status != HabitStatus.locked;
+                      final isActive = status != HabitStatus.locked;
                       return Container(
                         margin: const EdgeInsets.only(bottom: 6),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
                           color: isActive
-                              ? const Color(0xFF1D9E75)
-                                  .withValues(alpha: 0.1)
-                              : Colors.white
-                                  .withValues(alpha: 0.04),
-                          borderRadius:
-                              BorderRadius.circular(10),
+                              ? const Color(0xFF1D9E75).withValues(alpha: 0.1)
+                              : Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: isActive
-                                ? const Color(0xFF1D9E75)
-                                    .withValues(alpha: 0.3)
+                                ? const Color(0xFF1D9E75).withValues(alpha: 0.3)
                                 : Colors.white12,
                             width: 0.5,
                           ),
@@ -321,8 +307,7 @@ class _DebugPanelState extends State<DebugPanel> {
                           children: [
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     h.name,
@@ -339,8 +324,7 @@ class _DebugPanelState extends State<DebugPanel> {
                                   Text(
                                     status.name,
                                     style: const TextStyle(
-                                      color: Colors.white30,
-                                      fontSize: 10,
+                                      color: Colors.white30, fontSize: 10,
                                     ),
                                   ),
                                 ],
@@ -349,119 +333,34 @@ class _DebugPanelState extends State<DebugPanel> {
                             if (!isActive)
                               GestureDetector(
                                 onTap: () async {
-                                  await progression
-                                      .acceptHabit(h.id);
+                                  await progression.acceptHabit(h.id);
                                   setState(() {});
                                 },
                                 child: Container(
-                                  padding:
-                                      const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 5),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 5),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF1D9E75)
-                                        .withValues(alpha: 0.2),
-                                    borderRadius:
-                                        BorderRadius.circular(8),
+                                    color: const Color(0xFF1D9E75).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color:
-                                          const Color(0xFF1D9E75),
-                                      width: 0.5,
-                                    ),
+                                        color: const Color(0xFF1D9E75), width: 0.5),
                                   ),
                                   child: const Text(
                                     'Sblocca',
                                     style: TextStyle(
                                       color: Color(0xFF1D9E75),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11, fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
                               )
                             else
                               const Icon(Icons.check_circle,
-                                  color: Color(0xFF1D9E75),
-                                  size: 16),
+                                  color: Color(0xFF1D9E75), size: 16),
                           ],
                         ),
                       );
                     }).toList(),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Simula giorni ───────────────────────────────────
-                _Section(
-                  title: '📆 Simula giorni completati',
-                  child: Column(
-                    children: [
-                      Text(
-                        'Aggiunge giorni completati all\'abitudine acqua per testare gli sblocchi',
-                        style: const TextStyle(
-                            color: Colors.white38, fontSize: 11),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [3, 7, 14, 21].map((days) =>
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () async {
-                                for (int i = 0; i < days; i++) {
-                                  // Forza completamento per N giorni
-                                  final state = progression
-                                      .stateOf('water');
-                                  if (state != null) {
-                                    state.daysCompleted += 1;
-                                    state.lastCompletedAt =
-                                        DateTime.now().subtract(
-                                            Duration(days: days - i));
-                                  }
-                                }
-                                // Trigger unlock evaluation
-                                await progression.forceEvaluate();
-                                setState(() {});
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(SnackBar(
-                                    content: Text(
-                                        '+$days giorni simulati'),
-                                    backgroundColor:
-                                        const Color(0xFF1D9E75),
-                                  ));
-                                }
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(
-                                    right: 6),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white
-                                      .withValues(alpha: 0.06),
-                                  borderRadius:
-                                      BorderRadius.circular(10),
-                                  border: Border.all(
-                                      color: Colors.white12,
-                                      width: 0.5),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '+$days gg',
-                                    style: const TextStyle(
-                                      color: Colors.white60,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ).toList(),
-                      ),
-                    ],
                   ),
                 ),
 
@@ -473,24 +372,24 @@ class _DebugPanelState extends State<DebugPanel> {
                   child: Column(
                     children: [
                       _DangerButton(
-                        label: 'Sblocca tutto (debug)',
+                        label: 'Sblocca tutto (giorno 30)',
                         onTap: () async {
-                          await progression.resetAll();
+                          await progression.debugUnlockAll();
+                          if (!mounted) return;
                           setState(() {});
-                          if (mounted) Navigator.pop(context);
+                          Navigator.pop(context);
                         },
                       ),
                       const SizedBox(height: 8),
                       _DangerButton(
                         label: 'Reset onboarding Welly',
                         onTap: () async {
-                          final prefs =
-                              await SharedPreferences.getInstance();
+                          final nav = Navigator.of(context);
+                          final prefs = await SharedPreferences.getInstance();
                           await prefs.remove('welly_welcomed');
                           await prefs.remove('welly_name');
-                          if (mounted) Navigator.pop(context);
-                          Navigator.pushReplacementNamed(
-                              context, '/welly-welcome');
+                          nav.pop();
+                          nav.pushReplacementNamed('/welly-welcome');
                         },
                       ),
                       const SizedBox(height: 8),
@@ -498,13 +397,12 @@ class _DebugPanelState extends State<DebugPanel> {
                         label: 'Reset tutto (come nuovo utente)',
                         danger: true,
                         onTap: () async {
-                          final prefs =
-                              await SharedPreferences.getInstance();
+                          final nav = Navigator.of(context);
+                          final prefs = await SharedPreferences.getInstance();
                           await prefs.clear();
                           await progression.resetAll();
-                          if (mounted) Navigator.pop(context);
-                          Navigator.pushReplacementNamed(
-                              context, '/welly-welcome');
+                          nav.pop();
+                          nav.pushReplacementNamed('/welly-welcome');
                         },
                       ),
                     ],
@@ -560,8 +458,7 @@ class _InfoRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
-              style: const TextStyle(
-                  color: Colors.white38, fontSize: 12)),
+              style: const TextStyle(color: Colors.white38, fontSize: 12)),
           Text(value,
               style: const TextStyle(
                   color: Colors.white70,
@@ -596,7 +493,9 @@ class _DangerButton extends StatelessWidget {
               : Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: danger ? Colors.red.withValues(alpha: 0.4) : Colors.white12,
+            color: danger
+                ? Colors.red.withValues(alpha: 0.4)
+                : Colors.white12,
             width: 0.5,
           ),
         ),
@@ -614,4 +513,3 @@ class _DangerButton extends StatelessWidget {
     );
   }
 }
-

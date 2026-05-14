@@ -6,25 +6,31 @@ import 'package:video_player/video_player.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/progression_provider.dart';
 
-enum CompanionMood {
-  idle,       // breathe + cozy + look in rotation
-  happy,      // traguardo raggiunto
-  encourage,  // l'utente è in difficoltà
-  sleep,      // notte
-  meditate,   // durante respirazione
-  drink,      // reminder acqua
-  hug,        // completamento abitudine
+/// Stato emotivo di Welly — mappato su video specifici.
+/// Regola fondamentale: nessuno stato visivamente negativo.
+/// Welly non soffre, non è triste, non rimproverara mai.
+enum WellyMood {
+  calm,       // mattino, nessuna azione ancora — idle rotation (sit / breathe)
+  present,    // acqua iniziata (1-3 bicchieri) — look
+  engaged,    // acqua a metà (4-6 bicchieri) — sit2
+  radiant,    // giornata completata — happy
+  welcoming,  // primo accesso del giorno — hug
+  wondering,  // sera senza azioni (dopo le 20) — look con loop lento
+  returning,  // rientro dopo 2+ giorni — encourage
+  resting,    // notte (dopo le 22) — sleep
+  drinking,   // animazione specifica al bicchiere — drink
+  breathing,  // durante sessione respirazione — meditate
 }
 
 class CompanionWidget extends StatefulWidget {
   final double size;
-  final CompanionMood mood;
+  final WellyMood mood;
   final bool showPhase; // mostra fase di crescita invece del video
 
   const CompanionWidget({
     super.key,
     this.size = 120,
-    this.mood = CompanionMood.idle,
+    this.mood = WellyMood.calm,
     this.showPhase = false,
   });
 
@@ -38,17 +44,20 @@ class _CompanionWidgetState extends State<CompanionWidget> {
   int _idleIndex = 0;
   Timer? _idleTimer;
 
-  // Video per ogni mood
+  // Video per ogni mood (eccetto calm che usa idle rotation)
   static const _moodVideos = {
-    CompanionMood.happy:    'assets/images/companion/companion_happy.mp4',
-    CompanionMood.encourage:'assets/images/companion/companion_encourage.mp4',
-    CompanionMood.sleep:    'assets/images/companion/companion_sleep.mp4',
-    CompanionMood.meditate: 'assets/images/companion/companion_meditate.mp4',
-    CompanionMood.drink:    'assets/images/companion/companion_drink.mp4',
-    CompanionMood.hug:      'assets/images/companion/companion_hug.mp4',
+    WellyMood.present:   'assets/images/companion/companion_look.mp4',
+    WellyMood.engaged:   'assets/images/companion/companion_sit2.mp4',
+    WellyMood.radiant:   'assets/images/companion/companion_happy.mp4',
+    WellyMood.welcoming: 'assets/images/companion/companion_hug.mp4',
+    WellyMood.wondering: 'assets/images/companion/companion_look.mp4',
+    WellyMood.returning: 'assets/images/companion/companion_encourage.mp4',
+    WellyMood.resting:   'assets/images/companion/companion_sleep.mp4',
+    WellyMood.drinking:  'assets/images/companion/companion_drink.mp4',
+    WellyMood.breathing: 'assets/images/companion/companion_meditate.mp4',
   };
 
-  // Idle videos in rotation
+  // Idle videos in rotation per WellyMood.calm
   static const _idleVideos = [
     'assets/images/companion/companion_breathe.mp4',
     'assets/images/companion/companion_breathe.mp4',
@@ -61,12 +70,27 @@ class _CompanionWidgetState extends State<CompanionWidget> {
     'assets/images/companion/companion_sit2.mp4',
   ];
 
+  // Moods che usano loop continuo
+  static bool _isLooping(WellyMood mood) {
+    switch (mood) {
+      case WellyMood.calm:
+      case WellyMood.present:
+      case WellyMood.engaged:
+      case WellyMood.wondering:
+      case WellyMood.resting:
+      case WellyMood.breathing:
+        return true;
+      default:
+        return false;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     if (!widget.showPhase) {
       _loadVideo();
-      if (widget.mood == CompanionMood.idle) {
+      if (widget.mood == WellyMood.calm) {
         _startIdleRotation();
       }
     }
@@ -80,7 +104,7 @@ class _CompanionWidgetState extends State<CompanionWidget> {
       _disposeController();
       if (!widget.showPhase) {
         _loadVideo();
-        if (widget.mood == CompanionMood.idle) {
+        if (widget.mood == WellyMood.calm) {
           _startIdleRotation();
         }
       }
@@ -88,7 +112,7 @@ class _CompanionWidgetState extends State<CompanionWidget> {
   }
 
   String get _currentVideoPath {
-    if (widget.mood == CompanionMood.idle) {
+    if (widget.mood == WellyMood.calm) {
       return _idleVideos[_idleIndex % _idleVideos.length];
     }
     return _moodVideos[widget.mood] ??
@@ -102,8 +126,7 @@ class _CompanionWidgetState extends State<CompanionWidget> {
     try {
       await controller.initialize();
       if (!mounted) return;
-      controller.setLooping(widget.mood == CompanionMood.idle ||
-          widget.mood == CompanionMood.meditate);
+      controller.setLooping(_isLooping(widget.mood));
       controller.setVolume(0);
       controller.play();
       setState(() => _isInitialized = true);

@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../widgets/locale_selector.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
-import '../../providers/app_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/theme_provider.dart';
-import '../../theme/app_theme.dart';
 import 'theme_screen.dart';
 
 class SettingsScreen extends StatelessWidget {

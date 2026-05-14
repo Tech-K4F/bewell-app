@@ -1,9 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/auth_provider.dart' as bw;
 import '../../providers/theme_provider.dart';
+import '../../providers/tutorial_provider.dart';
 import '../../widgets/bw_scaffold.dart';
 import '../settings/settings_screen.dart';
 import '../../widgets/locale_selector.dart';
@@ -182,6 +184,22 @@ _Tile(
                   ),
                 ),
               ),
+
+              // ── Debug (solo in modalità debug) ────────────────────────
+              if (kDebugMode) ...[
+                const SizedBox(height: 32),
+                _SectionLabel(label: '🛠 Debug', p: p),
+                const SizedBox(height: 10),
+                _Card(p: p, children: [
+                  _Tile(
+                    icon: Icons.smart_toy_outlined,
+                    label: 'Reset tutorial Welly',
+                    subtitle: 'Mostra di nuovo tutti i dialoghi',
+                    p: p,
+                    onTap: () => _resetTutorial(context, p),
+                  ),
+                ]),
+              ],
             ],
           ),
         );
@@ -268,6 +286,50 @@ _Tile(
             },
             child: const Text('Esci',
                 style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Debug: reset tutorial ─────────────────────────────────────────────────
+
+  void _resetTutorial(BuildContext context, BwPaletteData p) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: p.card,
+        title: Text('Reset tutorial', style: TextStyle(color: p.text)),
+        content: Text(
+          'Welly mostrerà di nuovo tutti i dialoghi tutorial come se fosse '
+          'la prima volta. Utile per testare il flusso.',
+          style: TextStyle(color: p.textSec, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Annulla', style: TextStyle(color: p.textSec)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final tutorial = context.read<TutorialProvider>();
+              await tutorial.resetAll();
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Tutorial resettato ✓'),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    margin: const EdgeInsets.all(16),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: Text('Reset', style: TextStyle(color: p.primary,
+                fontWeight: FontWeight.w700)),
           ),
         ],
       ),

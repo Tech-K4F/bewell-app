@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/onboarding_provider.dart';
+import '../../providers/tutorial_provider.dart';
 import '../../models/generated_plan.dart';
 
 const _teal = Color(0xFF1E9E87);
@@ -254,6 +255,10 @@ class _PlanPreviewScreenState extends State<PlanPreviewScreen> {
               onPressed: _isConfirming ? null : () async {
                 setState(() => _isConfirming = true);
                 await onb.confirmPlan();
+                // Abilita i trigger tutorial (onboarding completato)
+                if (context.mounted) {
+                  context.read<TutorialProvider>().markOnboardingDone();
+                }
                 // La navigazione a /home è gestita da OnboardingScreen
               },
               style: ElevatedButton.styleFrom(

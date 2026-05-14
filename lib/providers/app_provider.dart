@@ -9,6 +9,7 @@ import '../models/user_profile.dart';
 import '../models/badge_model.dart' as bw;
 import '../models/planner_model.dart';
 import '../models/reward_model.dart';
+import '../services/analytics_service.dart';
 
 class AppProvider extends ChangeNotifier {
   bool _isLoading = true;
@@ -211,14 +212,96 @@ class AppProvider extends ChangeNotifier {
   }
 
   // ── Attività ───────────────────────────────────────────────────────────────
+
+  // ── Acqua: punti progressivi per bicchiere ───────────────────────────────────
+  // Distribuzione su N bicchieri con bonus al punto di mezzo e all'ultimo.
+  // Per N=8 → 2-4-6-10-12-14-16-20 (cumulativo).
+  // Totale sempre = 20 punti.
+  static int waterGlassPoints(int glassNumber, int totalGlasses) {
+    if (totalGlasses <= 0) return 0;
+    final int half = (totalGlasses / 2).round();
+    // Base: 2 per n≤8, 1 per n>8
+    final int base = totalGlasses <= 8 ? 2 : 1;
+    final int halfBonus = base * 2; // doppio al bicchiere di mezzo
+
+    if (glassNumber == totalGlasses) {
+      // Ultimo bicchiere: complementa a 20
+      int sumBefore = 0;
+      for (int i = 1; i < totalGlasses; i++) {
+        sumBefore += (i == half) ? halfBonus : base;
+      }
+      return (20 - sumBefore).clamp(base, 20);
+    }
+    if (glassNumber == half) return halfBonus;
+    return base;
+  }
+
+  /// Aggiunge punti acqua per un singolo bicchiere — nessun tracking sessione.
+  Future<void> awardWaterGlass(int pts) async {
+    if (_user == null || pts <= 0) return;
+    _user = _user!.copyWith(points: _user!.points + pts);
+    await _saveUser();
+    notifyListeners();
+  }
+
+  /// Rimuove punti (undo bicchiere acqua). I punti non scendono sotto zero.
+  Future<void> removeWaterGlassPoints(int pts) async {
+    if (_user == null || pts <= 0) return;
+    final newPts = (_user!.points - pts).clamp(0, 999999);
+    _user = _user!.copyWith(points: newPts);
+    await _saveUser();
+    notifyListeners();
+  }
+
+  /// Mappa punti per gli ID delle abitudini (HabitLibrary).
+  /// Usata quando completeActivity() viene chiamata con un habitId invece di activityId.
+  static const Map<String, int> _habitPoints = {
+    'water': 0, // Punti acqua gestiti per-bicchiere via awardWaterGlass()
+    'water_morn': 25,
+    'focus_25': 40,
+    'focus_50': 60,
+    'eyes_20_20_20': 15,
+    'neck_stretch': 20,
+    'postura': 20,
+    'breathing_box': 25,
+    'breathing_478': 25,
+    'walk_lunch': 30,
+    'desk_exercise': 20,
+    'stretching_active': 25,
+    'lunch_park': 30,
+    'meditation': 35,
+    'sleep_routine': 35,
+    'nap': 30,
+  };
+
+  static const Map<String, int> _habitMinutes = {
+    'water': 1,
+    'water_morn': 1,
+    'focus_25': 25,
+    'focus_50': 50,
+    'eyes_20_20_20': 5,
+    'neck_stretch': 5,
+    'postura': 3,
+    'breathing_box': 5,
+    'breathing_478': 5,
+    'walk_lunch': 15,
+    'desk_exercise': 10,
+    'stretching_active': 15,
+    'lunch_park': 30,
+    'meditation': 15,
+    'sleep_routine': 20,
+    'nap': 20,
+  };
+
   Future<void> completeActivity(String activityId) async {
     if (_completedToday.contains(activityId)) return;
     _completedToday.add(activityId);
 
     final activity =
         _allActivities.where((a) => a.id == activityId).firstOrNull;
-    final pts = activity?.points ?? 10;
-    final mins = activity?.durationMinutes ?? 5;
+    // Prima cerca nella mappa habit (se chiamato con habitId), poi nell'activity JSON, poi fallback
+    final pts = _habitPoints[activityId] ?? activity?.points ?? 10;
+    final mins = _habitMinutes[activityId] ?? activity?.durationMinutes ?? 5;
 
     if (_user != null) {
       // ── FIX 1: Aggiorna streak ─────────────────────────────────────────────
@@ -237,6 +320,7 @@ class AppProvider extends ChangeNotifier {
         lastActivityDate: DateTime.now(),
         weeklyCompletions: updatedWeekly,
       );
+      AnalyticsService.instance.logDayStreak(newStreak);
       await _checkAndAwardBadges();
       await _saveUser();
     }
@@ -294,6 +378,7 @@ class AppProvider extends ChangeNotifier {
     );
     _redeemedRewards = [redeemed, ..._redeemedRewards];
 
+    AnalyticsService.instance.logRewardRedeemed(reward.id, reward.pointsCost);
     await _saveUser();
     await _saveRedeemedRewards();
     notifyListeners();
