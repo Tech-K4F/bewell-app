@@ -1646,7 +1646,7 @@ class _NeverMissTwiceBanner extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Stai per saltare due giorni di fila.',
+                  context.sL.neverMissTwiceTitle,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -1662,7 +1662,7 @@ class _NeverMissTwiceBanner extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Una sola azione conta. Anche un bicchiere d\'acqua.',
+            context.sL.neverMissTwiceBody,
             style: TextStyle(fontSize: 12, color: p.textSec, height: 1.4),
           ),
           const SizedBox(height: 12),
@@ -1675,10 +1675,10 @@ class _NeverMissTwiceBanner extends StatelessWidget {
                 color: const Color(0xFFFF9800),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
-                  '💧 Aggiungi un bicchiere d\'acqua',
-                  style: TextStyle(
+                  context.sL.neverMissTwiceCta,
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,

@@ -39,12 +39,14 @@ class _FocusScreenState extends State<FocusScreen>
       // Deep Work: mostra i minuti rimasti in modo leggibile
       final m = _remaining ~/ 60;
       final s = _remaining % 60;
-      if (m > 0) return 'Deep Work · $m min rimasti';
-      return 'Deep Work · ${s}s rimasti';
+      final loc = context.sL;
+      if (m > 0) return '${loc.focusDeepWork} · $m ${loc.focusMinRemaining}';
+      return '${loc.focusDeepWork} · ${s}s';
     }
     // Pomodoro: blocco corrente + minuti alla pausa
     final pauseIn = _remaining ~/ 60;
-    return 'Blocco $_blockNumber di 4 · pausa tra ${pauseIn}min';
+    final loc = context.sL;
+    return '${loc.focusBlock} $_blockNumber ${loc.focusBlockOf4} · ${loc.focusBreak} ${pauseIn}min';
   }
 
   @override

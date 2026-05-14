@@ -288,24 +288,25 @@ class HabitsScreen extends StatelessWidget {
 
     // ── Welly Bonus (variable ratio reward) ──────────────────────────────────
     if (app.lastCompletionWasBonus && context.mounted) {
+      final loc = context.sL;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
-            children: const [
-              Text('⚡', style: TextStyle(fontSize: 22)),
-              SizedBox(width: 10),
+            children: [
+              const Text('⚡', style: TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Welly Bonus!',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                      loc.wellyBonusTitle,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                     ),
                     Text(
-                      'Punti tripli questo giro 🎉',
-                      style: TextStyle(fontSize: 12),
+                      loc.wellyBonusBody,
+                      style: const TextStyle(fontSize: 12),
                     ),
                   ],
                 ),

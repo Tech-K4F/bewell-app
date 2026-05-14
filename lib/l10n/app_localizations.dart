@@ -296,6 +296,8 @@ abstract class BwStrings {
   String get habitWakeName; String get habitWakeDesc;
   String get habitNapName; String get habitNapDesc;
   String get habitFocusPhoneName; String get habitFocusPhoneDesc;
+  String get habitMicroWalkName; String get habitMicroWalkDesc;
+  String get habitDigitalSunsetName; String get habitDigitalSunsetDesc;
 
   // ── Coach messages ────────────────────────────────────────────────────────
   String get coachDay1; String get coachDay3; String get coachDay7;
@@ -385,6 +387,20 @@ abstract class BwStrings {
   String get calendarFocus;
   String get calendarBreak;
   String get calendarLongBreak;
+
+  // ── Home banners ─────────────────────────────────────────────────────────
+  String get neverMissTwiceTitle;
+  String get neverMissTwiceBody;
+  String get neverMissTwiceCta;
+
+  // ── Welly Bonus ───────────────────────────────────────────────────────────
+  String get wellyBonusTitle;
+  String get wellyBonusBody;
+
+  // ── Focus avanzato ────────────────────────────────────────────────────────
+  String get focusDeepWork;
+  String get focusMinRemaining;
+  String get focusBlockOf4;
 
   // ── Tutorial Welly ────────────────────────────────────────────────────────
   String get tutorialOk;
@@ -509,6 +525,9 @@ class _En extends BwStrings {
   String get focusSessions => 'sessions';
   String get focusMinutes => 'min focus';
   String get focusStreak => 'streak';
+  String get focusDeepWork => 'Deep Work';
+  String get focusMinRemaining => 'min left';
+  String get focusBlockOf4 => 'of 4';
 
   String get planToday => 'Today';
   String get planCompleted => 'completed';
@@ -606,6 +625,14 @@ class _En extends BwStrings {
   String get habitWakeName => 'Consistent wake time'; String get habitWakeDesc => 'Wake at the same time every day';
   String get habitNapName => 'Power nap 20 min'; String get habitNapDesc => 'A short intentional rest in the afternoon';
   String get habitFocusPhoneName => 'Focus without phone'; String get habitFocusPhoneDesc => 'Phone face-down during focus sessions';
+  String get habitMicroWalkName => '5-min micro walk'; String get habitMicroWalkDesc => '5 minutes walking every 90 minutes — ultradian cycle';
+  String get habitDigitalSunsetName => 'Digital sunset'; String get habitDigitalSunsetDesc => 'No social media in the hour before sleep';
+
+  String get neverMissTwiceTitle => 'Don\'t miss two days in a row.';
+  String get neverMissTwiceBody => 'One small action counts. Even a glass of water.';
+  String get neverMissTwiceCta => '💧 Add a glass of water';
+  String get wellyBonusTitle => 'Welly Bonus!';
+  String get wellyBonusBody => 'Triple points this round 🎉';
 
   String get coachDay1 => 'First day. The most important one.';
   String get coachDay3 => '3 days. Your body is starting to register it.';
@@ -738,7 +765,7 @@ class _En extends BwStrings {
       case 'phase2_reached':      return 'Gardner (2012): automaticity = execution without conscious intention. The first automatism is always the hardest.';
       case 'phase3_reached':      return 'Lally et al. (2010): with 3 consolidated habits, long-term compliance rises significantly compared to just 1.';
       case 'phase4_reached':      return 'Duhigg (2012): consolidated routines require almost zero conscious deliberation — the prefrontal cortex delegates to the basal ganglia.';
-      case 'milestone_7_days':    return 'Data analysis on 12,000+ users (Habitica, 2019): 21-day completion rate increases by 340% after 7 consecutive days.';
+      case 'milestone_7_days':    return 'Gardner, Lally & Wardle (2012), British Journal of General Practice: automaticity grows most rapidly in the first weeks — initial consistency is the strongest predictor of long-term maintenance.';
       case 'milestone_21_days':   return 'Maltz (1960): the "21 days" was a surgical observation, not a scientific study. Lally (2010) estimates 66 days on average.';
       case 'milestone_66_days':   return 'Lally et al. (2010), UCL: average of 66 days (range 18–254) to reach behavioural automaticity.';
       case 'no_completion_3days': return 'Fogg (2020): Tiny Habits — even a minimal action keeps the habit neural loop alive.';
@@ -863,6 +890,9 @@ class _It extends BwStrings {
   String get focusSessions => 'sessioni';
   String get focusMinutes => 'min focus';
   String get focusStreak => 'streak';
+  String get focusDeepWork => 'Deep Work';
+  String get focusMinRemaining => 'min rimasti';
+  String get focusBlockOf4 => 'di 4';
 
   String get planToday => 'Oggi';
   String get planCompleted => 'completati';
@@ -960,6 +990,14 @@ class _It extends BwStrings {
   String get habitWakeName => 'Sveglia costante'; String get habitWakeDesc => 'Alzati sempre alla stessa ora';
   String get habitNapName => 'Power nap 20 min'; String get habitNapDesc => 'Un riposo breve e intenzionale nel pomeriggio';
   String get habitFocusPhoneName => 'Focus senza telefono'; String get habitFocusPhoneDesc => 'Telefono capovolto durante il focus';
+  String get habitMicroWalkName => 'Micro-camminata 5 min'; String get habitMicroWalkDesc => '5 minuti di camminata ogni 90 minuti — ciclo ultradiano';
+  String get habitDigitalSunsetName => 'Digital sunset'; String get habitDigitalSunsetDesc => 'Niente social media nell\'ora prima di dormire';
+
+  String get neverMissTwiceTitle => 'Stai per saltare due giorni di fila.';
+  String get neverMissTwiceBody => 'Una sola azione conta. Anche un bicchiere d\'acqua.';
+  String get neverMissTwiceCta => '💧 Aggiungi un bicchiere d\'acqua';
+  String get wellyBonusTitle => 'Welly Bonus!';
+  String get wellyBonusBody => 'Punti tripli questo giro 🎉';
 
   String get coachDay1 => 'Primo giorno. Il più importante.';
   String get coachDay3 => '3 giorni. Il corpo inizia a registrarlo.';
@@ -1092,7 +1130,7 @@ class _It extends BwStrings {
       case 'phase2_reached':      return 'Gardner (2012): automaticità = esecuzione senza intenzione conscia. Il primo automatismo è sempre il più difficile.';
       case 'phase3_reached':      return 'Lally et al. (2010): con 3 abitudini consolidate, la compliance a lungo termine sale significativamente rispetto a 1 sola.';
       case 'phase4_reached':      return 'Duhigg (2012): routine consolidate richiedono quasi zero deliberazione conscia — la corteccia prefrontale delega ai gangli basali.';
-      case 'milestone_7_days':    return 'Analisi dati su 12.000+ utenti (Habitica, 2019): completion rate a 21 gg aumenta del 340% dopo 7 gg consecutivi.';
+      case 'milestone_7_days':    return 'Gardner, Lally & Wardle (2012), British Journal of General Practice: l\'automaticità cresce più rapidamente nelle prime settimane — la consistenza iniziale è il predittore più forte del mantenimento.';
       case 'milestone_21_days':   return 'Maltz (1960): il "21 giorni" era un\'osservazione chirurgica, non uno studio scientifico. Lally (2010) stima 66 gg in media.';
       case 'milestone_66_days':   return 'Lally et al. (2010), UCL: media di 66 giorni (range 18–254) per raggiungere l\'automaticità comportamentale.';
       case 'no_completion_3days': return 'Fogg (2020): Tiny Habits — anche un\'azione minima mantiene vivo il loop neurale dell\'abitudine.';
@@ -1217,6 +1255,9 @@ class _Fr extends BwStrings {
   String get focusSessions => 'sessions';
   String get focusMinutes => 'min focus';
   String get focusStreak => 'série';
+  String get focusDeepWork => 'Travail profond';
+  String get focusMinRemaining => 'min restantes';
+  String get focusBlockOf4 => 'sur 4';
 
   String get planToday => 'Aujourd\'hui';
   String get planCompleted => 'complétés';
@@ -1314,6 +1355,14 @@ class _Fr extends BwStrings {
   String get habitWakeName => 'Réveil constant'; String get habitWakeDesc => 'Se lever à la même heure chaque jour';
   String get habitNapName => 'Sieste 20 min'; String get habitNapDesc => 'Un court repos intentionnel l\'après-midi';
   String get habitFocusPhoneName => 'Focus sans téléphone'; String get habitFocusPhoneDesc => 'Téléphone retourné pendant les sessions focus';
+  String get habitMicroWalkName => 'Micro-marche 5 min'; String get habitMicroWalkDesc => '5 minutes de marche toutes les 90 minutes — cycle ultradien';
+  String get habitDigitalSunsetName => 'Coucher digital'; String get habitDigitalSunsetDesc => 'Pas de réseaux sociaux dans l\'heure avant de dormir';
+
+  String get neverMissTwiceTitle => 'Ne ratez pas deux jours de suite.';
+  String get neverMissTwiceBody => 'Une seule action compte. Même un verre d\'eau.';
+  String get neverMissTwiceCta => '💧 Ajouter un verre d\'eau';
+  String get wellyBonusTitle => 'Bonus Welly !';
+  String get wellyBonusBody => 'Points triplés ce tour 🎉';
 
   String get coachDay1 => 'Premier jour. Le plus important.';
   String get coachDay3 => '3 jours. Votre corps commence à l\'enregistrer.';
@@ -1446,7 +1495,7 @@ class _Fr extends BwStrings {
       case 'phase2_reached':      return 'Gardner (2012): automaticité = exécution sans intention consciente. Le premier automatisme est toujours le plus difficile.';
       case 'phase3_reached':      return 'Lally et al. (2010): avec 3 habitudes consolidées, la compliance à long terme augmente significativement par rapport à 1 seule.';
       case 'phase4_reached':      return 'Duhigg (2012): les routines consolidées nécessitent presque zéro délibération consciente — le cortex préfrontal délègue aux ganglions de la base.';
-      case 'milestone_7_days':    return 'Analyse sur 12 000+ utilisateurs (Habitica, 2019): le taux de complétion à 21 j augmente de 340 % après 7 jours consécutifs.';
+      case 'milestone_7_days':    return 'Gardner, Lally & Wardle (2012), British Journal of General Practice: l\'automaticité croît le plus rapidement dans les premières semaines — la cohérence initiale est le meilleur prédicteur du maintien à long terme.';
       case 'milestone_21_days':   return 'Maltz (1960): les "21 jours" étaient une observation chirurgicale, pas une étude scientifique. Lally (2010) estime 66 jours en moyenne.';
       case 'milestone_66_days':   return 'Lally et al. (2010), UCL: moyenne de 66 jours (plage 18–254) pour atteindre l\'automaticité comportementale.';
       case 'no_completion_3days': return 'Fogg (2020): Tiny Habits — même une action minimale maintient vivant le loop neuronal de l\'habitude.';
@@ -1571,6 +1620,9 @@ class _De extends BwStrings {
   String get focusSessions => 'Sitzungen';
   String get focusMinutes => 'Min Fokus';
   String get focusStreak => 'Serie';
+  String get focusDeepWork => 'Tiefe Arbeit';
+  String get focusMinRemaining => 'Min verbleibend';
+  String get focusBlockOf4 => 'von 4';
 
   String get planToday => 'Heute';
   String get planCompleted => 'abgeschlossen';
@@ -1668,6 +1720,14 @@ class _De extends BwStrings {
   String get habitWakeName => 'Konstante Aufwachzeit'; String get habitWakeDesc => 'Jeden Tag zur gleichen Zeit aufstehen';
   String get habitNapName => 'Power-Nap 20 Min'; String get habitNapDesc => 'Eine kurze intentionale Ruhe am Nachmittag';
   String get habitFocusPhoneName => 'Fokus ohne Telefon'; String get habitFocusPhoneDesc => 'Telefon während Fokus-Sitzungen umgedreht';
+  String get habitMicroWalkName => 'Mikro-Spaziergang 5 Min'; String get habitMicroWalkDesc => '5 Minuten Gehen alle 90 Minuten — Ultradianischer Zyklus';
+  String get habitDigitalSunsetName => 'Digitaler Sonnenuntergang'; String get habitDigitalSunsetDesc => 'Kein Social Media in der Stunde vor dem Schlafen';
+
+  String get neverMissTwiceTitle => 'Nicht zwei Tage hintereinander auslassen.';
+  String get neverMissTwiceBody => 'Eine kleine Aktion zählt. Sogar ein Glas Wasser.';
+  String get neverMissTwiceCta => '💧 Ein Glas Wasser hinzufügen';
+  String get wellyBonusTitle => 'Welly-Bonus!';
+  String get wellyBonusBody => 'Dreifache Punkte diese Runde 🎉';
 
   String get coachDay1 => 'Erster Tag. Der wichtigste.';
   String get coachDay3 => '3 Tage. Dein Körper beginnt es zu registrieren.';
@@ -1800,7 +1860,7 @@ class _De extends BwStrings {
       case 'phase2_reached':      return 'Gardner (2012): Automatizität = Ausführung ohne bewusste Absicht. Der erste Automatismus ist immer der schwierigste.';
       case 'phase3_reached':      return 'Lally et al. (2010): Mit 3 gefestigten Gewohnheiten steigt die langfristige Compliance deutlich gegenüber nur 1.';
       case 'phase4_reached':      return 'Duhigg (2012): Konsolidierte Routinen erfordern fast null bewusste Überlegung — der präfrontale Kortex delegiert an die Basalganglien.';
-      case 'milestone_7_days':    return 'Datenanalyse mit 12.000+ Nutzern (Habitica, 2019): 21-Tage-Abschlussrate steigt nach 7 aufeinanderfolgenden Tagen um 340 %.';
+      case 'milestone_7_days':    return 'Gardner, Lally & Wardle (2012), British Journal of General Practice: Die Automatizität nimmt in den ersten Wochen am stärksten zu — frühe Konsequenz ist der stärkste Prädiktor für langfristige Beibehaltung.';
       case 'milestone_21_days':   return 'Maltz (1960): Die "21 Tage" waren eine chirurgische Beobachtung, keine wissenschaftliche Studie. Lally (2010) schätzt im Durchschnitt 66 Tage.';
       case 'milestone_66_days':   return 'Lally et al. (2010), UCL: Durchschnitt von 66 Tagen (Bereich 18–254), um Verhaltensautomatizität zu erreichen.';
       case 'no_completion_3days': return 'Fogg (2020): Tiny Habits — selbst eine minimale Handlung hält die neuronale Schleife der Gewohnheit am Leben.';
@@ -1925,6 +1985,9 @@ class _Es extends BwStrings {
   String get focusSessions => 'sesiones';
   String get focusMinutes => 'min enfoque';
   String get focusStreak => 'racha';
+  String get focusDeepWork => 'Trabajo profundo';
+  String get focusMinRemaining => 'min restantes';
+  String get focusBlockOf4 => 'de 4';
 
   String get planToday => 'Hoy';
   String get planCompleted => 'completados';
@@ -2022,6 +2085,14 @@ class _Es extends BwStrings {
   String get habitWakeName => 'Despertar constante'; String get habitWakeDesc => 'Levantarse a la misma hora cada día';
   String get habitNapName => 'Siesta de 20 min'; String get habitNapDesc => 'Un breve descanso intencional por la tarde';
   String get habitFocusPhoneName => 'Enfoque sin teléfono'; String get habitFocusPhoneDesc => 'Teléfono boca abajo durante las sesiones de enfoque';
+  String get habitMicroWalkName => 'Micro-caminata 5 min'; String get habitMicroWalkDesc => '5 minutos caminando cada 90 minutos — ciclo ultradiano';
+  String get habitDigitalSunsetName => 'Atardecer digital'; String get habitDigitalSunsetDesc => 'Sin redes sociales en la hora antes de dormir';
+
+  String get neverMissTwiceTitle => 'No faltes dos días seguidos.';
+  String get neverMissTwiceBody => 'Una sola acción cuenta. Incluso un vaso de agua.';
+  String get neverMissTwiceCta => '💧 Añadir un vaso de agua';
+  String get wellyBonusTitle => '¡Bonus Welly!';
+  String get wellyBonusBody => 'Puntos triplicados esta vez 🎉';
 
   String get coachDay1 => 'Primer día. El más importante.';
   String get coachDay3 => '3 días. Tu cuerpo empieza a registrarlo.';
@@ -2154,7 +2225,7 @@ class _Es extends BwStrings {
       case 'phase2_reached':      return 'Gardner (2012): automaticidad = ejecución sin intención consciente. El primer automatismo es siempre el más difícil.';
       case 'phase3_reached':      return 'Lally et al. (2010): con 3 hábitos consolidados, el cumplimiento a largo plazo aumenta significativamente respecto a solo 1.';
       case 'phase4_reached':      return 'Duhigg (2012): las rutinas consolidadas requieren casi cero deliberación consciente — la corteza prefrontal delega a los ganglios basales.';
-      case 'milestone_7_days':    return 'Análisis de datos con 12.000+ usuarios (Habitica, 2019): la tasa de completación a 21 días aumenta un 340 % después de 7 días consecutivos.';
+      case 'milestone_7_days':    return 'Gardner, Lally & Wardle (2012), British Journal of General Practice: la automaticidad crece más rápidamente en las primeras semanas — la consistencia inicial es el predictor más fuerte del mantenimiento a largo plazo.';
       case 'milestone_21_days':   return 'Maltz (1960): los "21 días" eran una observación quirúrgica, no un estudio científico. Lally (2010) estima 66 días en promedio.';
       case 'milestone_66_days':   return 'Lally et al. (2010), UCL: promedio de 66 días (rango 18–254) para alcanzar la automaticidad conductual.';
       case 'no_completion_3days': return 'Fogg (2020): Tiny Habits — incluso una acción mínima mantiene vivo el bucle neuronal del hábito.';
@@ -2189,6 +2260,8 @@ extension BwStringsHabitUtils on BwStrings {
       case 'wake_consistent':   return habitWakeName;
       case 'nap':               return habitNapName;
       case 'focus_no_phone':    return habitFocusPhoneName;
+      case 'micro_walk':        return habitMicroWalkName;
+      case 'digital_sunset':    return habitDigitalSunsetName;
       default:                  return id;
     }
   }
@@ -2216,6 +2289,8 @@ extension BwStringsHabitUtils on BwStrings {
       case 'wake_consistent':   return habitWakeDesc;
       case 'nap':               return habitNapDesc;
       case 'focus_no_phone':    return habitFocusPhoneDesc;
+      case 'micro_walk':        return habitMicroWalkDesc;
+      case 'digital_sunset':    return habitDigitalSunsetDesc;
       default:                  return coachGeneral;
     }
   }
