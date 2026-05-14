@@ -176,7 +176,10 @@ class _FocusScreenState extends State<FocusScreen>
                 Text(
                   _state == _TimerState.done
                       ? context.sL.focusDone
-                      : 'Blocco 1 di 4 · pausa tra ${_remaining ~/ 60} min',
+                      : () {
+                          final loc = context.sL;
+                          return '${loc.focusBlock} 1 ${loc.focusBlockOf4} · ${loc.focusBreak} ${_remaining ~/ 60}min';
+                        }(),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,

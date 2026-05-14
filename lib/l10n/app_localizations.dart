@@ -107,6 +107,9 @@ abstract class BwStrings {
   String get phase;
   String get waterToday;
   String get waterGlasses;
+  String get waterTrackedInHome;
+  String get achievementUnlocked;
+  String get newHabitUnlocked;
   String get waterZero;
   String get waterLow;
   String get waterMid;
@@ -213,6 +216,8 @@ abstract class BwStrings {
   String get rewardsPoints;
   String get rewardsLocked;
   String get rewardsLockedDesc;
+  String get rewardsHeader;
+  String get rewardsHeaderSub;
 
   // ── Habit names & descriptions ────────────────────────────────────────────
   String get habitWaterName; String get habitWaterDesc;
@@ -236,6 +241,151 @@ abstract class BwStrings {
   String get habitWakeName; String get habitWakeDesc;
   String get habitNapName; String get habitNapDesc;
   String get habitFocusPhoneName; String get habitFocusPhoneDesc;
+  String get habitMicroWalkName; String get habitMicroWalkDesc;
+  String get habitDigitalSunsetName; String get habitDigitalSunsetDesc;
+
+  /// Restituisce il nome localizzato di un'abitudine dato il suo ID.
+  String habitName(String id) {
+    switch (id) {
+      case 'water':             return habitWaterName;
+      case 'focus_25':          return habitFocus25Name;
+      case 'eyes_20_20_20':     return habitEyes2020Name;
+      case 'neck_stretch':      return habitNeckName;
+      case 'breathing_box':     return habitBreathingBoxName;
+      case 'walk_lunch':        return habitWalkLunchName;
+      case 'desk_exercise':     return habitDeskExName;
+      case 'water_morning':     return habitWaterMornName;
+      case 'posture':           return habitPostureName;
+      case 'lunch_park':        return habitLunchParkName;
+      case 'breathing_478':     return habitBreathing478Name;
+      case 'stretching_active': return habitStretchName;
+      case 'snack':             return habitSnackName;
+      case 'lunch_no_screen':   return habitLunchNoScreenName;
+      case 'focus_50':          return habitFocus50Name;
+      case 'meditation':        return habitMeditationName;
+      case 'stairs':            return habitStairsName;
+      case 'sleep_routine':     return habitSleepName;
+      case 'wake_consistent':   return habitWakeName;
+      case 'nap':               return habitNapName;
+      case 'focus_no_phone':    return habitFocusPhoneName;
+      case 'micro_walk':        return habitMicroWalkName;
+      case 'digital_sunset':    return habitDigitalSunsetName;
+      default:                  return id;
+    }
+  }
+
+  /// Restituisce la descrizione localizzata di un'abitudine dato il suo ID.
+  String habitDesc(String id) {
+    switch (id) {
+      case 'water':             return habitWaterDesc;
+      case 'focus_25':          return habitFocus25Desc;
+      case 'eyes_20_20_20':     return habitEyes2020Desc;
+      case 'neck_stretch':      return habitNeckDesc;
+      case 'breathing_box':     return habitBreathingBoxDesc;
+      case 'walk_lunch':        return habitWalkLunchDesc;
+      case 'desk_exercise':     return habitDeskExDesc;
+      case 'water_morning':     return habitWaterMornDesc;
+      case 'posture':           return habitPostureDesc;
+      case 'lunch_park':        return habitLunchParkDesc;
+      case 'breathing_478':     return habitBreathing478Desc;
+      case 'stretching_active': return habitStretchDesc;
+      case 'snack':             return habitSnackDesc;
+      case 'lunch_no_screen':   return habitLunchNoScreenDesc;
+      case 'focus_50':          return habitFocus50Desc;
+      case 'meditation':        return habitMeditationDesc;
+      case 'stairs':            return habitStairsDesc;
+      case 'sleep_routine':     return habitSleepDesc;
+      case 'wake_consistent':   return habitWakeDesc;
+      case 'nap':               return habitNapDesc;
+      case 'focus_no_phone':    return habitFocusPhoneDesc;
+      case 'micro_walk':        return habitMicroWalkDesc;
+      case 'digital_sunset':    return habitDigitalSunsetDesc;
+      default:                  return '';
+    }
+  }
+
+  // ── Habit intro sheet ─────────────────────────────────────────────────────
+  String get habitIntroTitle;
+  String get habitIntroSubtitle;
+  String get habitIntroMoreOptions;
+  String get effortLow;
+  String get effortMedium;
+  String get effortHigh;
+  String get daysOfHabits;
+
+  // ── FASE 2: Schermata Abitudini ───────────────────────────────────────────
+  String get habitStart;
+  String get habitMarkDone;
+  String get habitCompletedToday;
+  String get habitDaysToNextPhase;
+  String get habitsGuide;
+  String get habitsAllDone;
+  String get habitLate;
+  String get habitDetailWhyNow;
+  String get habitDetailWhatDoes;
+  String get habitDetailHowStart;
+  String get habitYourProgress;
+
+  // ── FASE 3: Home migliorata ────────────────────────────────────────────────
+  String get homeMomentNow;
+  String get homeFirstVisit;
+  String get homeReturnAfter2;
+  String get homeReturnAfter3to6;
+  String get homeReturnAfter7;
+  String get homeStreakBroken;
+  String get homeResume;
+
+  // ── FASE 4: Crescita / Marketplace ────────────────────────────────────────
+  String get growthMarketplaceHeader;
+  String get growthMilestones;
+  String get growthStats;
+  String get growthTotalDays;
+  String get growthTotalGlasses;
+  String get growthTotalFocusMin;
+  String get rewardRedeem;
+  String get rewardConfirmTitle;
+  String get rewardConfirmBody;
+  String get rewardCodeLabel;
+  String get rewardCopyCode;
+  String get rewardCopied;
+  String get rewardNotEnough;
+  String get rewardPointsLeft;
+  String get rewardUsed;
+  String get rewardMarkUsed;
+  String get marketplaceGuide;
+
+  // ── FASE 5: Celebrazioni ───────────────────────────────────────────────────
+  String get celebrationDay1to6;
+  String get celebrationDay7;
+  String get celebrationDay14;
+  String get celebrationNormal;
+  String get celebrationClose;
+  String get celebrationPointsToday;
+  String get navUnlockHabitsMsg;
+  String get navUnlockGrowthMsg;
+  String get navNewBadge;
+
+  // ── FASE 6: Notifiche re-engagement ────────────────────────────────────────
+  String get notifReturn1day;
+  String get notifReturn3days;
+  String get notifReturn7days;
+  String get notifStreakRisk;
+  String get notifMilestoneNear;
+  String get notifNewUnlock;
+
+  // ── Never miss twice banner ───────────────────────────────────────────────
+  String get neverMissTwiceTitle;
+  String get neverMissTwiceBody;
+  String get neverMissTwiceCta;
+
+  // ── Welly Bonus ───────────────────────────────────────────────────────────
+  String get wellyBonusTitle;
+  String get wellyBonusBody;
+
+  // ── Focus screen (nuove stringhe) ─────────────────────────────────────────
+  String get focusDeepWork;
+  String get focusMinRemaining;
+  String get focusBlockOf4;
 
   // ── Coach messages ────────────────────────────────────────────────────────
   String get coachDay1; String get coachDay3; String get coachDay7;
@@ -304,6 +454,9 @@ class _En extends BwStrings {
   String get phase => 'Phase';
   String get waterToday => 'Water today';
   String get waterGlasses => 'glasses';
+  String get waterTrackedInHome => '💧 home';
+  String get achievementUnlocked => 'Achievement unlocked!';
+  String get newHabitUnlocked => 'New habit unlocked!';
   String get waterZero => 'Start with the first glass.';
   String get waterLow => 'Good start — keep going.';
   String get waterMid => 'More than half — great!';
@@ -402,6 +555,8 @@ class _En extends BwStrings {
   String get rewardsPoints => 'Be Well points';
   String get rewardsLocked => 'Rewards are coming';
   String get rewardsLockedDesc => 'Keep building habits to unlock your rewards';
+  String get rewardsHeader => 'Your rewards';
+  String get rewardsHeaderSub => 'Collect what you\'ve sown';
 
   String get habitWaterName => 'Drink water'; String get habitWaterDesc => '8 glasses throughout the day';
   String get habitFocus25Name => 'Focus session 25 min'; String get habitFocus25Desc => 'One distraction-free Pomodoro';
@@ -424,12 +579,82 @@ class _En extends BwStrings {
   String get habitWakeName => 'Consistent wake time'; String get habitWakeDesc => 'Wake at the same time every day';
   String get habitNapName => 'Power nap 20 min'; String get habitNapDesc => 'A short intentional rest in the afternoon';
   String get habitFocusPhoneName => 'Focus without phone'; String get habitFocusPhoneDesc => 'Phone face-down during focus sessions';
+  String get habitMicroWalkName => '5-min micro walk';
+  String get habitMicroWalkDesc => '5 minutes walking every 90 minutes — ultradian cycle';
+  String get habitDigitalSunsetName => 'Digital sunset';
+  String get habitDigitalSunsetDesc => 'No social media in the hour before sleep';
+
+  String get neverMissTwiceTitle => 'Don\'t miss two days in a row.';
+  String get neverMissTwiceBody => 'One small action counts. Even a glass of water.';
+  String get neverMissTwiceCta => '💧 Add a glass of water';
+  String get wellyBonusTitle => 'Welly Bonus!';
+  String get wellyBonusBody => 'Triple points this round 🎉';
+  String get focusDeepWork => 'Deep Work';
+  String get focusMinRemaining => 'min left';
+  String get focusBlockOf4 => 'of 4';
 
   String get coachDay1 => 'First day. The most important one.';
   String get coachDay3 => '3 days. Your body is starting to register it.';
   String get coachDay7 => '7 days. You\'re building something.';
   String get coachDay14 => '2 weeks. This habit is yours now.';
   String get coachGeneral => 'Every day counts. Even the hard ones.';
+  String get habitIntroTitle => 'Time to add\nsomething new.';
+  String get habitIntroSubtitle => 'Choose where to focus next.';
+  String get habitIntroMoreOptions => 'show me other options ›';
+  String get effortLow => 'easy';
+  String get effortMedium => 'moderate';
+  String get effortHigh => 'demanding';
+  String get daysOfHabits => 'days of habits';
+  String get habitStart => 'Start';
+  String get habitMarkDone => 'Done';
+  String get habitCompletedToday => 'Done today';
+  String get habitDaysToNextPhase => 'to next level';
+  String get habitsGuide => 'Your active habits are here. Tap a card to start, or mark "Done" if you\'ve already done it. Every day you complete builds something.';
+  String get habitsAllDone => 'All done for today.';
+  String get habitLate => 'Late';
+  String get habitDetailWhyNow => 'Why now';
+  String get habitDetailWhatDoes => 'What it does';
+  String get habitDetailHowStart => 'How to start';
+  String get habitYourProgress => 'Your progress';
+  String get homeMomentNow => 'Right now';
+  String get homeFirstVisit => 'This is your home. Come back every day — I\'m here.';
+  String get homeReturnAfter2 => 'Welcome back. I missed you.';
+  String get homeReturnAfter3to6 => 'Great to see you. You\'re back — and that\'s what matters.';
+  String get homeReturnAfter7 => 'There you are. No matter how much time has passed — you\'re here now, and that\'s the starting point.';
+  String get homeStreakBroken => 'The streak stopped — but everything you\'ve built is still there. Let\'s continue from here.';
+  String get homeResume => 'Let\'s go';
+  String get growthMarketplaceHeader => 'Reap what you\'ve sown';
+  String get growthMilestones => 'Milestones';
+  String get growthStats => 'Statistics';
+  String get growthTotalDays => 'Total days';
+  String get growthTotalGlasses => 'Glasses of water';
+  String get growthTotalFocusMin => 'Focus minutes';
+  String get rewardRedeem => 'Redeem';
+  String get rewardConfirmTitle => 'Are you sure?';
+  String get rewardConfirmBody => 'Points will be deducted.';
+  String get rewardCodeLabel => 'Your code';
+  String get rewardCopyCode => 'Copy code';
+  String get rewardCopied => 'Copied!';
+  String get rewardNotEnough => 'Not enough points yet. Keep going with your habits — they arrive faster than you think.';
+  String get rewardPointsLeft => 'You\'ll have';
+  String get rewardUsed => 'Used';
+  String get rewardMarkUsed => 'Mark as used';
+  String get marketplaceGuide => 'These are the rewards you can redeem with your points. You earned them — enjoy the choice.';
+  String get celebrationDay1to6 => 'All done today. Tomorrow we start again.';
+  String get celebrationDay7 => 'A whole week. That\'s no small thing.';
+  String get celebrationDay14 => 'Two weeks. You\'re building something solid.';
+  String get celebrationNormal => 'Day complete. Welly is satisfied — and you?';
+  String get celebrationClose => 'Close';
+  String get celebrationPointsToday => 'points today';
+  String get navUnlockHabitsMsg => 'There\'s a new section for you. Your habits now have their own space.';
+  String get navUnlockGrowthMsg => 'You have enough history now to look at it. Your growth has its own space.';
+  String get navNewBadge => 'New';
+  String get notifReturn1day => 'How are you? I haven\'t seen you today.';
+  String get notifReturn3days => 'I\'m here when you\'re ready. Your habits are waiting for you.';
+  String get notifReturn7days => 'A week has passed. No pressure — but when you want to come back, I\'m here.';
+  String get notifStreakRisk => 'The day is ending. You still have time.';
+  String get notifMilestoneNear => 'You\'re 2 days away from a week in a row. You\'re almost there.';
+  String get notifNewUnlock => 'There\'s something new for you. Open Be Well.';
 
   String get errorNetwork => 'No internet connection';
   String get errorGeneral => 'Something went wrong. Try again.';
@@ -493,6 +718,9 @@ class _It extends BwStrings {
   String get phase => 'Fase';
   String get waterToday => 'Acqua oggi';
   String get waterGlasses => 'bicchieri';
+  String get waterTrackedInHome => '💧 home';
+  String get achievementUnlocked => 'Achievement sbloccato!';
+  String get newHabitUnlocked => 'Nuova abitudine sbloccata!';
   String get waterZero => 'Inizia con il primo bicchiere.';
   String get waterLow => 'Stai andando bene — continua così.';
   String get waterMid => 'Più della metà — ottimo!';
@@ -591,6 +819,8 @@ class _It extends BwStrings {
   String get rewardsPoints => 'Punti Be Well';
   String get rewardsLocked => 'I premi stanno arrivando';
   String get rewardsLockedDesc => 'Continua a costruire abitudini per sbloccare i tuoi premi';
+  String get rewardsHeader => 'I tuoi premi';
+  String get rewardsHeaderSub => 'Raccogli quello che hai seminato';
 
   String get habitWaterName => 'Bevi acqua'; String get habitWaterDesc => '8 bicchieri durante la giornata';
   String get habitFocus25Name => 'Sessione focus 25 min'; String get habitFocus25Desc => 'Un Pomodoro senza distrazioni';
@@ -613,12 +843,82 @@ class _It extends BwStrings {
   String get habitWakeName => 'Sveglia costante'; String get habitWakeDesc => 'Alzati sempre alla stessa ora';
   String get habitNapName => 'Power nap 20 min'; String get habitNapDesc => 'Un riposo breve e intenzionale nel pomeriggio';
   String get habitFocusPhoneName => 'Focus senza telefono'; String get habitFocusPhoneDesc => 'Telefono capovolto durante il focus';
+  String get habitMicroWalkName => 'Micro-camminata 5 min';
+  String get habitMicroWalkDesc => '5 minuti di camminata ogni 90 minuti — ciclo ultradiano';
+  String get habitDigitalSunsetName => 'Digital sunset';
+  String get habitDigitalSunsetDesc => 'Niente social media nell\'ora prima di dormire';
+
+  String get neverMissTwiceTitle => 'Stai per saltare due giorni di fila.';
+  String get neverMissTwiceBody => 'Una sola azione conta. Anche un bicchiere d\'acqua.';
+  String get neverMissTwiceCta => '💧 Aggiungi un bicchiere d\'acqua';
+  String get wellyBonusTitle => 'Welly Bonus!';
+  String get wellyBonusBody => 'Punti tripli questo giro 🎉';
+  String get focusDeepWork => 'Deep Work';
+  String get focusMinRemaining => 'min rimasti';
+  String get focusBlockOf4 => 'di 4';
 
   String get coachDay1 => 'Primo giorno. Il più importante.';
   String get coachDay3 => '3 giorni. Il corpo inizia a registrarlo.';
   String get coachDay7 => '7 giorni. Stai costruendo qualcosa.';
   String get coachDay14 => '2 settimane. Questa abitudine è tua adesso.';
   String get coachGeneral => 'Ogni giorno conta. Anche i giorni difficili.';
+  String get habitIntroTitle => 'È il momento di aggiungere\nqualcosa di nuovo.';
+  String get habitIntroSubtitle => 'Scegli dove concentrarti adesso.';
+  String get habitIntroMoreOptions => 'mostrami altre opzioni ›';
+  String get effortLow => 'facile';
+  String get effortMedium => 'moderato';
+  String get effortHigh => 'impegnativo';
+  String get daysOfHabits => 'giorni di abitudini';
+  String get habitStart => 'Inizia';
+  String get habitMarkDone => 'Fatto';
+  String get habitCompletedToday => 'Fatto oggi';
+  String get habitDaysToNextPhase => 'al prossimo livello';
+  String get habitsGuide => 'Le tue abitudini attive sono qui. Tocca una card per iniziare, o segna "Fatto" se l\'hai già fatta. Ogni giorno che completi costruisce qualcosa.';
+  String get habitsAllDone => 'Tutto fatto per oggi.';
+  String get habitLate => 'In ritardo';
+  String get habitDetailWhyNow => 'Perché ora';
+  String get habitDetailWhatDoes => 'Cosa fa';
+  String get habitDetailHowStart => 'Come iniziare';
+  String get habitYourProgress => 'I tuoi progressi';
+  String get homeMomentNow => 'Adesso';
+  String get homeFirstVisit => 'Questa è la tua home. Torna qui ogni giorno — io ci sono.';
+  String get homeReturnAfter2 => 'Bentornato. Mi sei mancato.';
+  String get homeReturnAfter3to6 => 'Che bello rivederti. Sei tornato — ed è quello che conta.';
+  String get homeReturnAfter7 => 'Eccoti. Non importa quanto tempo è passato — sei qui adesso, e questo è il punto di partenza.';
+  String get homeStreakBroken => 'La serie si è fermata — ma tutto quello che hai costruito è ancora lì. Continuiamo da dove siamo.';
+  String get homeResume => 'Riprendiamo';
+  String get growthMarketplaceHeader => 'Raccogli quello che hai seminato';
+  String get growthMilestones => 'Momenti memorabili';
+  String get growthStats => 'Statistiche';
+  String get growthTotalDays => 'Giorni totali';
+  String get growthTotalGlasses => 'Bicchieri d\'acqua';
+  String get growthTotalFocusMin => 'Minuti di focus';
+  String get rewardRedeem => 'Riscatta';
+  String get rewardConfirmTitle => 'Sei sicuro?';
+  String get rewardConfirmBody => 'Verranno scalati i punti.';
+  String get rewardCodeLabel => 'Il tuo codice';
+  String get rewardCopyCode => 'Copia codice';
+  String get rewardCopied => 'Copiato!';
+  String get rewardNotEnough => 'Ti mancano ancora un po\' di punti. Continua con le abitudini — arrivano più in fretta di quanto pensi.';
+  String get rewardPointsLeft => 'Ti resterebbero';
+  String get rewardUsed => 'Usato';
+  String get rewardMarkUsed => 'Segna come usato';
+  String get marketplaceGuide => 'Questi sono i premi che puoi riscattare con i tuoi punti. Li hai guadagnati tu — goditi la scelta.';
+  String get celebrationDay1to6 => 'Tutto fatto oggi. Domani si riparte.';
+  String get celebrationDay7 => 'Una settimana intera. Non è poco.';
+  String get celebrationDay14 => 'Due settimane. Stai costruendo qualcosa di solido.';
+  String get celebrationNormal => 'Giornata completa. Welly è soddisfatto — e tu?';
+  String get celebrationClose => 'Chiudi';
+  String get celebrationPointsToday => 'punti oggi';
+  String get navUnlockHabitsMsg => 'C\'è una sezione nuova per te. Le tue abitudini hanno adesso il loro spazio.';
+  String get navUnlockGrowthMsg => 'Hai abbastanza storia adesso per guardarla. La tua crescita ha il suo spazio.';
+  String get navNewBadge => 'Nuovo';
+  String get notifReturn1day => 'Come stai? Non ti ho visto oggi.';
+  String get notifReturn3days => 'Sono qui quando sei pronto. Le tue abitudini ti aspettano.';
+  String get notifReturn7days => 'È passata una settimana. Nessuna pressione — ma quando vuoi tornare, ci sono.';
+  String get notifStreakRisk => 'La giornata sta finendo. Hai ancora tempo.';
+  String get notifMilestoneNear => 'Ti mancano 2 giorni a una settimana consecutiva. Ci sei quasi.';
+  String get notifNewUnlock => 'C\'è qualcosa di nuovo per te. Apri Be Well.';
 
   String get errorNetwork => 'Nessuna connessione internet';
   String get errorGeneral => 'Qualcosa è andato storto. Riprova.';
@@ -682,6 +982,9 @@ class _Fr extends BwStrings {
   String get phase => 'Phase';
   String get waterToday => 'Eau aujourd\'hui';
   String get waterGlasses => 'verres';
+  String get waterTrackedInHome => '💧 home';
+  String get achievementUnlocked => 'Achievement débloqué !';
+  String get newHabitUnlocked => 'Nouvelle habitude débloquée !';
   String get waterZero => 'Commencez par le premier verre.';
   String get waterLow => 'Bien parti — continuez !';
   String get waterMid => 'Plus de la moitié — excellent !';
@@ -780,6 +1083,8 @@ class _Fr extends BwStrings {
   String get rewardsPoints => 'Points Be Well';
   String get rewardsLocked => 'Les récompenses arrivent';
   String get rewardsLockedDesc => 'Continuez à construire des habitudes pour débloquer vos récompenses';
+  String get rewardsHeader => 'Vos récompenses';
+  String get rewardsHeaderSub => 'Récoltez ce que vous avez semé';
 
   String get habitWaterName => 'Boire de l\'eau'; String get habitWaterDesc => '8 verres tout au long de la journée';
   String get habitFocus25Name => 'Session focus 25 min'; String get habitFocus25Desc => 'Un Pomodoro sans distractions';
@@ -802,12 +1107,82 @@ class _Fr extends BwStrings {
   String get habitWakeName => 'Réveil constant'; String get habitWakeDesc => 'Se lever à la même heure chaque jour';
   String get habitNapName => 'Sieste 20 min'; String get habitNapDesc => 'Un court repos intentionnel l\'après-midi';
   String get habitFocusPhoneName => 'Focus sans téléphone'; String get habitFocusPhoneDesc => 'Téléphone retourné pendant les sessions focus';
+  String get habitMicroWalkName => 'Micro-marche 5 min';
+  String get habitMicroWalkDesc => '5 minutes de marche toutes les 90 minutes — cycle ultradien';
+  String get habitDigitalSunsetName => 'Coucher digital';
+  String get habitDigitalSunsetDesc => 'Pas de réseaux sociaux dans l\'heure avant de dormir';
+
+  String get neverMissTwiceTitle => 'Ne ratez pas deux jours de suite.';
+  String get neverMissTwiceBody => 'Une seule action compte. Même un verre d\'eau.';
+  String get neverMissTwiceCta => '💧 Ajouter un verre d\'eau';
+  String get wellyBonusTitle => 'Bonus Welly !';
+  String get wellyBonusBody => 'Points triplés ce tour 🎉';
+  String get focusDeepWork => 'Travail profond';
+  String get focusMinRemaining => 'min restantes';
+  String get focusBlockOf4 => 'sur 4';
 
   String get coachDay1 => 'Premier jour. Le plus important.';
   String get coachDay3 => '3 jours. Votre corps commence à l\'enregistrer.';
   String get coachDay7 => '7 jours. Vous construisez quelque chose.';
   String get coachDay14 => '2 semaines. Cette habitude est la vôtre maintenant.';
   String get coachGeneral => 'Chaque jour compte. Même les jours difficiles.';
+  String get habitIntroTitle => 'Il est temps d\'ajouter\nquelque chose de nouveau.';
+  String get habitIntroSubtitle => 'Choisissez où vous concentrer maintenant.';
+  String get habitIntroMoreOptions => 'montrez-moi d\'autres options ›';
+  String get effortLow => 'facile';
+  String get effortMedium => 'modéré';
+  String get effortHigh => 'exigeant';
+  String get daysOfHabits => 'jours d\'habitudes';
+  String get habitStart => 'Démarrer';
+  String get habitMarkDone => 'Fait';
+  String get habitCompletedToday => 'Fait aujourd\'hui';
+  String get habitDaysToNextPhase => 'au niveau suivant';
+  String get habitsGuide => 'Vos habitudes actives sont ici. Touchez une carte pour commencer, ou marquez "Fait" si vous l\'avez déjà faite. Chaque jour que vous complétez construit quelque chose.';
+  String get habitsAllDone => 'Tout fait pour aujourd\'hui.';
+  String get habitLate => 'En retard';
+  String get habitDetailWhyNow => 'Pourquoi maintenant';
+  String get habitDetailWhatDoes => 'Ce que ça fait';
+  String get habitDetailHowStart => 'Comment commencer';
+  String get habitYourProgress => 'Vos progrès';
+  String get homeMomentNow => 'Maintenant';
+  String get homeFirstVisit => 'C\'est votre accueil. Revenez chaque jour — je suis là.';
+  String get homeReturnAfter2 => 'Bienvenue. Tu m\'as manqué.';
+  String get homeReturnAfter3to6 => 'Quelle joie de te revoir. Tu es revenu — et c\'est ce qui compte.';
+  String get homeReturnAfter7 => 'Te voilà. Peu importe le temps passé — tu es là maintenant, et c\'est le point de départ.';
+  String get homeStreakBroken => 'La série s\'est arrêtée — mais tout ce que tu as construit est toujours là. Continuons d\'où nous sommes.';
+  String get homeResume => 'Reprendre';
+  String get growthMarketplaceHeader => 'Récoltez ce que vous avez semé';
+  String get growthMilestones => 'Moments mémorables';
+  String get growthStats => 'Statistiques';
+  String get growthTotalDays => 'Jours totaux';
+  String get growthTotalGlasses => 'Verres d\'eau';
+  String get growthTotalFocusMin => 'Minutes de focus';
+  String get rewardRedeem => 'Utiliser';
+  String get rewardConfirmTitle => 'Êtes-vous sûr ?';
+  String get rewardConfirmBody => 'Les points seront déduits.';
+  String get rewardCodeLabel => 'Votre code';
+  String get rewardCopyCode => 'Copier le code';
+  String get rewardCopied => 'Copié !';
+  String get rewardNotEnough => 'Il vous manque encore quelques points. Continuez avec vos habitudes — ils arrivent plus vite que vous ne pensez.';
+  String get rewardPointsLeft => 'Il vous resterait';
+  String get rewardUsed => 'Utilisé';
+  String get rewardMarkUsed => 'Marquer comme utilisé';
+  String get marketplaceGuide => 'Ce sont les récompenses que vous pouvez échanger avec vos points. Vous les avez gagnées — profitez du choix.';
+  String get celebrationDay1to6 => 'Tout fait aujourd\'hui. Demain on recommence.';
+  String get celebrationDay7 => 'Une semaine entière. C\'est pas rien.';
+  String get celebrationDay14 => 'Deux semaines. Vous construisez quelque chose de solide.';
+  String get celebrationNormal => 'Journée complète. Welly est satisfait — et vous ?';
+  String get celebrationClose => 'Fermer';
+  String get celebrationPointsToday => 'points aujourd\'hui';
+  String get navUnlockHabitsMsg => 'Il y a une nouvelle section pour vous. Vos habitudes ont maintenant leur propre espace.';
+  String get navUnlockGrowthMsg => 'Vous avez assez d\'histoire maintenant pour la regarder. Votre croissance a son propre espace.';
+  String get navNewBadge => 'Nouveau';
+  String get notifReturn1day => 'Comment vas-tu ? Je ne t\'ai pas vu aujourd\'hui.';
+  String get notifReturn3days => 'Je suis là quand tu es prêt. Tes habitudes t\'attendent.';
+  String get notifReturn7days => 'Une semaine a passé. Pas de pression — mais quand tu veux revenir, je suis là.';
+  String get notifStreakRisk => 'La journée se termine. Tu as encore le temps.';
+  String get notifMilestoneNear => 'Il te manque 2 jours pour une semaine consécutive. Tu y es presque.';
+  String get notifNewUnlock => 'Il y a quelque chose de nouveau pour toi. Ouvre Be Well.';
 
   String get errorNetwork => 'Pas de connexion internet';
   String get errorGeneral => 'Quelque chose s\'est mal passé. Réessayez.';
@@ -871,6 +1246,9 @@ class _De extends BwStrings {
   String get phase => 'Phase';
   String get waterToday => 'Wasser heute';
   String get waterGlasses => 'Gläser';
+  String get waterTrackedInHome => '💧 home';
+  String get achievementUnlocked => 'Achievement freigeschaltet!';
+  String get newHabitUnlocked => 'Neue Gewohnheit freigeschaltet!';
   String get waterZero => 'Beginne mit dem ersten Glas.';
   String get waterLow => 'Gut so — weiter so!';
   String get waterMid => 'Mehr als die Hälfte — toll!';
@@ -969,6 +1347,8 @@ class _De extends BwStrings {
   String get rewardsPoints => 'Be Well-Punkte';
   String get rewardsLocked => 'Belohnungen kommen';
   String get rewardsLockedDesc => 'Baue weiter Gewohnheiten auf, um deine Belohnungen freizuschalten';
+  String get rewardsHeader => 'Deine Belohnungen';
+  String get rewardsHeaderSub => 'Ernte, was du gesät hast';
 
   String get habitWaterName => 'Wasser trinken'; String get habitWaterDesc => '8 Gläser über den Tag verteilt';
   String get habitFocus25Name => 'Fokus-Sitzung 25 Min'; String get habitFocus25Desc => 'Ein Pomodoro ohne Ablenkungen';
@@ -991,12 +1371,82 @@ class _De extends BwStrings {
   String get habitWakeName => 'Konstante Aufwachzeit'; String get habitWakeDesc => 'Jeden Tag zur gleichen Zeit aufstehen';
   String get habitNapName => 'Power-Nap 20 Min'; String get habitNapDesc => 'Eine kurze intentionale Ruhe am Nachmittag';
   String get habitFocusPhoneName => 'Fokus ohne Telefon'; String get habitFocusPhoneDesc => 'Telefon während Fokus-Sitzungen umgedreht';
+  String get habitMicroWalkName => 'Mikro-Spaziergang 5 Min';
+  String get habitMicroWalkDesc => '5 Minuten Gehen alle 90 Minuten — Ultradianischer Zyklus';
+  String get habitDigitalSunsetName => 'Digitaler Sonnenuntergang';
+  String get habitDigitalSunsetDesc => 'Kein Social Media in der Stunde vor dem Schlafen';
+
+  String get neverMissTwiceTitle => 'Nicht zwei Tage hintereinander auslassen.';
+  String get neverMissTwiceBody => 'Eine kleine Aktion zählt. Sogar ein Glas Wasser.';
+  String get neverMissTwiceCta => '💧 Ein Glas Wasser hinzufügen';
+  String get wellyBonusTitle => 'Welly-Bonus!';
+  String get wellyBonusBody => 'Dreifache Punkte diese Runde 🎉';
+  String get focusDeepWork => 'Tiefe Arbeit';
+  String get focusMinRemaining => 'Min verbleibend';
+  String get focusBlockOf4 => 'von 4';
 
   String get coachDay1 => 'Erster Tag. Der wichtigste.';
   String get coachDay3 => '3 Tage. Dein Körper beginnt es zu registrieren.';
   String get coachDay7 => '7 Tage. Du baust etwas auf.';
   String get coachDay14 => '2 Wochen. Diese Gewohnheit gehört dir jetzt.';
   String get coachGeneral => 'Jeder Tag zählt. Auch die schwierigen.';
+  String get habitIntroTitle => 'Zeit, etwas Neues\nhinzuzufügen.';
+  String get habitIntroSubtitle => 'Wähle, worauf du dich jetzt konzentrieren möchtest.';
+  String get habitIntroMoreOptions => 'zeig mir andere Optionen ›';
+  String get effortLow => 'einfach';
+  String get effortMedium => 'moderat';
+  String get effortHigh => 'anspruchsvoll';
+  String get daysOfHabits => 'Tage mit Gewohnheiten';
+  String get habitStart => 'Starten';
+  String get habitMarkDone => 'Erledigt';
+  String get habitCompletedToday => 'Heute erledigt';
+  String get habitDaysToNextPhase => 'zur nächsten Phase';
+  String get habitsGuide => 'Deine aktiven Gewohnheiten sind hier. Tippe auf eine Karte, um zu beginnen, oder markiere "Erledigt", wenn du es bereits getan hast. Jeder Tag, den du abschließt, baut etwas auf.';
+  String get habitsAllDone => 'Alles für heute erledigt.';
+  String get habitLate => 'Verspätet';
+  String get habitDetailWhyNow => 'Warum jetzt';
+  String get habitDetailWhatDoes => 'Was es bewirkt';
+  String get habitDetailHowStart => 'Wie man beginnt';
+  String get habitYourProgress => 'Dein Fortschritt';
+  String get homeMomentNow => 'Jetzt';
+  String get homeFirstVisit => 'Das ist dein Zuhause. Komm jeden Tag zurück — ich bin hier.';
+  String get homeReturnAfter2 => 'Willkommen zurück. Du hast mir gefehlt.';
+  String get homeReturnAfter3to6 => 'Schön, dich wiederzusehen. Du bist zurück — und das ist es, was zählt.';
+  String get homeReturnAfter7 => 'Da bist du. Egal wie viel Zeit vergangen ist — du bist jetzt hier, und das ist der Ausgangspunkt.';
+  String get homeStreakBroken => 'Die Serie hat aufgehört — aber alles, was du aufgebaut hast, ist noch da. Machen wir weiter, wo wir sind.';
+  String get homeResume => 'Weitermachen';
+  String get growthMarketplaceHeader => 'Ernte, was du gesät hast';
+  String get growthMilestones => 'Meilensteine';
+  String get growthStats => 'Statistiken';
+  String get growthTotalDays => 'Gesamttage';
+  String get growthTotalGlasses => 'Gläser Wasser';
+  String get growthTotalFocusMin => 'Fokus-Minuten';
+  String get rewardRedeem => 'Einlösen';
+  String get rewardConfirmTitle => 'Bist du sicher?';
+  String get rewardConfirmBody => 'Punkte werden abgezogen.';
+  String get rewardCodeLabel => 'Dein Code';
+  String get rewardCopyCode => 'Code kopieren';
+  String get rewardCopied => 'Kopiert!';
+  String get rewardNotEnough => 'Es fehlen dir noch ein paar Punkte. Mach weiter mit deinen Gewohnheiten — sie kommen schneller als du denkst.';
+  String get rewardPointsLeft => 'Es würden dir bleiben';
+  String get rewardUsed => 'Verwendet';
+  String get rewardMarkUsed => 'Als verwendet markieren';
+  String get marketplaceGuide => 'Das sind die Belohnungen, die du mit deinen Punkten einlösen kannst. Du hast sie verdient — genieße die Auswahl.';
+  String get celebrationDay1to6 => 'Alles heute erledigt. Morgen fangen wir wieder an.';
+  String get celebrationDay7 => 'Eine ganze Woche. Das ist nicht wenig.';
+  String get celebrationDay14 => 'Zwei Wochen. Du baust etwas Solides auf.';
+  String get celebrationNormal => 'Tag abgeschlossen. Welly ist zufrieden — und du?';
+  String get celebrationClose => 'Schließen';
+  String get celebrationPointsToday => 'Punkte heute';
+  String get navUnlockHabitsMsg => 'Es gibt einen neuen Bereich für dich. Deine Gewohnheiten haben jetzt ihren eigenen Platz.';
+  String get navUnlockGrowthMsg => 'Du hast jetzt genug Geschichte, um sie anzusehen. Dein Wachstum hat seinen eigenen Platz.';
+  String get navNewBadge => 'Neu';
+  String get notifReturn1day => 'Wie geht es dir? Ich habe dich heute nicht gesehen.';
+  String get notifReturn3days => 'Ich bin hier, wenn du bereit bist. Deine Gewohnheiten warten auf dich.';
+  String get notifReturn7days => 'Eine Woche ist vergangen. Kein Druck — aber wenn du zurückkommen möchtest, bin ich hier.';
+  String get notifStreakRisk => 'Der Tag endet. Du hast noch Zeit.';
+  String get notifMilestoneNear => 'Es fehlen dir 2 Tage bis zu einer Woche in Folge. Du bist fast da.';
+  String get notifNewUnlock => 'Es gibt etwas Neues für dich. Öffne Be Well.';
 
   String get errorNetwork => 'Keine Internetverbindung';
   String get errorGeneral => 'Etwas ist schiefgelaufen. Versuche es erneut.';
@@ -1060,6 +1510,9 @@ class _Es extends BwStrings {
   String get phase => 'Fase';
   String get waterToday => 'Agua hoy';
   String get waterGlasses => 'vasos';
+  String get waterTrackedInHome => '💧 home';
+  String get achievementUnlocked => '¡Logro desbloqueado!';
+  String get newHabitUnlocked => '¡Nuevo hábito desbloqueado!';
   String get waterZero => 'Empieza con el primer vaso.';
   String get waterLow => 'Bien encaminado — sigue así.';
   String get waterMid => 'Más de la mitad — ¡genial!';
@@ -1158,6 +1611,8 @@ class _Es extends BwStrings {
   String get rewardsPoints => 'Puntos Be Well';
   String get rewardsLocked => 'Las recompensas están llegando';
   String get rewardsLockedDesc => 'Sigue construyendo hábitos para desbloquear tus recompensas';
+  String get rewardsHeader => 'Tus recompensas';
+  String get rewardsHeaderSub => 'Cosecha lo que has sembrado';
 
   String get habitWaterName => 'Beber agua'; String get habitWaterDesc => '8 vasos durante el día';
   String get habitFocus25Name => 'Sesión de enfoque 25 min'; String get habitFocus25Desc => 'Un Pomodoro sin distracciones';
@@ -1180,12 +1635,82 @@ class _Es extends BwStrings {
   String get habitWakeName => 'Despertar constante'; String get habitWakeDesc => 'Levantarse a la misma hora cada día';
   String get habitNapName => 'Siesta de 20 min'; String get habitNapDesc => 'Un breve descanso intencional por la tarde';
   String get habitFocusPhoneName => 'Enfoque sin teléfono'; String get habitFocusPhoneDesc => 'Teléfono boca abajo durante las sesiones de enfoque';
+  String get habitMicroWalkName => 'Micro-caminata 5 min';
+  String get habitMicroWalkDesc => '5 minutos caminando cada 90 minutos — ciclo ultradiano';
+  String get habitDigitalSunsetName => 'Atardecer digital';
+  String get habitDigitalSunsetDesc => 'Sin redes sociales en la hora antes de dormir';
+
+  String get neverMissTwiceTitle => 'No faltes dos días seguidos.';
+  String get neverMissTwiceBody => 'Una sola acción cuenta. Incluso un vaso de agua.';
+  String get neverMissTwiceCta => '💧 Añadir un vaso de agua';
+  String get wellyBonusTitle => '¡Bonus Welly!';
+  String get wellyBonusBody => 'Puntos triplicados esta vez 🎉';
+  String get focusDeepWork => 'Trabajo profundo';
+  String get focusMinRemaining => 'min restantes';
+  String get focusBlockOf4 => 'de 4';
 
   String get coachDay1 => 'Primer día. El más importante.';
   String get coachDay3 => '3 días. Tu cuerpo empieza a registrarlo.';
   String get coachDay7 => '7 días. Estás construyendo algo.';
   String get coachDay14 => '2 semanas. Este hábito es tuyo ahora.';
   String get coachGeneral => 'Cada día cuenta. Incluso los días difíciles.';
+  String get habitIntroTitle => 'Es hora de añadir\nalgo nuevo.';
+  String get habitIntroSubtitle => 'Elige en qué enfocarte ahora.';
+  String get habitIntroMoreOptions => 'muéstrame otras opciones ›';
+  String get effortLow => 'fácil';
+  String get effortMedium => 'moderado';
+  String get effortHigh => 'exigente';
+  String get daysOfHabits => 'días de hábitos';
+  String get habitStart => 'Comenzar';
+  String get habitMarkDone => 'Hecho';
+  String get habitCompletedToday => 'Hecho hoy';
+  String get habitDaysToNextPhase => 'al siguiente nivel';
+  String get habitsGuide => 'Tus hábitos activos están aquí. Toca una tarjeta para empezar, o marca "Hecho" si ya lo has hecho. Cada día que completas construye algo.';
+  String get habitsAllDone => 'Todo hecho por hoy.';
+  String get habitLate => 'Con retraso';
+  String get habitDetailWhyNow => 'Por qué ahora';
+  String get habitDetailWhatDoes => 'Qué hace';
+  String get habitDetailHowStart => 'Cómo empezar';
+  String get habitYourProgress => 'Tu progreso';
+  String get homeMomentNow => 'Ahora';
+  String get homeFirstVisit => 'Este es tu hogar. Vuelve cada día — yo estoy aquí.';
+  String get homeReturnAfter2 => 'Bienvenido de vuelta. Te he echado de menos.';
+  String get homeReturnAfter3to6 => 'Qué alegría verte. Has vuelto — y eso es lo que importa.';
+  String get homeReturnAfter7 => 'Aquí estás. No importa cuánto tiempo ha pasado — estás aquí ahora, y ese es el punto de partida.';
+  String get homeStreakBroken => 'La racha se detuvo — pero todo lo que has construido sigue ahí. Continuemos desde donde estamos.';
+  String get homeResume => 'Retomemos';
+  String get growthMarketplaceHeader => 'Cosecha lo que has sembrado';
+  String get growthMilestones => 'Momentos memorables';
+  String get growthStats => 'Estadísticas';
+  String get growthTotalDays => 'Días totales';
+  String get growthTotalGlasses => 'Vasos de agua';
+  String get growthTotalFocusMin => 'Minutos de enfoque';
+  String get rewardRedeem => 'Canjear';
+  String get rewardConfirmTitle => '¿Estás seguro?';
+  String get rewardConfirmBody => 'Se deducirán los puntos.';
+  String get rewardCodeLabel => 'Tu código';
+  String get rewardCopyCode => 'Copiar código';
+  String get rewardCopied => '¡Copiado!';
+  String get rewardNotEnough => 'Todavía te faltan algunos puntos. Sigue con tus hábitos — llegan más rápido de lo que crees.';
+  String get rewardPointsLeft => 'Te quedarían';
+  String get rewardUsed => 'Usado';
+  String get rewardMarkUsed => 'Marcar como usado';
+  String get marketplaceGuide => 'Estas son las recompensas que puedes canjear con tus puntos. Tú las ganaste — disfruta la elección.';
+  String get celebrationDay1to6 => 'Todo hecho hoy. Mañana empezamos de nuevo.';
+  String get celebrationDay7 => 'Una semana entera. No es poco.';
+  String get celebrationDay14 => 'Dos semanas. Estás construyendo algo sólido.';
+  String get celebrationNormal => 'Día completo. Welly está satisfecho — ¿y tú?';
+  String get celebrationClose => 'Cerrar';
+  String get celebrationPointsToday => 'puntos hoy';
+  String get navUnlockHabitsMsg => 'Hay una nueva sección para ti. Tus hábitos ahora tienen su propio espacio.';
+  String get navUnlockGrowthMsg => 'Tienes suficiente historia ahora para verla. Tu crecimiento tiene su propio espacio.';
+  String get navNewBadge => 'Nuevo';
+  String get notifReturn1day => '¿Cómo estás? No te he visto hoy.';
+  String get notifReturn3days => 'Estoy aquí cuando estés listo. Tus hábitos te esperan.';
+  String get notifReturn7days => 'Ha pasado una semana. Sin presión — pero cuando quieras volver, estoy aquí.';
+  String get notifStreakRisk => 'El día está terminando. Todavía tienes tiempo.';
+  String get notifMilestoneNear => 'Te faltan 2 días para una semana consecutiva. Ya casi estás.';
+  String get notifNewUnlock => 'Hay algo nuevo para ti. Abre Be Well.';
 
   String get errorNetwork => 'Sin conexión a internet';
   String get errorGeneral => 'Algo salió mal. Inténtalo de nuevo.';

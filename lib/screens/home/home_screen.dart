@@ -9,6 +9,7 @@ import '../../widgets/bw_scaffold.dart';
 import '../../widgets/companion/companion_widget.dart';
 import '../../widgets/debug_panel.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/habits/habit_intro_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -42,12 +43,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     final today = DateTime.now();
-    final savedDate = prefs.getString('water_date') ?? '';
     final todayStr = '${today.year}-${today.month}-${today.day}';
+
+    final savedDate = prefs.getString('water_date') ?? '';
     if (savedDate != todayStr) {
       await prefs.setString('water_date', todayStr);
       await prefs.setInt('water_count', 0);
     }
+
     setState(() {
       _waterCount = prefs.getInt('water_count') ?? 0;
       _wellyName = prefs.getString('welly_name') ?? 'Welly';
@@ -136,53 +139,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ],
                 ),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
+
+                // ── Fumetto Welly (sopra companion) ──────────────────
+                if (message.isNotEmpty) ...[
+                  _WellySpeechBubble(message: message, p: p, isAmb: isAmb),
+                  const SizedBox(height: 4),
+                ],
 
                 // ── Companion ────────────────────────────────────────
                 Center(
                   child: DebugTrigger(
                     child: CompanionWidget(
-                      size: 180,
-                      mood: CompanionMood.idle,
+                      size: 160,
+                      mood: _companionMood(
+                        app: context.watch<AppProvider>(),
+                        progression: progression,
+                      ),
                     ),
                   ),
                 ),
-
-                const SizedBox(height: 20),
-
-                // ── Messaggio Welly ──────────────────────────────────
-                if (message.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: p.primaryLight,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: p.primary.withValues(alpha: 0.15),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('💬', style: TextStyle(fontSize: 16)),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            message,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: p.text,
-                              height: 1.55,
-                              fontStyle: isAmb
-                                  ? FontStyle.italic
-                                  : FontStyle.normal,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
 
                 const SizedBox(height: 24),
                 _Divider(p: p),
@@ -329,6 +305,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ],
                 ),
 
+                // ── Card momento attuale ─────────────────────────────
+                const SizedBox(height: 24),
+                _Divider(p: p),
+                const SizedBox(height: 20),
+                _CurrentMomentCard(
+                  waterCount: _waterCount,
+                  isWaterDone: _waterCount >= 8,
+                  onAddWater: _addWater,
+                  progression: progression,
+                  p: p,
+                  isAmb: isAmb,
+                  s: s,
+                ),
+
+                // ── Never miss twice banner ──────────────────────────
+                if ((user?.streak ?? 0) == 0 &&
+                    (user?.totalSessions ?? 0) > 0) ...[
+                  const SizedBox(height: 24),
+                  _Divider(p: p),
+                  const SizedBox(height: 20),
+                  _NeverMissTwiceBanner(p: p),
+                ],
+
                 // ── Prossima abitudine ────────────────────────────────
                 if (nextHabit != null) ...[
                   const SizedBox(height: 24),
@@ -354,6 +353,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     p: p,
                     progression: progression,
                     s: s,
+                    onTap: progression.pendingChoicePair != null
+                        ? () {
+                            final pair = progression.pendingChoicePair!;
+                            HabitIntroSheet.show(context,
+                                habitA: pair.$1, habitB: pair.$2);
+                          }
+                        : null,
                   ),
                 ],
               ],
@@ -365,6 +371,168 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 }
 
+// ── Speech bubble Welly (TASK 1) ─────────────────────────────────────────────
+class _WellySpeechBubble extends StatelessWidget {
+  final String message;
+  final BwPaletteData p;
+  final bool isAmb;
+  const _WellySpeechBubble({required this.message, required this.p, required this.isAmb});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: p.primaryLight,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: p.primary.withValues(alpha: 0.2), width: 0.5),
+          ),
+          child: Text(
+            message,
+            style: TextStyle(
+              fontSize: 14,
+              color: p.text,
+              height: 1.6,
+              fontStyle: isAmb ? FontStyle.italic : FontStyle.normal,
+              fontFamily: isAmb ? 'CormorantGaramond' : null,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        // Triangolino del fumetto che punta verso il basso (verso Welly)
+        Align(
+          alignment: Alignment.center,
+          child: CustomPaint(
+            size: const Size(16, 8),
+            painter: _BubbleTailPainter(
+              color: p.primaryLight,
+              borderColor: p.primary.withValues(alpha: 0.2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BubbleTailPainter extends CustomPainter {
+  final Color color;
+  final Color borderColor;
+  const _BubbleTailPainter({required this.color, required this.borderColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width, 0)
+      ..close();
+    canvas.drawPath(path, Paint()..color = borderColor);
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_BubbleTailPainter old) => old.color != color;
+}
+
+// ── Card momento attuale (TASK 2) ─────────────────────────────────────────────
+class _CurrentMomentCard extends StatelessWidget {
+  final int waterCount;
+  final bool isWaterDone;
+  final VoidCallback onAddWater;
+  final ProgressionProvider progression;
+  final BwPaletteData p;
+  final bool isAmb;
+  final BwStrings s;
+
+  const _CurrentMomentCard({
+    required this.waterCount,
+    required this.isWaterDone,
+    required this.onAddWater,
+    required this.progression,
+    required this.p,
+    required this.isAmb,
+    required this.s,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    String title;
+    String subtitle;
+    IconData icon;
+    VoidCallback? action;
+    String actionLabel;
+
+    if (!isWaterDone) {
+      icon = Icons.water_drop_outlined;
+      title = s.waterToday;
+      subtitle = '$waterCount / 8 ${s.waterGlasses}';
+      action = onAddWater;
+      actionLabel = s.addGlass;
+    } else {
+      final active = progression.activeHabits.where((h) => h.id != 'water').toList();
+      if (active.isEmpty) return const SizedBox.shrink();
+
+      icon = Icons.check_circle_outline_rounded;
+      title = s.waterDone;
+      subtitle = '${active.length} ${s.activeHabits.toLowerCase()}';
+      action = null;
+      actionLabel = '';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isWaterDone ? p.primaryLight : p.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isWaterDone ? p.primary.withValues(alpha: 0.3) : p.cardBorder,
+          width: isWaterDone ? 1 : 0.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: isWaterDone ? p.primary : p.primaryLight,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: isWaterDone ? Colors.white : p.primary, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.text)),
+                const SizedBox(height: 2),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: p.textSec)),
+              ],
+            ),
+          ),
+          if (action != null && !isWaterDone)
+            GestureDetector(
+              onTap: action,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: p.btn,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(actionLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.btnText)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Divider ───────────────────────────────────────────────────────────────────
 class _Divider extends StatelessWidget {
   final BwPaletteData p;
   const _Divider({required this.p});
@@ -409,80 +577,157 @@ class _NextHabitPreview extends StatelessWidget {
   final BwPaletteData p;
   final ProgressionProvider progression;
   final BwStrings s;
+  final VoidCallback? onTap;
 
   const _NextHabitPreview({
     required this.habit,
     required this.p,
     required this.progression,
     required this.s,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final daysLeft = progression.daysUntilUnlock(habit.id);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: p.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: p.cardBorder, width: 0.5),
-      ),
-      child: Row(
-        children: [
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: ColorFiltered(
-                  colorFilter: const ColorFilter.mode(
-                      Colors.grey, BlendMode.saturation),
-                  child: Image.asset(
-                    habit.imageAsset,
-                    width: 52, height: 52, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 52, height: 52,
-                      decoration: BoxDecoration(
-                          color: p.bg2,
-                          borderRadius: BorderRadius.circular(10)),
+    final tappable = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: tappable ? p.primary.withValues(alpha: 0.4) : p.cardBorder,
+            width: tappable ? 1.0 : 0.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: ColorFiltered(
+                    colorFilter: const ColorFilter.mode(
+                        Colors.grey, BlendMode.saturation),
+                    child: Image.asset(
+                      habit.imageAsset,
+                      width: 52, height: 52, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 52, height: 52,
+                        decoration: BoxDecoration(
+                            color: p.bg2,
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: p.bg.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(10),
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: p.bg.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      tappable ? Icons.star_outline : Icons.lock_outline,
+                      color: tappable ? p.primary : p.textMut,
+                      size: 18,
+                    ),
                   ),
-                  child: Icon(Icons.lock_outline,
-                      color: p.textMut, size: 18),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _habitName(habit.id, s),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: p.textSec,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  daysLeft <= 0
-                      ? s.almostReady
-                      : daysLeft == 1
-                          ? s.unlocksTomorrow
-                          : '${s.unlocksIn} $daysLeft ${s.days}',
-                  style: TextStyle(fontSize: 11, color: p.textMut),
                 ),
               ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _habitName(habit.id, s),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: tappable ? p.text : p.textSec,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    tappable
+                        ? s.almostReady
+                        : daysLeft <= 0
+                            ? s.almostReady
+                            : daysLeft == 1
+                                ? s.unlocksTomorrow
+                                : '${s.unlocksIn} $daysLeft ${s.days}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: tappable ? p.primary : p.textMut,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (tappable)
+              Icon(Icons.chevron_right_rounded, color: p.primary, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+
+// ── Never miss twice banner ───────────────────────────────────────────────────
+class _NeverMissTwiceBanner extends StatelessWidget {
+  final BwPaletteData p;
+  const _NeverMissTwiceBanner({required this.p});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.sL;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: p.primaryLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: p.primary.withValues(alpha: 0.25), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            s.neverMissTwiceTitle,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: p.text,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            s.neverMissTwiceBody,
+            style: TextStyle(fontSize: 12, color: p.textSec),
+          ),
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () {},
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: p.btn,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                s.neverMissTwiceCta,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: p.btnText,
+                ),
+              ),
             ),
           ),
         ],
@@ -491,7 +736,32 @@ class _NextHabitPreview extends StatelessWidget {
   }
 }
 
+// ── Companion mood dinamico ───────────────────────────────────────────────────
+CompanionMood _companionMood({
+  required AppProvider app,
+  required ProgressionProvider progression,
+}) {
+  // Nuova abitudine sbloccata in attesa di scelta → celebra
+  if (progression.pendingChoicePair != null) return CompanionMood.happy;
 
+  // Attività appena completata (entro 8 secondi) → abbraccio
+  if (app.justCompleted) return CompanionMood.hug;
+
+  // Reminder acqua: meno di 2 bicchieri e sono le 10+ → incoraggia a bere
+  final hour = DateTime.now().hour;
+  if (hour >= 10 && (app.user?.totalSessions ?? 0) > 0) {
+    // proxy semplice: se ha pochi completamenti oggi rispetto al totale
+    final todayPct = app.todayCompletionPct;
+    if (todayPct < 0.25 && hour >= 14) return CompanionMood.encourage;
+  }
+
+  // Streak rotto (era attivo ma ha saltato ieri) → incoraggia
+  final streak = app.user?.streak ?? 0;
+  final totalSessions = app.user?.totalSessions ?? 0;
+  if (streak == 0 && totalSessions > 3) return CompanionMood.encourage;
+
+  return CompanionMood.idle;
+}
 
 String _habitName(String id, BwStrings s) {
   switch (id) {
@@ -520,40 +790,3 @@ String _habitName(String id, BwStrings s) {
   }
 }
 
-String _habitCoachIntro(String id, BwStrings s) {
-  // Usa il coachIntro localizzato per l'abitudine water
-  // Le altre abitudini usano il testo di default dall'habit_library
-  switch (id) {
-    case 'water': return s.firstHabitBody1;
-    default: return '';
-  }
-}
-
-
-
-String _habitCoachDaily(String id, BwStrings s) {
-  switch (id) {
-    case 'water': return s.habitWaterDesc;
-    case 'focus_25': return s.habitFocus25Desc;
-    case 'eyes_20_20_20': return s.habitEyes2020Desc;
-    case 'neck_stretch': return s.habitNeckDesc;
-    case 'breathing_box': return s.habitBreathingBoxDesc;
-    case 'walk_lunch': return s.habitWalkLunchDesc;
-    case 'desk_exercise': return s.habitDeskExDesc;
-    case 'water_morning': return s.habitWaterMornDesc;
-    case 'posture': return s.habitPostureDesc;
-    case 'lunch_park': return s.habitLunchParkDesc;
-    case 'breathing_478': return s.habitBreathing478Desc;
-    case 'stretching_active': return s.habitStretchDesc;
-    case 'snack': return s.habitSnackDesc;
-    case 'lunch_no_screen': return s.habitLunchNoScreenDesc;
-    case 'focus_50': return s.habitFocus50Desc;
-    case 'meditation': return s.habitMeditationDesc;
-    case 'stairs': return s.habitStairsDesc;
-    case 'sleep_routine': return s.habitSleepDesc;
-    case 'wake_consistent': return s.habitWakeDesc;
-    case 'nap': return s.habitNapDesc;
-    case 'focus_no_phone': return s.habitFocusPhoneDesc;
-    default: return '';
-  }
-}
