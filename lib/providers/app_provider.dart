@@ -25,6 +25,13 @@ class AppProvider extends ChangeNotifier {
   List<String> _newlyEarnedBadges = [];
   List<RedeemedReward> _redeemedRewards = [];
 
+  // ── Variable ratio reward (Skinner) ───────────────────────────────────────
+  // 1 completamento su 5 (random) attiva il "Welly bonus": punti tripli.
+  // Non cambia la media attesa di punti in modo significativo, ma aumenta
+  // il coinvolgimento tramite rinforzo variabile intermittente.
+  bool _lastCompletionWasBonus = false;
+  bool get lastCompletionWasBonus => _lastCompletionWasBonus;
+
   // ── Getters ────────────────────────────────────────────────────────────────
   bool get isLoading => _isLoading;
   bool get isOnboarded => _isOnboarded;
@@ -42,6 +49,17 @@ class AppProvider extends ChangeNotifier {
   double get todayCompletionPct {
     if (_todayPlan.isEmpty) return 0;
     return _completedToday.length / _todayPlan.length;
+  }
+
+  /// True quando l'utente non ha completato nulla né ieri né (finora) oggi.
+  /// Segnale di "rischio abbandono" — James Clear never-miss-twice rule.
+  bool get shouldShowNeverMissTwiceBanner {
+    if (_user == null) return false;
+    final today = _dateKey(DateTime.now());
+    final yesterday = _dateKey(DateTime.now().subtract(const Duration(days: 1)));
+    final todayCount = _user!.weeklyCompletions[today] ?? 0;
+    final yesterdayCount = _user!.weeklyCompletions[yesterday] ?? 0;
+    return todayCount == 0 && yesterdayCount == 0;
   }
 
   int get completedCount => _completedToday.length;
@@ -256,13 +274,13 @@ class AppProvider extends ChangeNotifier {
   /// Mappa punti per gli ID delle abitudini (HabitLibrary).
   /// Usata quando completeActivity() viene chiamata con un habitId invece di activityId.
   static const Map<String, int> _habitPoints = {
-    'water': 0, // Punti acqua gestiti per-bicchiere via awardWaterGlass()
-    'water_morn': 25,
+    'water': 0,          // Punti acqua gestiti per-bicchiere via awardWaterGlass()
+    'water_morning': 25,
     'focus_25': 40,
     'focus_50': 60,
     'eyes_20_20_20': 15,
     'neck_stretch': 20,
-    'postura': 20,
+    'posture': 20,
     'breathing_box': 25,
     'breathing_478': 25,
     'walk_lunch': 30,
@@ -271,17 +289,24 @@ class AppProvider extends ChangeNotifier {
     'lunch_park': 30,
     'meditation': 35,
     'sleep_routine': 35,
+    'wake_consistent': 35,
     'nap': 30,
+    'snack': 15,
+    'lunch_no_screen': 20,
+    'stairs': 15,
+    'focus_no_phone': 25,
+    'micro_walk': 20,
+    'digital_sunset': 30,
   };
 
   static const Map<String, int> _habitMinutes = {
     'water': 1,
-    'water_morn': 1,
+    'water_morning': 1,
     'focus_25': 25,
     'focus_50': 50,
     'eyes_20_20_20': 5,
     'neck_stretch': 5,
-    'postura': 3,
+    'posture': 3,
     'breathing_box': 5,
     'breathing_478': 5,
     'walk_lunch': 15,
@@ -290,7 +315,14 @@ class AppProvider extends ChangeNotifier {
     'lunch_park': 30,
     'meditation': 15,
     'sleep_routine': 20,
+    'wake_consistent': 5,
     'nap': 20,
+    'snack': 5,
+    'lunch_no_screen': 30,
+    'stairs': 3,
+    'focus_no_phone': 25,
+    'micro_walk': 5,
+    'digital_sunset': 10,
   };
 
   Future<void> completeActivity(String activityId) async {
@@ -300,14 +332,22 @@ class AppProvider extends ChangeNotifier {
     final activity =
         _allActivities.where((a) => a.id == activityId).firstOrNull;
     // Prima cerca nella mappa habit (se chiamato con habitId), poi nell'activity JSON, poi fallback
-    final pts = _habitPoints[activityId] ?? activity?.points ?? 10;
+    final basePts = _habitPoints[activityId] ?? activity?.points ?? 10;
     final mins = _habitMinutes[activityId] ?? activity?.durationMinutes ?? 5;
 
+    // ── Variable ratio reward (Skinner, 1938) ──────────────────────────────
+    // 1 completamento su 5 in modo casuale → punti tripli ("Welly Bonus").
+    // Il rinforzo intermittente è più efficace di quello fisso per mantenere
+    // un comportamento (slot machine effect applicato al benessere).
+    // Non cambia il valore medio atteso in modo significativo.
+    _lastCompletionWasBonus = basePts > 0 && Random().nextInt(5) == 0;
+    final pts = _lastCompletionWasBonus ? basePts * 3 : basePts;
+
     if (_user != null) {
-      // ── FIX 1: Aggiorna streak ─────────────────────────────────────────────
+      // ── Aggiorna streak ────────────────────────────────────────────────────
       final newStreak = _calculateStreak();
 
-      // ── FIX 2: Aggiorna weeklyCompletions ──────────────────────────────────
+      // ── Aggiorna weeklyCompletions ─────────────────────────────────────────
       final todayStr = _dateKey(DateTime.now());
       final updatedWeekly = Map<String, int>.from(_user!.weeklyCompletions);
       updatedWeekly[todayStr] = (updatedWeekly[todayStr] ?? 0) + 1;
@@ -321,6 +361,9 @@ class AppProvider extends ChangeNotifier {
         weeklyCompletions: updatedWeekly,
       );
       AnalyticsService.instance.logDayStreak(newStreak);
+      if (_lastCompletionWasBonus) {
+        AnalyticsService.instance.logWellyBonus(activityId, pts);
+      }
       await _checkAndAwardBadges();
       await _saveUser();
     }

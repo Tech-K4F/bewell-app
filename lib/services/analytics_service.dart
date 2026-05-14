@@ -116,4 +116,8 @@ class AnalyticsService {
   /// Companion ha mostrato un determinato mood (drinking, radiant, ecc.).
   void logWellyMoodShown(String mood) =>
       _log('welly_mood_shown', {'mood': mood});
+
+  /// Rinforzo variabile scattato: 1 completamento su 5 → punti tripli.
+  void logWellyBonus(String activityId, int bonusPts) =>
+      _log('welly_bonus', {'activity_id': activityId, 'bonus_pts': bonusPts});
 }

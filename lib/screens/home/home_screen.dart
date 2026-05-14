@@ -30,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _wellyName = 'Welly';
   bool _showWorkBanner = false;
   bool _slowdownDismissed = false;
+  bool _neverMissTwiceDismissed = false;
   ProgressionProvider? _progressionRef;
   WellyMood _wellyMood = WellyMood.calm;
   Timer? _drinkTimer;
@@ -419,6 +420,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       setState(() => _slowdownDismissed = true);
                     },
                     onNo: () => setState(() => _slowdownDismissed = true),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ── Banner "never miss twice" (James Clear) ──────────
+                // Mostrato quando ieri E oggi non ci sono completamenti.
+                // Scopo: intervento gentile prima che il secondo skip diventi abitudine.
+                if (user != null &&
+                    context.watch<AppProvider>().shouldShowNeverMissTwiceBanner &&
+                    _waterCount == 0 &&
+                    !_neverMissTwiceDismissed) ...[
+                  _NeverMissTwiceBanner(
+                    p: p,
+                    onAddWater: () {
+                      setState(() => _neverMissTwiceDismissed = true);
+                      _addWater();
+                    },
+                    onDismiss: () => setState(() => _neverMissTwiceDismissed = true),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -1590,6 +1609,85 @@ class _TimeButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Banner "never miss twice" ─────────────────────────────────────────────────
+/// Mostrato quando l'utente non ha completato nulla né ieri né oggi.
+/// Messaggio urgente ma gentile — CTA immediata all'azione più piccola possibile.
+class _NeverMissTwiceBanner extends StatelessWidget {
+  final BwPaletteData p;
+  final VoidCallback onAddWater;
+  final VoidCallback onDismiss;
+
+  const _NeverMissTwiceBanner({
+    required this.p,
+    required this.onAddWater,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0), // amber chiaro
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFB74D), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('⚠️', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Stai per saltare due giorni di fila.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: p.text,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: onDismiss,
+                child: Icon(Icons.close, size: 16, color: p.textMut),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Una sola azione conta. Anche un bicchiere d\'acqua.',
+            style: TextStyle(fontSize: 12, color: p.textSec, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: onAddWater,
+            child: Container(
+              width: double.infinity,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF9800),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Center(
+                child: Text(
+                  '💧 Aggiungi un bicchiere d\'acqua',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

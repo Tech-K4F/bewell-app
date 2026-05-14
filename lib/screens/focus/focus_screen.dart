@@ -10,7 +10,9 @@ import '../../services/analytics_service.dart';
 enum _TimerState { idle, running, paused, done }
 
 class FocusScreen extends StatefulWidget {
-  const FocusScreen({super.key});
+  /// Durata della sessione in minuti (25 per focus_25, 50 per focus_50).
+  final int durationMinutes;
+  const FocusScreen({super.key, this.durationMinutes = 25});
 
   @override
   State<FocusScreen> createState() => _FocusScreenState();
@@ -18,15 +20,37 @@ class FocusScreen extends StatefulWidget {
 
 class _FocusScreenState extends State<FocusScreen>
     with SingleTickerProviderStateMixin {
-  static const _totalSeconds = 25 * 60;
-  int _remaining = _totalSeconds;
+  int get _totalSeconds => widget.durationMinutes * 60;
+  late int _remaining;
   _TimerState _state = _TimerState.idle;
   Timer? _timer;
   late AnimationController _pulseCtrl;
 
+  // ── Pomodoro block counter (solo per sessioni da 25 min) ─────────────────
+  // Si incrementa ad ogni sessione completata, si azzera con _stop().
+  // Per sessioni da 50 min (Deep Work) non è rilevante.
+  int _blockNumber = 1;
+  bool get _isPomodoro => widget.durationMinutes == 25;
+
+  // Testo informativo sotto il timer
+  String _sessionInfoText(BuildContext context) {
+    if (_state == _TimerState.done) return context.sL.focusDone;
+    if (!_isPomodoro) {
+      // Deep Work: mostra i minuti rimasti in modo leggibile
+      final m = _remaining ~/ 60;
+      final s = _remaining % 60;
+      if (m > 0) return 'Deep Work · $m min rimasti';
+      return 'Deep Work · ${s}s rimasti';
+    }
+    // Pomodoro: blocco corrente + minuti alla pausa
+    final pauseIn = _remaining ~/ 60;
+    return 'Blocco $_blockNumber di 4 · pausa tra ${pauseIn}min';
+  }
+
   @override
   void initState() {
     super.initState();
+    _remaining = _totalSeconds;
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -53,6 +77,10 @@ class _FocusScreenState extends State<FocusScreen>
           _state = _TimerState.done;
           _timer?.cancel();
           AnalyticsService.instance.logFocusSessionCompleted(_totalSeconds ~/ 60);
+          // Avanza il contatore blocco Pomodoro (1-4, poi torna a 1)
+          if (_isPomodoro) {
+            _blockNumber = _blockNumber < 4 ? _blockNumber + 1 : 1;
+          }
         }
       });
     });
@@ -70,6 +98,7 @@ class _FocusScreenState extends State<FocusScreen>
     setState(() {
       _state = _TimerState.idle;
       _remaining = _totalSeconds;
+      _blockNumber = 1; // reset blocco al primo Pomodoro
     });
   }
 
@@ -177,11 +206,9 @@ class _FocusScreenState extends State<FocusScreen>
 
                 const SizedBox(height: 12),
 
-                // Info sessione
+                // Info sessione (blocco Pomodoro o Deep Work)
                 Text(
-                  _state == _TimerState.done
-                      ? context.sL.focusDone
-                      : 'Blocco 1 di 4 · pausa tra ${_remaining ~/ 60} min',
+                  _sessionInfoText(context),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,

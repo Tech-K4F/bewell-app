@@ -233,11 +233,12 @@ const _dialogs = <WellyDialog>[
   WellyDialog(
     id: 'milestone_7_days',
     mood: TutorialMood.celebrating,
-    text: '7 giorni consecutivi! La scienza dice che dopo questa soglia il 90% '
-        'di chi continua arriverà a 21. Sei nella zona in cui il cambiamento '
-        'diventa molto più probabile.',
-    scienceFact: 'Analisi dati su 12.000+ utenti (Habitica, 2019): completion '
-        'rate a 21 gg aumenta del 340% dopo 7 gg consecutivi.',
+    text: '7 giorni consecutivi! Sei nella fase in cui la crescita '
+        'dell\'automaticità è più rapida — le prime due settimane costruiscono '
+        'lo slancio critico per il mantenimento a lungo termine.',
+    scienceFact: 'Gardner, Lally & Wardle (2012), British Journal of General '
+        'Practice: l\'automaticità cresce più rapidamente nelle prime settimane — '
+        'la consistenza iniziale è il predittore più forte del mantenimento.',
     actions: [TutorialAction.ok],
   ),
 

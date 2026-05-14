@@ -292,11 +292,23 @@ class HabitLibrary {
     HabitDefinition(
       id: 'desk_exercise',
       name: 'Esercizi alla scrivania',
-      description: 'Stretching attivo di 5 minuti ogni 2 ore',
+      // 5 esercizi in sequenza precisa, ~5 min totali.
+      // TODO: integrare immagini/video tutorial per ogni step (da produrre).
+      description:
+          '5 esercizi in sequenza (5 min): rotazione spalle, '
+          'torsione dorsale, cerchi polsi, inclinazione collo, cat-cow seduto.',
       coachIntro:
-          'Non serve alzarsi. Basta sedersi diversamente per 5 minuti. '
-          'Braccia, schiena, gambe — tutto si può muovere da qui.',
-      coachDaily: 'Piccoli movimenti, grande differenza.',
+          'Non serve alzarsi. Ecco la sequenza esatta — eseguila sempre '
+          'nello stesso ordine: diventa automatica in pochi giorni.\n'
+          '1) Rotazione spalle indietro × 5\n'
+          '2) Torsione dorsale seduta × 3 per lato\n'
+          '3) Cerchi polsi e avambracci × 10\n'
+          '4) Inclinazione laterale collo × 3 per lato\n'
+          '5) Cat-cow seduto × 5\n'
+          'Cinque minuti, ogni due ore.',
+      coachDaily:
+          'Rotazione spalle → torsione → polsi → collo → cat-cow. '
+          'Stesso ordine, stessa sedia.',
       category: HabitCategory.movement,
       effort: HabitEffort.low,
       imageAsset: 'assets/images/habits/habit_desk_exercise.jpg',
@@ -674,6 +686,79 @@ class HabitLibrary {
         ),
       ],
     ),
+
+    // ── NUOVE ABITUDINI ───────────────────────────────────────────────────────
+
+    // micro_walk — cicli ultradiani di Kleitman (90 min)
+    // Prerequisito: focus_25 >= 14 giorni (chi sa fare sessioni di focus
+    // comprende già i cicli di attenzione — il micro_walk ne è la controparte fisica).
+    HabitDefinition(
+      id: 'micro_walk',
+      name: 'Micro-camminata 5 min',
+      description: '5 minuti di camminata ogni 90 minuti — ciclo ultradiano',
+      coachIntro:
+          'Il cervello lavora per cicli naturali di circa 90 minuti. '
+          'Alla fine di ogni ciclo, 5 minuti in piedi o camminando '
+          'ripristinano l\'attenzione per il blocco successivo. '
+          'Imposta un timer: quando suona, alzati.',
+      coachDaily:
+          'Ogni 90 minuti: alzati e cammina 5 minuti. '
+          'Non pensare — muoviti, poi ricomincia.',
+      category: HabitCategory.movement,
+      effort: HabitEffort.low,
+      imageAsset: 'assets/images/habits/habit_micro_walk.jpg',
+      unlock: UnlockCondition(
+        requiredHabitId: 'focus_25',
+        requiredDaysCompleted: 14,
+        // Chi fa Pomodoro da 2 settimane comprende già la struttura a blocchi.
+        // Il micro_walk diventa il complemento fisico dei cicli di focus.
+      ),
+      defaultFrequencyMinutes: 90,
+      ifThenRules: [
+        IfThenRule(
+          questionId: 'Q2',
+          answerValue: 'From home',
+          effect: 'frequency_90min_mandatory',
+        ),
+      ],
+    ),
+
+    // digital_sunset — separata da sleep_routine, obiettivo specifico:
+    // interrompere il loop dopaminergico dei social 1h prima del sonno.
+    HabitDefinition(
+      id: 'digital_sunset',
+      name: 'Digital sunset',
+      description: 'Niente social media nell\'ora prima di dormire',
+      coachIntro:
+          'Diverso dalla routine pre-sonno: l\'obiettivo qui è specifico — '
+          'interrompere il loop dopaminergico dei social prima di dormire. '
+          'Il feed è progettato per tenerti sveglio. '
+          'Scegli un orario fisso (es. 22:00) e metti il telefono in modalità lettura.',
+      coachDaily:
+          'Un\'ora prima di dormire: niente scroll, niente feed. '
+          'Scegli il confine — poi tienilo.',
+      category: HabitCategory.sleep,
+      effort: HabitEffort.medium,
+      imageAsset: 'assets/images/habits/habit_digital_sunset.jpg',
+      unlock: UnlockCondition(
+        requiredTotalDays: 42,
+        // Stesso threshold di walk_lunch/lunch_no_screen:
+        // chi ha 6 settimane di consistenza è pronto a cambiare comportamenti serali.
+      ),
+      defaultFrequencyMinutes: 0, // triggered all'ora scelta dall'utente
+      ifThenRules: [
+        IfThenRule(
+          questionId: 'Q15',
+          answerValue: '<5h',
+          effect: 'unlock_immediately_priority',
+        ),
+        IfThenRule(
+          questionId: 'Q19',
+          answerValue: 'Social media',
+          effect: 'unlock_immediately_skip_prerequisite',
+        ),
+      ],
+    ),
   ];
 
   /// Restituisce solo le abitudini disponibili dal giorno 1
@@ -693,8 +778,13 @@ class HabitLibrary {
     }
   }
 
-  /// Restituisce le coppie di scelta per il popup introduttivo
-  /// (due abitudini della stessa categoria con lo stesso unlock prerequisito)
+  /// Coppie di scelta per il popup introduttivo.
+  ///
+  /// NOTA: questa lista è documentazione dell'intento di design.
+  /// La logica EFFETTIVA di sblocco è in ProgressionProvider._evaluateUnlocks(),
+  /// che seleziona dinamicamente i primi due habit con condizione soddisfatta
+  /// dall'ordine di HabitLibrary.all. Le coppie qui sotto riflettono
+  /// le scelte semanticamente desiderate per ogni fase.
   // V2: coppie aggiornate secondo distanze scientifiche
   static List<(HabitDefinition, HabitDefinition)> get choicePairs => [
     // Coppia 1: Movimento base — dopo 21 giorni di acqua
@@ -712,12 +802,14 @@ class HabitLibrary {
       findById('walk_lunch')!,
       findById('lunch_no_screen')!,
     ),
-    // Coppia 4: Focus avanzato vs Meditazione — dopo 42 giorni
+    // Coppia 4: Focus avanzato vs Digital sunset — entrambi richiedono ~42 giorni
+    // (focus_50: focus_25 >= 42g; digital_sunset: totalDays >= 42)
+    // Nota: meditation si propone singolarmente quando breathing_box >= 42g.
     (
       findById('focus_50')!,
-      findById('meditation')!,
+      findById('digital_sunset')!,
     ),
-    // Coppia 5: Sonno — dopo 60 giorni totali
+    // Coppia 5: Sonno base — dopo 60 giorni totali
     (
       findById('sleep_routine')!,
       findById('nap')!,
@@ -727,7 +819,7 @@ class HabitLibrary {
       findById('breathing_box')!,
       findById('focus_no_phone')!,
     ),
-    // Coppia 7: Postura vs Stretching attivo — stesso prereq: neck/desk
+    // Coppia 7: Postura vs Stretching attivo — prereq: neck/desk >= 21g
     (
       findById('posture')!,
       findById('stretching_active')!,
@@ -741,6 +833,11 @@ class HabitLibrary {
     (
       findById('breathing_478')!,
       findById('wake_consistent')!,
+    ),
+    // Coppia 10: Micro-camminata vs Focus no-phone — entrambe focus_25-based
+    (
+      findById('micro_walk')!,
+      findById('focus_no_phone')!,
     ),
   ];
 }

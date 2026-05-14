@@ -188,7 +188,7 @@ class HabitsScreen extends StatelessWidget {
                         ? null
                         : () => _complete(context, habitForNow.id, progression, app),
                     onStartTimer: habitForNow.id == 'focus_25' || habitForNow.id == 'focus_50'
-                        ? () => _openFocus(context)
+                        ? () => _openFocus(context, durationMinutes: habitForNow.id == 'focus_50' ? 50 : 25)
                         : null,
                     slotLabelFn: (slot) => _slotLabel(slot, s),
                   ),
@@ -234,7 +234,7 @@ class HabitsScreen extends StatelessWidget {
                               ? null
                               : () => _complete(context, h.id, progression, app),
                           onStartTimer: h.id == 'focus_25' || h.id == 'focus_50'
-                              ? () => _openFocus(context)
+                              ? () => _openFocus(context, durationMinutes: h.id == 'focus_50' ? 50 : 25)
                               : null,
                         ),
                       ),
@@ -285,12 +285,48 @@ class HabitsScreen extends StatelessWidget {
     context.read<TutorialProvider>().scheduleTrigger('first_completion', context);
     await progression.markCompleted(habitId);
     await app.completeActivity(habitId);
+
+    // ── Welly Bonus (variable ratio reward) ──────────────────────────────────
+    if (app.lastCompletionWasBonus && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: const [
+              Text('⚡', style: TextStyle(fontSize: 22)),
+              SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welly Bonus!',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    ),
+                    Text(
+                      'Punti tripli questo giro 🎉',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF2D7D46),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
-  void _openFocus(BuildContext context) {
+  void _openFocus(BuildContext context, {int durationMinutes = 25}) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const FocusScreen()),
+      MaterialPageRoute(
+        builder: (_) => FocusScreen(durationMinutes: durationMinutes),
+      ),
     );
   }
 
@@ -673,7 +709,9 @@ class _HabitCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          done ? '✓ ${s.completedToday}' : s.habitDesc(habit.id),
+                          // coachDaily: messaggio giornaliero specifico dell'abitudine.
+                          // Più motivante della semplice descrizione — è il "perché farlo oggi".
+                          done ? '✓ ${s.completedToday}' : habit.coachDaily,
                           style: TextStyle(fontSize: 11, color: p.textSec),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

@@ -292,7 +292,12 @@ class ProgressionProvider extends ChangeNotifier {
   }
 
   void _updateHabitStatus(HabitState state) {
-    if (state.daysCompleted >= 7) {
+    // Non retrocedere uno stato già avanzato (es. da automatic a consolidated)
+    if (state.status == HabitStatus.automatic) return;
+    if (state.daysCompleted >= 66) {
+      // Lally et al. (2010): 66 giorni = automaticità comportamentale media
+      state.status = HabitStatus.automatic;
+    } else if (state.daysCompleted >= 7) {
       state.status = HabitStatus.consolidated;
     } else if (state.daysCompleted >= 4) {
       state.status = HabitStatus.growing;
@@ -721,6 +726,7 @@ extension ProgressionProviderUI on ProgressionProvider {
   String getLocalizedMessage(BwStrings s) {
     final activeList = activeHabits;
     if (activeList.isEmpty) return s.waterZero;
+    // Trova l'abitudine con meno giorni completati (quella che ha più bisogno di rinforzo)
     HabitDefinition? focusHabit;
     int minDays = 9999;
     for (final h in activeList) {
@@ -733,15 +739,18 @@ extension ProgressionProviderUI on ProgressionProvider {
     if (focusHabit != null) {
       final def = HabitLibrary.findById(focusHabit.id);
       if (def != null) {
+        // Giorni milestone: messaggio celebrativo/motivazionale localizzato
         if (minDays == 0) {
           if (def.id == 'water') return s.firstHabitBody2;
-          return s.habitDesc(def.id);
+          return def.coachIntro; // Primo giorno: usa il messaggio di intro dell'abitudine
         }
-        if (minDays == 1) return s.coachDay1;
-        if (minDays == 3) return s.coachDay3;
-        if (minDays == 7) return s.coachDay7;
+        if (minDays == 1)  return s.coachDay1;
+        if (minDays == 3)  return s.coachDay3;
+        if (minDays == 7)  return s.coachDay7;
         if (minDays == 14) return s.coachDay14;
-        return s.habitDesc(def.id);
+        // Default: mostra il coachDaily dell'abitudine — messaggio giornaliero reale,
+        // non la semplice descrizione. Più specifico, più motivante.
+        return def.coachDaily;
       }
     }
     return s.coachGeneral;
