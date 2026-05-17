@@ -19,8 +19,8 @@ enum HabitStatus {
   active,       // L'utente l'ha accettata e sta lavorandoci
   sprouting,    // 🌱 1-3 giorni completati
   growing,      // 🌿 4-6 giorni completati
-  consolidated, // 🌳 7+ giorni nelle prime 2 settimane
-  automatic,    // 💚 completata senza reminder per 7 giorni
+  consolidated, // 🌳 7-65 giorni completati
+  automatic,    // 💚 66+ giorni completati (Lally et al., 2010)
 }
 
 class HabitState {

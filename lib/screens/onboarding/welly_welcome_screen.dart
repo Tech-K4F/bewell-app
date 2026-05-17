@@ -459,7 +459,7 @@ class _Page3 extends StatelessWidget {
                     color: p.primary, size: 22),
                 const SizedBox(width: 8),
                 Text(
-                  '! 1/8',
+                  '💧 1/8',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

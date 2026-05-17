@@ -348,7 +348,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     );
   }
 
-  // Habits si sblocca quando focus_25 è attivo (dopo 3 giorni di acqua)
+  // Habits si sblocca quando focus_25 è attivo (dopo 14 giorni di acqua)
   // Growth si sblocca con 14 completamenti totali (≈ 1 settimana con 2 abitudini)
   bool _habitsUnlocked(ProgressionProvider p) =>
       p.activeHabits.any((h) => h.id == 'focus_25');
