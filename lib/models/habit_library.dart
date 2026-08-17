@@ -70,6 +70,10 @@ class HabitDefinition {
   final int defaultFrequencyMinutes; // ogni quanti minuti il reminder
   final List<IfThenRule> ifThenRules;
   final bool isStarter;         // true = disponibile dal giorno 1
+  /// Punti assegnati al completamento (0 = gestito altrove, es. acqua per-bicchiere).
+  final int points;
+  /// Minuti stimati di durata — usati per il totale minuti utente.
+  final int minutes;
 
   const HabitDefinition({
     required this.id,
@@ -84,6 +88,8 @@ class HabitDefinition {
     required this.defaultFrequencyMinutes,
     this.ifThenRules = const [],
     this.isStarter = false,
+    this.points = 20,
+    this.minutes = 5,
   });
 }
 
@@ -109,6 +115,8 @@ class HabitLibrary {
       unlock: UnlockCondition(appDayMin: 0),
       defaultFrequencyMinutes: 90,
       isStarter: true,
+      points: 0, // gestiti per-bicchiere in AppProvider.awardWaterGlass
+      minutes: 1,
       ifThenRules: [
         // Q16: se beve già poco → reminder ogni 45 min
         IfThenRule(
@@ -131,25 +139,24 @@ class HabitLibrary {
       ],
     ),
 
-    // ── FASE 1: Dopo 14 giorni di acqua ─────────────────────────────────────
+    // ── STARTER: disponibile dal giorno 1, insieme all'acqua ─────────────────
 
     HabitDefinition(
       id: 'focus_25',
       name: 'Sessione focus 25 min',
       description: 'Una sessione Pomodoro da 25 minuti senza distrazioni',
       coachIntro:
-          'Hai sviluppato la tua prima abitudine. '
-          'Pronto per la seconda? Imposta 25 minuti. '
-          'Niente telefono, niente notifiche. Solo tu e il lavoro.',
+          'Imposta 25 minuti, senza telefono e senza notifiche. '
+          'Solo tu e il lavoro — quando sei pronto, ovviamente.',
       coachDaily: 'Anche una sola sessione oggi fa la differenza.',
       category: HabitCategory.focus,
       effort: HabitEffort.medium,
       imageAsset: 'assets/images/habits/habit_focus_25.jpg',
-      unlock: UnlockCondition(
-        requiredHabitId: 'water',
-        requiredDaysCompleted: 14,  // V2: 2 settimane di acqua
-      ),
+      unlock: UnlockCondition(appDayMin: 0),
       defaultFrequencyMinutes: 0, // on-demand, non reminder automatico
+      isStarter: true,
+      points: 40,
+      minutes: 25,
       ifThenRules: [
         // Q21: focus <25 min → sessioni da 15 min
         IfThenRule(
@@ -196,6 +203,8 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: 3 settimane di acqua (soglia radicamento)
       ),
       defaultFrequencyMinutes: 60,
+      points: 20,
+      minutes: 5,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q2',
@@ -223,6 +232,8 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: 21 giorni — focus consolidato prima di pratica cognitiva nuova
       ),
       defaultFrequencyMinutes: 120,
+      points: 25,
+      minutes: 5,
       ifThenRules: [
         // Q4: stress molto alto → diventa priorità assoluta
         IfThenRule(
@@ -261,6 +272,8 @@ class HabitLibrary {
         requiredTotalDays: 42,  // V2: 6 settimane di consistenza comprovata
       ),
       defaultFrequencyMinutes: 0, // triggered da pranzo
+      points: 30,
+      minutes: 15,
       ifThenRules: [
         // Q11: parco <5 min → suggerita frequentemente
         IfThenRule(
@@ -285,6 +298,13 @@ class HabitLibrary {
           questionId: 'Q9',
           answerValue: '30 minutes',
           effect: 'shorten_to_10min',
+        ),
+        // EXERCISE_FREQ: chi non fa mai esercizio ha più bisogno di
+        // movimento nella giornata → priorità più alta a questa proposta.
+        IfThenRule(
+          questionId: 'EXERCISE_FREQ',
+          answerValue: 'never',
+          effect: 'highlight_in_home',
         ),
       ],
     ),
@@ -317,6 +337,8 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: coppia con neck_stretch — stessa condizione
       ),
       defaultFrequencyMinutes: 120,
+      points: 20,
+      minutes: 10,
       ifThenRules: [
         // Q2: lavoro da casa → reminder ogni 2h (rischio sedentarietà)
         IfThenRule(
@@ -345,6 +367,8 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: evoluzione naturale abitudine acqua
       ),
       defaultFrequencyMinutes: 0, // solo mattina
+      points: 25,
+      minutes: 1,
     ),
 
     HabitDefinition(
@@ -364,6 +388,8 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: evoluzione naturale delle abitudini di movimento
       ),
       defaultFrequencyMinutes: 60,
+      points: 20,
+      minutes: 3,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q2',
@@ -389,6 +415,8 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: proposta dopo che la passeggiata è consolidata
       ),
       defaultFrequencyMinutes: 0,
+      points: 30,
+      minutes: 30,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q11',
@@ -421,6 +449,8 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: upgrade solo quando la base è consolidata
       ),
       defaultFrequencyMinutes: 0, // on-demand o dopo stress check
+      points: 25,
+      minutes: 5,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q4',
@@ -452,6 +482,8 @@ class HabitLibrary {
         requiredDaysCompleted: 42,  // V2: evoluzione abitudini movimento dopo 6 settimane
       ),
       defaultFrequencyMinutes: 240,
+      points: 25,
+      minutes: 15,
     ),
 
     HabitDefinition(
@@ -470,6 +502,8 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: coppia con water_morning — stessa condizione
       ),
       defaultFrequencyMinutes: 0,
+      points: 15,
+      minutes: 5,
     ),
 
     HabitDefinition(
@@ -487,6 +521,8 @@ class HabitLibrary {
         requiredTotalDays: 42,  // V2: coppia con walk_lunch — stessa condizione globale
       ),
       defaultFrequencyMinutes: 0,
+      points: 20,
+      minutes: 30,
     ),
 
     // ── FASE 6: Mese 3+ ─────────────────────────────────────────────────────
@@ -508,6 +544,8 @@ class HabitLibrary {
         requiredDaysCompleted: 42,  // V2: 6 settimane di Pomodoro prima dei cicli lunghi
       ),
       defaultFrequencyMinutes: 0,
+      points: 60,
+      minutes: 50,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q4',
@@ -539,6 +577,8 @@ class HabitLibrary {
         requiredDaysCompleted: 42,  // V2: evoluzione mindfulness dopo 6 settimane
       ),
       defaultFrequencyMinutes: 0,
+      points: 35,
+      minutes: 15,
       ifThenRules: [
         // Q14: ha spazio quieto al lavoro → suggerita durante pause
         IfThenRule(
@@ -570,6 +610,8 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: evoluzione del movimento quotidiano
       ),
       defaultFrequencyMinutes: 0,
+      points: 15,
+      minutes: 3,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q2',
@@ -595,6 +637,8 @@ class HabitLibrary {
         requiredTotalDays: 60,  // V2: 60 giorni totali — abitudine avanzata per chi ha dimostrato consistenza
       ),
       defaultFrequencyMinutes: 0,
+      points: 35,
+      minutes: 20,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q15',
@@ -626,6 +670,23 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: solo dopo che la routine serale è stabile
       ),
       defaultFrequencyMinutes: 0,
+      points: 35,
+      minutes: 5,
+      ifThenRules: [
+        // SCHEDULE_TYPE: orario irregolare o a turni → la costanza del
+        // risveglio conta di più (e prima) che per chi ha già un orario
+        // fisso.
+        IfThenRule(
+          questionId: 'SCHEDULE_TYPE',
+          answerValue: 'irregular',
+          effect: 'unlock_immediately_skip_prerequisite',
+        ),
+        IfThenRule(
+          questionId: 'SCHEDULE_TYPE',
+          answerValue: 'shift',
+          effect: 'unlock_immediately_skip_prerequisite',
+        ),
+      ],
     ),
 
     HabitDefinition(
@@ -643,6 +704,8 @@ class HabitLibrary {
         requiredTotalDays: 60,  // V2: abitudine avanzata — solo per chi ha dimostrato lunga consistenza
       ),
       defaultFrequencyMinutes: 0,
+      points: 30,
+      minutes: 20,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q9',
@@ -673,6 +736,8 @@ class HabitLibrary {
         requiredDaysCompleted: 21,  // V2: potenziamento naturale del focus
       ),
       defaultFrequencyMinutes: 0,
+      points: 25,
+      minutes: 25,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q19',
@@ -683,6 +748,13 @@ class HabitLibrary {
           questionId: 'Q19',
           answerValue: 'Social media',
           effect: 'unlock_immediately_skip_prerequisite',
+        ),
+        // MEETING_LOAD: giornate con 6+ riunioni al giorno rendono i blocchi
+        // di focus senza telefono ancora più preziosi — evidenziata prima.
+        IfThenRule(
+          questionId: 'MEETING_LOAD',
+          answerValue: '6+/day',
+          effect: 'highlight_in_home',
         ),
       ],
     ),
@@ -714,6 +786,8 @@ class HabitLibrary {
         // Il micro_walk diventa il complemento fisico dei cicli di focus.
       ),
       defaultFrequencyMinutes: 90,
+      points: 20,
+      minutes: 5,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q2',
@@ -746,11 +820,20 @@ class HabitLibrary {
         // chi ha 6 settimane di consistenza è pronto a cambiare comportamenti serali.
       ),
       defaultFrequencyMinutes: 0, // triggered all'ora scelta dall'utente
+      points: 30,
+      minutes: 10,
       ifThenRules: [
         IfThenRule(
           questionId: 'Q15',
           answerValue: '<5h',
           effect: 'unlock_immediately_priority',
+        ),
+        // SCREEN_TIME: tempo schermo alto (6h+/giorno di svago) → utile
+        // prima, non dopo 6 settimane di attesa.
+        IfThenRule(
+          questionId: 'SCREEN_TIME',
+          answerValue: 'high',
+          effect: 'unlock_immediately_skip_prerequisite',
         ),
         IfThenRule(
           questionId: 'Q19',

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_result.dart';
 import '../services/auth_service.dart';
 
@@ -35,6 +36,20 @@ class AuthProvider extends ChangeNotifier {
   }
 
   int get attemptsRemaining => (5 - _failedAttempts).clamp(0, 5);
+
+  /// Unica fonte di verità per "dove andare dopo l'autenticazione" — legge
+  /// welly_welcomed da SharedPreferences invece di fidarsi del flag
+  /// isFirstLogin (FlutterSecureStorage, `bw_is_first_login`), che vive in
+  /// uno storage separato e poteva disallinearsi da quello che SplashScreen
+  /// usa per la stessa decisione: risultato, primo login mostrava il
+  /// carosello di benvenuto ma un login successivo poteva ripartire dal
+  /// configuratore a 5 fasi, che invece è ora un percorso facoltativo
+  /// raggiungibile dalla sezione Abitudini, non un passaggio obbligato.
+  Future<AuthNavigation> _postAuthNavigation() async {
+    final prefs = await SharedPreferences.getInstance();
+    final wellyWelcomed = prefs.getBool('welly_welcomed') ?? false;
+    return wellyWelcomed ? AuthNavigation.toHome : AuthNavigation.toWelcome;
+  }
 
   Future<void> init() async {
     // FIX: connectivity_plus 6.x restituisce List<ConnectivityResult>
@@ -76,11 +91,11 @@ class AuthProvider extends ChangeNotifier {
         case AuthSessionStatus.valid:
           _isFirstLogin = false;
           _setState(AuthState.authenticated,
-              navigate: AuthNavigation.toHome);
+              navigate: await _postAuthNavigation());
         case AuthSessionStatus.validFirstLogin:
           _isFirstLogin = true;
           _setState(AuthState.authenticated,
-              navigate: AuthNavigation.toOnboarding);
+              navigate: await _postAuthNavigation());
         case AuthSessionStatus.expired:
           _setState(AuthState.unauthenticated,
               navigate: AuthNavigation.toLogin);
@@ -102,7 +117,7 @@ class AuthProvider extends ChangeNotifier {
     _setState(AuthState.loading);
     final result =
         await _auth.loginWithEmail(email: email, password: password);
-    _handleAuthResult(result);
+    await _handleAuthResult(result);
   }
 
   Future<void> loginWithGoogle() async {
@@ -112,7 +127,7 @@ class AuthProvider extends ChangeNotifier {
     }
     _setState(AuthState.loading);
     final result = await _auth.loginWithGoogle();
-    _handleAuthResult(result);
+    await _handleAuthResult(result);
   }
 
   Future<void> loginWithApple() async {
@@ -122,7 +137,7 @@ class AuthProvider extends ChangeNotifier {
     }
     _setState(AuthState.loading);
     final result = await _auth.loginWithApple();
-    _handleAuthResult(result);
+    await _handleAuthResult(result);
   }
 
   Future<void> loginWithBiometric() async {
@@ -139,9 +154,7 @@ class AuthProvider extends ChangeNotifier {
           _isFirstLogin = status == AuthSessionStatus.validFirstLogin;
           _setState(
             AuthState.authenticated,
-            navigate: _isFirstLogin
-                ? AuthNavigation.toOnboarding
-                : AuthNavigation.toHome,
+            navigate: await _postAuthNavigation(),
           );
         }
       }
@@ -187,16 +200,14 @@ class AuthProvider extends ChangeNotifier {
     _setState(AuthState.unauthenticated, navigate: AuthNavigation.toLogin);
   }
 
-  void _handleAuthResult(AuthResult result) {
+  Future<void> _handleAuthResult(AuthResult result) async {
     if (result.success) {
       _failedAttempts = 0;
       _lockUntil = null;
       _isFirstLogin = result.isFirstLogin;
       _setState(
         AuthState.authenticated,
-        navigate: result.isFirstLogin
-            ? AuthNavigation.toOnboarding
-            : AuthNavigation.toHome,
+        navigate: await _postAuthNavigation(),
       );
     } else {
       if (result.error == AuthError.invalidCredentials) {
@@ -264,5 +275,8 @@ enum AuthNavigation {
   toLogin,
   toRegister,
   toHome,
-  toOnboarding,
+  /// Carosello di benvenuto "Be Well" (`/welly-welcome`) — il configuratore
+  /// a 5 fasi NON fa più parte del flusso post-auth: è facoltativo e si
+  /// raggiunge dalla sezione Abitudini dopo il primo sblocco.
+  toWelcome,
 }

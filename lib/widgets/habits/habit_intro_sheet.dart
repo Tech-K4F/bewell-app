@@ -145,6 +145,30 @@ class _HabitIntroSheetState extends State<HabitIntroSheet> {
                 ),
               ),
             ),
+
+          // "Non mi sento pronto" — non blocca per sempre: rimanda la
+          // proposta di 7 giorni invece di lasciarla "pending" a tempo
+          // indeterminato (che bloccava anche la valutazione di qualsiasi
+          // altra abitudine).
+          GestureDetector(
+            onTap: () {
+              context.read<ProgressionProvider>().declineChoice();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(s.habitNotReadySnoozed)),
+              );
+              Navigator.pop(context);
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                s.habitChoiceNotReady,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: p.textMut,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

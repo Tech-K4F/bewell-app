@@ -43,17 +43,58 @@ class LocaleProvider extends ChangeNotifier {
   }
 
   void _scheduleNotifications() {
-    final strings = BwStrings.of(_locale);
-    NotificationService.instance.rescheduleReminders(
-      waterTitle:   strings.notifWaterTitle,
-      waterBody:    strings.notifWaterBody,
-      eveningTitle: strings.notifEveningTitle,
-      eveningBody:  strings.notifEveningBody,
-    );
+    rescheduleBwReminders();
   }
 
   // Shortcut per ottenere le stringhe
   BwStrings get s => BwStrings.of(_locale);
+}
+
+/// Legge la lingua correntemente selezionata direttamente da
+/// SharedPreferences e restituisce le stringhe corrispondenti — per il
+/// codice che non ha un BuildContext a disposizione (provider, servizi
+/// in background) e non può usare `context.sL`.
+Future<BwStrings> currentBwStrings() async {
+  final prefs = await SharedPreferences.getInstance();
+  final code = prefs.getString('app_locale') ?? 'en';
+  final locale = BwLocale.values.firstWhere(
+    (l) => l.code == code,
+    orElse: () => BwLocale.en,
+  );
+  return BwStrings.of(locale);
+}
+
+/// Ripianifica i reminder periodici leggendo lingua, frequenza e pausa
+/// direttamente da SharedPreferences — così sia [LocaleProvider] (cambio
+/// lingua) sia [SettingsProvider] (cambio frequenza/pausa) possono
+/// richiamarla senza doversi conoscere a vicenda.
+Future<void> rescheduleBwReminders() async {
+  final prefs = await SharedPreferences.getInstance();
+  final s = await currentBwStrings();
+
+  final snoozeMs = prefs.getInt('notif_snooze_until');
+  if (snoozeMs != null && DateTime.now().millisecondsSinceEpoch < snoozeMs) {
+    await NotificationService.instance.cancelReminders();
+    return;
+  }
+
+  final freqStr = prefs.getString('notif_frequency') ?? 'normal';
+  final hours = switch (freqStr) {
+    'off'  => const <int>[],
+    'low'  => const [10, 20],
+    'high' => const [9, 11, 13, 15, 17, 19, 21],
+    _      => const [10, 14, 17, 20],
+  };
+
+  await NotificationService.instance.scheduleReminders(
+    hours: hours,
+    waterTitle: s.notifWaterTitle,
+    waterBody: s.notifWaterBody,
+    habitTitle: s.notifHabitTitle,
+    habitBody: s.notifHabitBody,
+    eveningTitle: s.notifEveningTitle,
+    eveningBody: s.notifEveningBody,
+  );
 }
 
 // ── Stringhe app ──────────────────────────────────────────────────────────────
@@ -94,6 +135,12 @@ abstract class BwStrings {
   String get createAccount;
   String get alreadyHaveAccount;
   String get signIn;
+  String get registerSubtitle;
+  String get tosAccept;
+  String get tosTerms;
+  String get tosAnd;
+  String get tosPrivacy;
+  String get tosSuffix;
   String get passwordForgotTitle;
   String get passwordForgotSub;
   String get sendResetEmail;
@@ -127,6 +174,7 @@ abstract class BwStrings {
 
   // ── Home ─────────────────────────────────────────────────────────────────
   String get goodMorning;
+  String get greetingFallbackName;
   String get phase;
   String get waterToday;
   String get waterGlasses;
@@ -247,8 +295,25 @@ abstract class BwStrings {
   String get notifWaterBody;
   String get notifEveningTitle;
   String get notifEveningBody;
+  String get notifHabitTitle;
+  String get notifHabitBody;
   String get notifHabitChoiceTitle;
   String get notifHabitChoiceBody;
+
+  // ── Impostazioni notifiche ────────────────────────────────────────────────
+  String get notifFrequencyLabel;
+  String get notifFreqOff;
+  String get notifFreqLow;
+  String get notifFreqNormal;
+  String get notifFreqHigh;
+  String get notifFreqOffDesc;
+  String get notifFreqLowDesc;
+  String get notifFreqNormalDesc;
+  String get notifFreqHighDesc;
+  String get notifSnoozeLabel;
+  String notifSnoozeActive(String until);
+  String get notifSnoozeCancel;
+  String notifSnoozeHours(int h);
 
   // ── Nav ───────────────────────────────────────────────────────────────────
   String get navHome;
@@ -299,6 +364,34 @@ abstract class BwStrings {
   String get habitMicroWalkName; String get habitMicroWalkDesc;
   String get habitDigitalSunsetName; String get habitDigitalSunsetDesc;
 
+  // ── Breathing session ────────────────────────────────────────────────────
+  String get breathingInhale;
+  String get breathingHold;
+  String get breathingExhale;
+  String get breathingCycles;
+  String get breathingTapToStart;
+  String get breathingStart;
+  String get breathingStop;
+  String get breathingAgain;
+  String get breathingWellDone;
+  String breathingCyclesCompleted(int n);
+  String breathingPointsEarned(int pts);
+
+  // ── Guided step sequence (es. esercizi alla scrivania) ──────────────────
+  String get guideTapToStart;
+  String get guideStart;
+  String get guideWellDone;
+  String guideStepProgress(int i, int total);
+  String guideStepsCompleted(int n);
+  // desk_exercise
+  String get guideDeskStep1; String get guideDeskStep2; String get guideDeskStep3;
+  String get guideDeskStep4; String get guideDeskStep5;
+  // neck_stretch
+  String get guideNeckStep1; String get guideNeckStep2; String get guideNeckStep3;
+  // stretching_active
+  String get guideStretchStep1; String get guideStretchStep2; String get guideStretchStep3;
+  String get guideStretchStep4; String get guideStretchStep5;
+
   // ── Coach messages ────────────────────────────────────────────────────────
   String get coachDay1; String get coachDay3; String get coachDay7;
   String get coachDay14; String get coachGeneral;
@@ -315,12 +408,23 @@ abstract class BwStrings {
   String get badgeFocused; String get badgeFocusedDesc;
   String get badgeWalker; String get badgeWalkerDesc;
   String get badgeBreath; String get badgeBreathDesc;
+  String get badgeRootedName; String get badgeRootedDesc;
+  String get badgeTierBronze; String get badgeTierSilver; String get badgeTierGold;
+  String get growthNextGoal;
+  String growthHabitsToRoot(int n);
 
   // ── Habit intro sheet ────────────────────────────────────────────────────
   String get habitChoiceTitle;
   String get habitChoiceSub;
   String get habitChoiceShowOther;
+  String get habitChoiceNotReady;
   String get habitChoiceOpen;
+  String get habitNotReadySnoozed;
+  String get consolidatedTitle;
+  String consolidatedBody(String habitName);
+  String get consolidatedBadge;
+  String get consolidatedCta;
+  String habitStartsTomorrow(String habitName);
   String get habitEffortLow;
   String get habitEffortMedium;
   String get habitEffortHigh;
@@ -332,6 +436,224 @@ abstract class BwStrings {
   String get errorWeakPassword;
   String get errorEmailInUse;
   String get errorInvalidCredentials;
+  String get errorTooManyAttempts;
+  String get errorTimeout;
+  String get errorCancelled;
+  String get errorAccountDisabled;
+  String get passwordStrengthWeak;
+  String get passwordStrengthMedium;
+  String get passwordStrengthStrong;
+  String get passwordStrengthVeryStrong;
+  String get validationEmailRequired;
+  String get validationPasswordRequired;
+  String get validationPasswordTooShort;
+  String get validationNameRequired;
+  String get validationNameTooShort;
+  String get accountLockedBody;
+  String get accountLockedEmailSent;
+  String get offlineLoginRequired;
+  String get forgotCheckEmailTitle;
+  String forgotEmailSentBody(String email);
+  String get forgotLinkExpiry;
+  String get forgotResendLimitReached;
+  String forgotResendIn(int seconds);
+  String get verifyEmailCta;
+  String get verifyResendCta;
+  String get verifyChecked;
+  String get verifyDifferentEmail;
+  String get verifySendError;
+
+  // ── Welcome carousel ─────────────────────────────────────────────────────
+  String get welcomeSlide1Title;
+  String get welcomeSlide1Sub;
+  String get welcomeSlide2Title;
+  String get welcomeSlide2Sub;
+  String get welcomeSlide3Title;
+  String get welcomeSlide3Sub;
+  String get welcomeSkip;
+  String get welcomeNext;
+  String get welcomeStart;
+  String get welcomeConfigureLater;
+
+  // ── Questionario onboarding ──────────────────────────────────────────────
+  String get qProfileTitle;
+  String get qProfileSub;
+  String get qGoalsTitle;
+  String get qGoalsSub;
+  String get qHealthTitle;
+  String get qHealthSub;
+  String get qScheduleTitle;
+  String get qScheduleSub;
+  String get qEnvTitle;
+  String get qEnvSub;
+  String get qBuildPlan;
+  String get q1Label;
+  String get q2Label;
+  String get q3Label;
+  String get q4Label;
+  String get q23Label;
+  String get q15Label;
+  String get q16Label;
+  String get q17Label;
+  String get q18Label;
+  String get q5Label;
+  String get q6Label;
+  String get q7Label;
+  String get q8Label;
+  String get q9q10Label;
+  String get q11q14Label;
+  String get q19Label;
+  String get q20Label;
+  String get q21Label;
+  String get q22Label;
+  String get q1Student;
+  String get q1Employee;
+  String get q1Freelancer;
+  String get q1Other;
+  String get q1Both;
+  String get q2Home;
+  String get q2Office;
+  String get q2Hybrid;
+  String get q2Varies;
+  String get goalStress;
+  String get goalFocus;
+  String get goalHealth;
+  String get goalSleep;
+  String get goalEnergy;
+  String get goalWeight;
+  String get stress1;
+  String get stress2;
+  String get stress3;
+  String get stress4;
+  String get stress5;
+  String get stressCalmEnd;
+  String get stressStressedEnd;
+  String get priorNone;
+  String get priorHeadspace;
+  String get priorCalm;
+  String get priorMultiple;
+  String get priorOther;
+  String get hydroLow;
+  String get hydroGreat;
+  String get exNever;
+  String get ex12x;
+  String get ex34x;
+  String get exDaily;
+  String get schedFixed;
+  String get schedFlexible;
+  String get schedShift;
+  String get schedIrregular;
+  String get calNoneLabel;
+  String get calSyncNote;
+  String get remMinimal;
+  String get remMinimalSub;
+  String get remModerate;
+  String get remModerateSub;
+  String get remFrequent;
+  String get remFrequentSub;
+  String get remVeryFrequent;
+  String get remVeryFrequentSub;
+  String get lunchTimeLabel;
+  String get lunchDurationLabel;
+  String get resParkLabel;
+  String get resParkSub;
+  String get resGymLabel;
+  String get resGymSub;
+  String get resWindowLabel;
+  String get resWindowSub;
+  String get resQuietLabel;
+  String get resQuietSub;
+  String get distLow;
+  String get distMedium;
+  String get distHigh;
+  String get distVeryHigh;
+  String get focusMorning;
+  String get focusMidday;
+  String get focusAfternoon;
+  String get focusEvening;
+  String get meeting02;
+  String get meeting24;
+  String get meeting46;
+  String get meeting6plus;
+  String get screenTimeWarning;
+  String get crisisTitle;
+  String get crisisBody;
+  String get qOptional;
+  String get qBack;
+  String get qSkipAll;
+  String qOfTotal(int current, int total);
+  String get planGenTitle;
+  String get planGenSub;
+  String get planStep1;
+  String get planStep2;
+  String get planStep3;
+  String get planStep4;
+  String get planReadyBadge;
+  String get planPreviewTitle;
+  String get planPreviewSub;
+  String get planRemindersPerDay;
+  String get planFocusSessions;
+  String get planPointsPerDay;
+  String get planMorning;
+  String get planAfternoon;
+  String get planEvening;
+  String planFromTime(String time);
+  String planConnectCalendar(String name);
+  String get planConnectCalendarSub;
+  String get planFallbackNote;
+  String get planConfirmCta;
+  String get planConfirmSub;
+  String planMinutes(int n);
+
+  // ── Profile screen ───────────────────────────────────────────────────────
+  String get profileTitle;
+  String get accountSection;
+  String get emailAccountLabel;
+  String get supportSection;
+  String get editNameTitle;
+  String get yourNameHint;
+  String get resetTutorialTitle;
+  String get resetTutorialBody;
+  String get resetTutorialCta;
+  String get resetTutorialSnackbar;
+  String genericError(String msg);
+  String get settingsTitle;
+  String get styleCardDesc;
+  String get styleAmbientDesc;
+  String get toneSection;
+  String get accessibilitySection;
+  String get contrastDesc;
+  String get textSizeDesc;
+  String get remindersLabel;
+  String get remindersDesc;
+  String get comingSoonTitle;
+  String get comingSoonBody;
+  String get habitMarkDone;
+  String get slowdownReasonHeavy;
+  String heatmapDaysAgo(int n);
+  String get heatmapToday;
+  String phaseStarted(String date);
+  String phaseReached(String date);
+  String get marketAdTitle;
+  String get marketAdSubtitle;
+  String get marketAdDialogBody;
+  String get marketWatchNow;
+  String get dialogGotIt;
+  String get marketAdUnavailable;
+  String get referralTitle;
+  String get referralSubtitle;
+  String get referralApply;
+  String get referralApplied;
+  String get referralErrorInvalid;
+  String get referralErrorOwn;
+  String get referralErrorAlready;
+  String get referralErrorNotSignedIn;
+  String get referralErrorGeneric;
+  String get referralHint;
+  String premiumPrice(String price);
+  String referralShareButton(String code);
+  String get referralRetry;
+  String referralShareMessage(String code);
 
   // ── Tracker acqua personalizzato ──────────────────────────────────────────
   String get waterContainerGlass;
@@ -346,6 +668,10 @@ abstract class BwStrings {
   String get habitsEveningTitle;
   String get habitsNowLabel;
   String get habitsComingSoon;
+  String get configuratorTitle;
+  String get configuratorSubtitle;
+  String get configuratorDoneTitle;
+  String get configuratorDoneSubtitle;
   String get habitsAllDone;
   String get habitsToday;
   String get completedToday;
@@ -377,6 +703,7 @@ abstract class BwStrings {
   String get slowdownYes;
   String get slowdownNo;
   String get slowdownHabitMenu;
+  String get slowdownMenuSubtitle;
   String get slowdownWellyResponse;
   String get speedupPrompt;
   String get speedupYes;
@@ -406,8 +733,58 @@ abstract class BwStrings {
   String get tutorialOk;
   String get tutorialMore;
   String get tutorialSkip;
+  String get tutorialNext;
   String tutorialText(String id);
   String? tutorialFact(String id);
+
+  // ── Spotlight tutorial (coach-mark stile videogame) ───────────────────────
+  String spotlightText(String id);
+
+  // ── Marketplace ───────────────────────────────────────────────────────────
+  String get pointsAvailable;
+  String get marketplaceTabRewards;
+  String get marketplaceTabDiscounts;
+  String get marketplaceTabInApp;
+  String get rewardsToRedeem;
+  String get rewardRedeemed;
+  String get rewardConfirmTitle;
+  String get rewardConfirmBody;
+  String get rewardRedeemFailed;
+  String get copyCode;
+  String get codeCopied;
+  String get watchAd;
+  String get whyAds;
+  String get whyAdsTitle;
+  String get whyAdsBody;
+  String get discountsActive;
+  String get discountsNote;
+  String get discountExclusive;
+  String get goToSite;
+  String get affiliateNote;
+  String get inAppWelly;
+  String get inAppSoundscape;
+  String get inAppMinigame;
+  String get inAppPercorsi;
+  String get unlockItem;
+  String get itemUnlocked;
+  String get premiumAllContent;
+  String get premiumPoints;
+  String get premiumWelly;
+  String get premiumDiscounts;
+  String get premiumTrial;
+  String get premiumOr;
+
+  // ── Feedback ──────────────────────────────────────────────────────────────
+  String get feedbackTitle;
+  String get feedbackSubtitle;
+  String get feedbackHint;
+  String get feedbackSubmit;
+  String get feedbackThanks;
+  String get feedbackError;
+  String get feedbackCategoryBug;
+  String get feedbackCategoryIdea;
+  String get feedbackCategoryFeature;
+  String get feedbackCategoryOther;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -439,6 +816,12 @@ class _En extends BwStrings {
   String get createAccount => 'Create account';
   String get alreadyHaveAccount => 'Already have an account? ';
   String get signIn => 'Sign in';
+  String get registerSubtitle => 'Start your wellness journey';
+  String get tosAccept => 'I accept the ';
+  String get tosTerms => 'Terms of Service';
+  String get tosAnd => ' and the ';
+  String get tosPrivacy => 'Privacy Policy';
+  String get tosSuffix => ' of Be Well';
   String get passwordForgotTitle => 'Reset password';
   String get passwordForgotSub => 'Enter your email and we\'ll send you a reset link';
   String get sendResetEmail => 'Send reset email';
@@ -452,8 +835,8 @@ class _En extends BwStrings {
   String get wellyNameSub => 'My name is Welly, but you can give me your own name if you prefer.';
   String get perfect => 'Perfect';
   String get firstHabitTitle => 'First habit: water.';
-  String get firstHabitBody1 => 'Your body is 60% water. When you\'re dehydrated by just 2%, concentration drops, mood worsens and you tire more easily. Yet most people drink less than half of what they should.';
-  String get firstHabitBody2 => 'We start here: 8 glasses of water. I\'ll remind you when to drink. Then, step by step, we\'ll add new activities as we consolidate previous ones — building healthy habits together that truly work for you.';
+  String get firstHabitBody1 => 'Just 2% dehydration lowers focus and mood — yet most people drink far too little.';
+  String get firstHabitBody2 => 'We start here: 8 glasses a day. I\'ll remind you when to drink, then we\'ll add new habits step by step.';
   String get drinkFirstGlass => 'Drink the first glass now';
   String get rewardTitle => 'Perfect. One.';
   String get rewardBody => 'Every time you complete something, you earn Be Well points. You\'ll accumulate them without thinking — and you can use them for discount vouchers, gift cards, accessories, premium app features and much more.';
@@ -468,6 +851,7 @@ class _En extends BwStrings {
   String get waterContainerBtn => 'Container';
 
   String get goodMorning => 'Good morning,';
+  String get greetingFallbackName => 'there';
   String get phase => 'Phase';
   String get waterToday => 'Water today';
   String get waterGlasses => 'glasses';
@@ -579,8 +963,24 @@ class _En extends BwStrings {
   String get notifWaterBody => 'Have you drunk enough water today?';
   String get notifEveningTitle => 'Be Well 🌱';
   String get notifEveningBody => 'How are your habits going today?';
+  String get notifHabitTitle => '🌱 Be Well';
+  String get notifHabitBody => 'Time to work on your habits — even one small action counts.';
   String get notifHabitChoiceTitle => '✨ New habit available';
   String get notifHabitChoiceBody => 'Open Be Well to choose your next habit.';
+
+  String get notifFrequencyLabel => 'Reminder frequency';
+  String get notifFreqOff => 'Off';
+  String get notifFreqLow => 'Few';
+  String get notifFreqNormal => 'Normal';
+  String get notifFreqHigh => 'All';
+  String get notifFreqOffDesc => 'No reminders';
+  String get notifFreqLowDesc => '2 a day — morning and evening';
+  String get notifFreqNormalDesc => '4 a day, spaced through the day';
+  String get notifFreqHighDesc => 'Every ~2h during waking hours';
+  String get notifSnoozeLabel => 'Pause reminders';
+  String notifSnoozeActive(String until) => 'Paused until $until';
+  String get notifSnoozeCancel => 'Resume now';
+  String notifSnoozeHours(int h) => '$h h';
 
   String get navHome => 'Home';
   String get navHabits => 'Habits';
@@ -627,6 +1027,36 @@ class _En extends BwStrings {
   String get habitFocusPhoneName => 'Focus without phone'; String get habitFocusPhoneDesc => 'Phone face-down during focus sessions';
   String get habitMicroWalkName => '5-min micro walk'; String get habitMicroWalkDesc => '5 minutes walking every 90 minutes — ultradian cycle';
   String get habitDigitalSunsetName => 'Digital sunset'; String get habitDigitalSunsetDesc => 'No social media in the hour before sleep';
+  String get breathingInhale => 'Inhale';
+  String get breathingHold => 'Hold';
+  String get breathingExhale => 'Exhale';
+  String get breathingCycles => 'Cycles:';
+  String get breathingTapToStart => 'Tap to\nbegin';
+  String get breathingStart => 'Start breathing';
+  String get breathingStop => 'Stop';
+  String get breathingAgain => 'Again';
+  String get breathingWellDone => '🌿 Well done!';
+  String breathingCyclesCompleted(int n) => '$n cycles completed.';
+  String breathingPointsEarned(int pts) => '+$pts points ⭐';
+
+  String get guideTapToStart => 'Tap to\nbegin';
+  String get guideStart => 'Start sequence';
+  String get guideWellDone => '💪 Well done!';
+  String guideStepProgress(int i, int total) => 'Step $i of $total';
+  String guideStepsCompleted(int n) => '$n steps completed.';
+  String get guideDeskStep1 => 'Shoulder rolls backward × 5';
+  String get guideDeskStep2 => 'Seated spinal twist × 3 each side';
+  String get guideDeskStep3 => 'Wrist and forearm circles × 10';
+  String get guideDeskStep4 => 'Lateral neck tilt × 3 each side';
+  String get guideDeskStep5 => 'Seated cat-cow × 5';
+  String get guideNeckStep1 => 'Slow neck rolls × 5 each way';
+  String get guideNeckStep2 => 'Shoulder shrug and release × 8';
+  String get guideNeckStep3 => 'Lateral neck stretch × 3 each side';
+  String get guideStretchStep1 => 'Arm reach overhead × 5';
+  String get guideStretchStep2 => 'Torso side bend × 3 each side';
+  String get guideStretchStep3 => 'Hip circles × 8';
+  String get guideStretchStep4 => 'Calf raises × 10';
+  String get guideStretchStep5 => 'Standing forward fold × 20s';
 
   String get neverMissTwiceTitle => 'Don\'t miss two days in a row.';
   String get neverMissTwiceBody => 'One small action counts. Even a glass of water.';
@@ -651,11 +1081,25 @@ class _En extends BwStrings {
   String get badgeFocused => 'In focus'; String get badgeFocusedDesc => 'Focus 25 consolidated';
   String get badgeWalker => 'Walker'; String get badgeWalkerDesc => 'Lunch walk consolidated';
   String get badgeBreath => 'Breath'; String get badgeBreathDesc => 'Breathing consolidated';
+  String get badgeRootedName => 'Rooted habits';
+  String get badgeRootedDesc => 'Habits that became second nature';
+  String get badgeTierBronze => 'Bronze';
+  String get badgeTierSilver => 'Silver';
+  String get badgeTierGold => 'Gold';
+  String get growthNextGoal => 'Next goal';
+  String growthHabitsToRoot(int n) => n == 1 ? '1 habit to go' : '$n habits to go';
 
   String get habitChoiceTitle => 'Time to add something new.';
   String get habitChoiceSub => 'Choose where to focus next.';
   String get habitChoiceShowOther => 'show me other options ›';
+  String get habitChoiceNotReady => 'I\'m not ready for this yet';
   String get habitChoiceOpen => 'Choose your next habit';
+  String get habitNotReadySnoozed => 'No problem — I\'ll ask again in a week.';
+  String get consolidatedTitle => '🏆 Congratulations!';
+  String consolidatedBody(String habitName) => 'You\'ve made "$habitName" a real habit — your brain has built a lasting circuit for it.';
+  String get consolidatedBadge => 'Habit consolidated';
+  String get consolidatedCta => 'Continue';
+  String habitStartsTomorrow(String habitName) => 'Great! Enjoy today\'s win — we\'ll start working on "$habitName" tomorrow.';
   String get habitEffortLow => 'easy';
   String get habitEffortMedium => 'moderate';
   String get habitEffortHigh => 'challenging';
@@ -666,6 +1110,222 @@ class _En extends BwStrings {
   String get errorWeakPassword => 'Password is too weak';
   String get errorEmailInUse => 'This email is already in use';
   String get errorInvalidCredentials => 'Incorrect email or password';
+  String get errorTooManyAttempts => 'Too many attempts. Account temporarily locked';
+  String get errorTimeout => 'The server isn\'t responding. Try again shortly';
+  String get errorCancelled => 'Sign-in cancelled';
+  String get errorAccountDisabled => 'Account disabled. Contact support';
+  String get passwordStrengthWeak => 'Weak';
+  String get passwordStrengthMedium => 'Medium';
+  String get passwordStrengthStrong => 'Strong';
+  String get passwordStrengthVeryStrong => 'Very strong';
+  String get validationEmailRequired => 'Enter your email';
+  String get validationPasswordRequired => 'Enter a password';
+  String get validationPasswordTooShort => 'At least 8 characters';
+  String get validationNameRequired => 'Enter your name';
+  String get validationNameTooShort => 'At least 2 characters';
+  String get accountLockedBody => 'Too many failed attempts.\nTry again in';
+  String get accountLockedEmailSent => 'You\'ve received an email with instructions.';
+  String get offlineLoginRequired => 'No connection — sign in requires internet';
+  String get forgotCheckEmailTitle => 'Check your email';
+  String forgotEmailSentBody(String email) =>
+      'If an account exists for $email, you\'ll receive a link to reset your password.';
+  String get forgotLinkExpiry => 'The link expires in 30 minutes.';
+  String get forgotResendLimitReached => 'Resend limit reached';
+  String forgotResendIn(int seconds) => 'Resend in ${seconds}s';
+  String get verifyEmailCta => 'Click the link to activate your account.';
+  String get verifyResendCta => 'Resend verification email';
+  String get verifyChecked => 'I\'ve verified my email';
+  String get verifyDifferentEmail => 'Use a different email?';
+  String get verifySendError => 'Couldn\'t send the email, try again shortly';
+  String get welcomeSlide1Title => 'Your personal\nwellness plan';
+  String get welcomeSlide1Sub => 'Be Well builds a plan tailored to you, based on your habits and goals.';
+  String get welcomeSlide2Title => 'Reminders that\nknow your calendar';
+  String get welcomeSlide2Sub => 'Reminders adapt to your meetings and schedule, so they never interrupt you at the wrong time.';
+  String get welcomeSlide3Title => 'Turn habits\ninto real rewards';
+  String get welcomeSlide3Sub => 'Earn points by completing activities and redeem them for discounts, vouchers and more.';
+  String get welcomeSkip => 'Skip';
+  String get welcomeNext => 'Next →';
+  String get welcomeStart => 'Start setup →';
+  String get welcomeConfigureLater => 'Set up later';
+
+  String get qProfileTitle => 'Tell us about you';
+  String get qProfileSub => 'Helps us build the right plan for you.';
+  String get qGoalsTitle => 'Goals & Stress';
+  String get qGoalsSub => 'The most important screen for personalizing your plan.';
+  String get qHealthTitle => 'Your habits';
+  String get qHealthSub => 'Calibrates reminder frequency and type.';
+  String get qScheduleTitle => 'Your schedule';
+  String get qScheduleSub => 'We\'ll set reminders at the right moments.';
+  String get qEnvTitle => 'Environment & Productivity';
+  String get qEnvSub => 'The last details for your plan.';
+  String get qBuildPlan => 'Done ✓';
+  String get q1Label => 'Q1 · I\'m mainly…';
+  String get q2Label => 'Q2 · I mainly work/study…';
+  String get q3Label => 'Q3 · What do you want to improve? (multiple)';
+  String get q4Label => 'Q4 · Current stress level';
+  String get q23Label => 'Q5 · Have you used wellness apps before?';
+  String get q15Label => 'Q6 · I usually sleep…';
+  String get q16Label => 'Q7 · I drink about…';
+  String get q17Label => 'Q8 · Screen time (leisure, excluding work)';
+  String get q18Label => 'Q9 · I exercise…';
+  String get q5Label => 'Q10 · My schedule is…';
+  String get q6Label => 'Q11 · Want to sync your calendar?';
+  String get q7Label => 'Q12 · How many reminders per day?';
+  String get q8Label => 'Q13 · Ideal break…';
+  String get q9q10Label => 'Q14–Q15 · Lunch break';
+  String get q11q14Label => 'Q16–Q19 · I have access to…';
+  String get q19Label => 'Q20 · Distraction level in your environment';
+  String get q20Label => 'Q21 · When are you most focused?';
+  String get q21Label => 'Q22 · How long can you focus at a stretch?';
+  String get q22Label => 'Q23 · How many meetings per day (average)?';
+  String get q1Student => 'Student';
+  String get q1Employee => 'Employee';
+  String get q1Freelancer => 'Freelancer';
+  String get q1Other => 'Other';
+  String get q1Both => 'Both';
+  String get q2Home => 'From home';
+  String get q2Office => 'At the office';
+  String get q2Hybrid => 'Hybrid';
+  String get q2Varies => 'Varies';
+  String get goalStress => 'Reduce stress';
+  String get goalFocus => 'Improve focus';
+  String get goalHealth => 'General health';
+  String get goalSleep => 'Sleep better';
+  String get goalEnergy => 'More energy';
+  String get goalWeight => 'Fitness';
+  String get stress1 => 'Very calm';
+  String get stress2 => 'Fairly calm';
+  String get stress3 => 'Normal';
+  String get stress4 => 'A bit stressed';
+  String get stress5 => 'Very stressed';
+  String get stressCalmEnd => 'Calm';
+  String get stressStressedEnd => 'Stressed';
+  String get priorNone => 'No, never';
+  String get priorHeadspace => 'Headspace';
+  String get priorCalm => 'Calm';
+  String get priorMultiple => 'More than one';
+  String get priorOther => 'Another app';
+  String get hydroLow => 'low';
+  String get hydroGreat => 'great';
+  String get exNever => 'Never';
+  String get ex12x => '1-2x/week';
+  String get ex34x => '3-4x/week';
+  String get exDaily => 'Every day';
+  String get schedFixed => 'Fixed';
+  String get schedFlexible => 'Flexible';
+  String get schedShift => 'Shifts';
+  String get schedIrregular => 'Irregular';
+  String get calNoneLabel => 'No thanks, not now';
+  String get calSyncNote => '✓ We\'ll ask for permissions after you confirm your plan';
+  String get remMinimal => 'Minimal';
+  String get remMinimalSub => '~2/day';
+  String get remModerate => 'Moderate';
+  String get remModerateSub => '~4/day';
+  String get remFrequent => 'Frequent';
+  String get remFrequentSub => '~6/day';
+  String get remVeryFrequent => 'Very frequent';
+  String get remVeryFrequentSub => '8+/day';
+  String get lunchTimeLabel => 'Time';
+  String get lunchDurationLabel => 'Duration';
+  String get resParkLabel => 'Park or green space';
+  String get resParkSub => 'For lunch-break walks';
+  String get resGymLabel => 'Gym or fitness space';
+  String get resGymSub => 'At the office or nearby';
+  String get resWindowLabel => 'Window with a view';
+  String get resWindowSub => 'For the 20-20-20 eye rule';
+  String get resQuietLabel => 'Quiet space';
+  String get resQuietSub => 'For meditation and deep focus';
+  String get distLow => 'Low';
+  String get distMedium => 'Medium';
+  String get distHigh => 'High';
+  String get distVeryHigh => 'Very high';
+  String get focusMorning => 'Morning';
+  String get focusMidday => 'Midday';
+  String get focusAfternoon => 'Afternoon';
+  String get focusEvening => 'Evening';
+  String get meeting02 => '0-2 / day';
+  String get meeting24 => '2-4 / day';
+  String get meeting46 => '4-6 / day';
+  String get meeting6plus => '6+ / day';
+  String get screenTimeWarning => 'We\'ll enable more frequent eye reminders';
+  String get crisisTitle => 'You\'re going through a hard time';
+  String get crisisBody => 'Be Well is here to support you. If you need immediate help: contact a local helpline.';
+  String get qOptional => 'optional';
+  String get qBack => '← Back';
+  String get qSkipAll => 'Skip all';
+  String qOfTotal(int current, int total) => '$current of $total';
+  String get planGenTitle => 'Building your plan…';
+  String get planGenSub => 'Applying your personalization rules';
+  String get planStep1 => 'Analyzing your profile';
+  String get planStep2 => 'Configuring reminders';
+  String get planStep3 => 'Selecting activities';
+  String get planStep4 => 'Setting up your dashboard';
+  String get planReadyBadge => '🎉 Plan ready!';
+  String get planPreviewTitle => 'Your wellness\nplan';
+  String get planPreviewSub => 'Personalized from your answers. You can always change it from Settings.';
+  String get planRemindersPerDay => 'reminders/day';
+  String get planFocusSessions => 'focus sessions';
+  String get planPointsPerDay => 'points/day';
+  String get planMorning => '🌅 Morning';
+  String get planAfternoon => '☀️ Afternoon';
+  String get planEvening => '🌙 Evening';
+  String planFromTime(String time) => 'from $time';
+  String planConnectCalendar(String name) => 'Connect $name';
+  String get planConnectCalendarSub => 'We\'ll ask for permission after you confirm';
+  String get planFallbackNote => 'We used a default plan. We\'ll refine it as you use the app.';
+  String get planConfirmCta => 'Start with Be Well  ';
+  String get planConfirmSub => 'You can change your plan anytime from Settings';
+  String planMinutes(int n) => '$n min';
+  String get profileTitle => 'Profile';
+  String get accountSection => 'Account';
+  String get emailAccountLabel => 'Email account';
+  String get supportSection => 'Support';
+  String get editNameTitle => 'Edit name';
+  String get yourNameHint => 'Your name';
+  String get resetTutorialTitle => 'Reset tutorial';
+  String get resetTutorialBody => 'Welly will show all tutorial dialogs again as if it were your first time. Useful for testing the flow.';
+  String get resetTutorialCta => 'Reset';
+  String get resetTutorialSnackbar => 'Tutorial reset ✓';
+  String genericError(String msg) => 'Error: $msg';
+  String get settingsTitle => 'Settings';
+  String get styleCardDesc => 'Content in cards,\nclean typography';
+  String get styleAmbientDesc => 'Atmospheric landscape,\neditorial font';
+  String get toneSection => 'Tone';
+  String get accessibilitySection => 'Accessibility';
+  String get contrastDesc => 'Increases text contrast';
+  String get textSizeDesc => 'Increases font size';
+  String get remindersLabel => 'Activity reminders';
+  String get remindersDesc => 'Notifications for planned activities';
+  String get comingSoonTitle => 'Coming soon';
+  String get comingSoonBody => 'This section isn\'t available yet — it\'s on our roadmap.';
+  String get habitMarkDone => 'Done';
+  String get slowdownReasonHeavy => 'This habit feels like too much right now';
+  String heatmapDaysAgo(int n) => '$n days ago';
+  String get heatmapToday => 'today';
+  String phaseStarted(String date) => 'started $date';
+  String phaseReached(String date) => 'reached $date';
+  String get marketAdTitle => 'Help Be Well';
+  String get marketAdSubtitle => 'Earn 10 pts by watching a spot';
+  String get marketAdDialogBody => 'Watch an ad: you help keep the app free and instantly earn 10 points.';
+  String get marketWatchNow => 'Watch now';
+  String get dialogGotIt => 'Got it';
+  String get marketAdUnavailable => 'Spot not available right now';
+  String get referralTitle => 'Invite a friend';
+  String get referralSubtitle => 'Earn 50 pts for every friend who signs up';
+  String get referralApply => 'Apply';
+  String get referralApplied => 'Code applied! Your friend will get the bonus soon. 🎉';
+  String get referralErrorInvalid => 'Invalid code';
+  String get referralErrorOwn => 'You can\'t use your own code';
+  String get referralErrorAlready => 'You\'ve already redeemed a code';
+  String get referralErrorNotSignedIn => 'You need to be signed in';
+  String get referralErrorGeneric => 'Something went wrong, try again';
+  String get referralHint => 'Have an invite code?';
+  String premiumPrice(String price) => '$price/month';
+  String referralShareButton(String code) => 'Share my code · $code';
+  String get referralRetry => 'Couldn\'t generate the code — tap to retry';
+  String referralShareMessage(String code) =>
+      'I\'m using Be Well to build healthier habits, one day at a time 🌱\n'
+      'Download the app and use my invite code "$code" — you\'ll get 50 bonus points as soon as you start!';
 
   String get waterContainerGlass => 'glass';
   String get waterContainerBottle => 'bottle';
@@ -678,6 +1338,10 @@ class _En extends BwStrings {
   String get habitsEveningTitle => 'How did it go today?';
   String get habitsNowLabel => 'Right now';
   String get habitsComingSoon => 'Coming up';
+  String get configuratorTitle => 'Personalize your plan';
+  String get configuratorSubtitle => 'Answer a few questions so Be Well can suggest the right habits for you';
+  String get configuratorDoneTitle => 'Your plan is personalized';
+  String get configuratorDoneSubtitle => 'Tap to update your answers';
   String get habitsAllDone => 'All good for now. Welly is with you.';
   String get habitsToday => 'Today';
   String get completedToday => 'completed today';
@@ -705,7 +1369,8 @@ class _En extends BwStrings {
   String get slowdownYes => 'Yes, let\'s slow down';
   String get slowdownNo => 'No, I\'ll keep going';
   String get slowdownHabitMenu => 'I need more time with this one';
-  String get slowdownWellyResponse => 'No problem — let\'s strengthen this one before adding anything new. That\'s exactly the right choice.';
+  String get slowdownMenuSubtitle => 'This pauses new habit suggestions for 2 weeks — this one stays in your plan either way.';
+  String get slowdownWellyResponse => 'No problem — new suggestions are paused for 2 weeks. This habit stays in your plan, take the time you need.';
   String get speedupPrompt => 'You\'re doing really well — are you ready for something new ahead of schedule?';
   String get speedupYes => 'Yes, I\'m ready';
   String get speedupNo => 'No, I\'ll stay here';
@@ -718,11 +1383,85 @@ class _En extends BwStrings {
   String get tutorialOk   => 'Got it!';
   String get tutorialMore => 'Tell me more →';
   String get tutorialSkip => 'Skip';
+  String get tutorialNext => 'Next →';
+
+  // ── Marketplace ───────────────────────────────────────────────────────────
+  String get pointsAvailable         => 'points available';
+  String get marketplaceTabRewards   => 'Rewards';
+  String get marketplaceTabDiscounts => 'Discounts';
+  String get marketplaceTabInApp     => 'In-app';
+  String get rewardsToRedeem         => 'to redeem';
+  String get rewardRedeemed          => 'There it is. You earned it.';
+  String get rewardConfirmTitle      => 'Are you sure?';
+  String get rewardConfirmBody       => 'X points will be deducted from your balance.';
+  String get rewardRedeemFailed => 'Couldn\'t redeem this reward — not enough points, or it\'s no longer available.';
+  String get copyCode                => 'Copy code';
+  String get codeCopied              => 'Copied';
+  String get watchAd                 => 'Watch a spot · +10 pt';
+  String get whyAds                  => 'why?';
+  String get whyAdsTitle             => 'Be Well is free for everyone';
+  String get whyAdsBody              => 'Be Well is a free app to be accessible to everyone. Like any service, it has running costs. By watching ads when you can, you help us keep the service running and improve it for everyone. Thank you.';
+  String get discountsActive         => 'active discounts';
+  String get discountsNote           => 'Discounts are updated monthly. No points required.';
+  String get discountExclusive       => 'exclusive Be Well';
+  String get goToSite                => 'Go to site';
+  String get affiliateNote           => 'This link supports Be Well';
+  String get inAppWelly              => 'welly';
+  String get inAppSoundscape         => 'soundscape';
+  String get inAppMinigame           => 'minigame';
+  String get inAppPercorsi           => 'paths';
+  String get unlockItem              => 'Unlock';
+  String get itemUnlocked            => 'Unlocked';
+  String get premiumAllContent       => 'All in-app content included';
+  String get premiumPoints           => '+20% points on every habit';
+  String get premiumWelly            => 'Fully customizable Welly';
+  String get premiumDiscounts        => 'Exclusive discounts in advance';
+  String get premiumTrial            => 'Try 7 days free';
+  String get premiumOr               => 'or buy individually with points';
+
+  String get feedbackTitle => 'Leave feedback';
+  String get feedbackSubtitle => 'It helps us make Be Well better for you.';
+  String get feedbackHint => 'Write your feedback here…';
+  String get feedbackSubmit => 'Send feedback';
+  String get feedbackThanks => 'Thanks for your feedback!';
+  String get feedbackError => 'Couldn\'t send it, try again shortly';
+  String get feedbackCategoryBug => 'Bug';
+  String get feedbackCategoryIdea => 'Idea';
+  String get feedbackCategoryFeature => 'Feature';
+  String get feedbackCategoryOther => 'Other';
+
+  String spotlightText(String id) {
+    switch (id) {
+      // Home tour
+      case 'home_welcome':    return 'Welcome! I\'m Welly. Let me show you around so you can start the right way.';
+      case 'home_water':      return 'This is your first habit: drinking water. 8 glasses a day is your goal. Simple and powerful.';
+      case 'home_add_glass':  return 'Tap here every time you drink a glass. Each tap builds your habit — try it right now!';
+      case 'home_welly':      return 'That\'s me — Welly! I change expression based on your progress. The better you do, the more radiant I get.';
+      case 'home_phase':      return 'This is your Phase. You start at Seed — Phase 1. Build habits to grow all the way to Phase 5: Radiant.';
+      case 'home_nav':        return 'New sections unlock here as you progress. Start with water — everything else opens up from there.';
+      // Habits tour
+      case 'habits_welcome':  return 'You unlocked the Habits screen! From here you manage all your routines.';
+      case 'habits_now':      return 'The \'Right now\' card shows the habit most relevant to this exact moment of your day.';
+      case 'habits_list':     return 'All habits are sorted by their best time. Morning habits appear first in the morning — Welly knows your rhythm.';
+      case 'habits_ready':      return 'All set! Tap \'Complete\' every day to build your streak. Small actions, done consistently, change everything.';
+      // Marketplace tour
+      case 'marketplace_welcome': return 'These are your Be Well Rewards! Every glass of water, every habit completed brings you here — where your efforts become real rewards.';
+      case 'marketplace_points':  return 'Your points balance is always visible here. It builds automatically as you build habits — nothing extra to do.';
+      case 'marketplace_tabs':    return 'Three tabs: Rewards to redeem with points, exclusive Discounts for free, and In-app content to unlock. All earned through your daily habits.';
+      case 'marketplace_card':    return 'Each reward has a cost in points. Tap to redeem — you\'ll get a code instantly. The more consistent you are, the more you unlock.';
+      // Growth tour
+      case 'growth_welcome':      return 'This is your Growth. Not a ranking — a mirror. It shows who you\'re becoming, not just what you\'re doing.';
+      case 'growth_phase':        return 'Your phase reflects how deep your habits are rooted. From Phase 1 (Seed) to Phase 5 (Radiant) — each step is a real neurological change, not a game level.';
+      case 'growth_heatmap':      return 'This heatmap shows your consistency over time. Science says the pattern matters more than intensity: a few missed days don\'t reset everything.';
+      case 'growth_badges':       return 'Badges aren\'t decorations. Each one matches a behaviour you\'ve kept for a measurable period. They\'re proof of your journey.';
+      default: return '';
+    }
+  }
 
   String tutorialText(String id) {
     if (id.startsWith('habit_chosen_')) {
       final hid = id.substring('habit_chosen_'.length);
-      return '✅ ${habitName(hid)} is now in your plan! ${habitDesc(hid)} Complete it every day to make it stick.';
+      return habitStartsTomorrow(habitName(hid));
     }
     switch (id) {
       case 'home_first_open':     return 'Welcome! This is your base. At the top you\'ll always find the most urgent habit for right now. Start there — everything else can wait.';
@@ -732,7 +1471,7 @@ class _En extends BwStrings {
       case 'streak_explain':      return 'If you come back tomorrow, your streak begins. The only rule that matters: never skip two days in a row. One stop is human. Two is a new habit — the wrong one.';
       case 'habits_tab_first':    return 'Here you\'ll find all your habits sorted for the best moment in your day. Welly knows your rhythms — morning habits appear in the morning, evening ones in the evening.';
       case 'habit_card_explain':  return 'The circular arc fills each time you complete. At 7 days something interesting happens — your brain starts registering it as a routine.';
-      case 'focus_unlocked':      return 'You\'ve unlocked the 25-minute Focus! The human brain has a natural concentration cycle of about 20–30 minutes. You\'ve earned this by building the water habit.';
+      case 'focus_unlocked':      return 'You have the 25-minute Focus available right from the start! The human brain has a natural concentration cycle of about 20–30 minutes — use it for a distraction-free work block.';
       case 'focus_unlocked_2':    return 'Golden rule of Focus: when the timer starts, the phone goes face-down. Even Welly goes quiet. The notification you\'re waiting for can wait 25 minutes — I promise.';
       case 'calendar_appears':    return 'New! The contextual calendar shows only the coming hours, not the whole day. Less to see = more mental space to act. The distant future isn\'t your problem yet.';
       case 'growth_first_visit':  return 'This section shows who you\'re becoming, not just what you\'re doing. The phases aren\'t rewards — they\'re real descriptions of your neurological change. Science, not motivation, guides the journey.';
@@ -804,6 +1543,12 @@ class _It extends BwStrings {
   String get createAccount => 'Crea account';
   String get alreadyHaveAccount => 'Hai già un account? ';
   String get signIn => 'Accedi';
+  String get registerSubtitle => 'Inizia il tuo percorso di benessere';
+  String get tosAccept => 'Accetto i ';
+  String get tosTerms => 'Termini di Servizio';
+  String get tosAnd => ' e la ';
+  String get tosPrivacy => 'Privacy Policy';
+  String get tosSuffix => ' di Be Well';
   String get passwordForgotTitle => 'Reimposta password';
   String get passwordForgotSub => 'Inserisci la tua email e ti invieremo un link di reset';
   String get sendResetEmail => 'Invia email di reset';
@@ -817,8 +1562,8 @@ class _It extends BwStrings {
   String get wellyNameSub => 'Il mio nome è Welly, ma se preferisci puoi darmi un nome tutto tuo.';
   String get perfect => 'Perfetto';
   String get firstHabitTitle => 'Prima abitudine: l\'acqua.';
-  String get firstHabitBody1 => 'Il tuo corpo è composto per il 60% di acqua. Quando sei disidratato anche solo del 2%, la concentrazione cala, l\'umore peggiora e ti stanchi prima. Eppure la maggior parte delle persone beve meno della metà di quello che dovrebbe.';
-  String get firstHabitBody2 => 'Oggi partiamo da qui: 8 bicchieri d\'acqua. Ti ricorderò io quando bere. Poi, passo dopo passo, aggiungeremo nuove attività man mano che consolideremo quelle precedenti — costruendo insieme delle sane abitudini che funzionano davvero per te.';
+  String get firstHabitBody1 => 'Bastano il 2% di disidratazione per calare concentrazione e umore — e in pochi bevono a sufficienza.';
+  String get firstHabitBody2 => 'Partiamo da qui: 8 bicchieri al giorno. Ti ricorderò io quando bere, poi aggiungeremo nuove abitudini passo dopo passo.';
   String get drinkFirstGlass => 'Bevi il primo bicchiere adesso';
   String get rewardTitle => 'Perfetto. Uno.';
   String get rewardBody => 'Ogni volta che completi qualcosa, guadagni punti Be Well. Li accumulerai senza pensarci — e potrai usarli per buoni sconto, voucher, accessori, funzionalità premium nell\'app e molto altro ancora.';
@@ -833,6 +1578,7 @@ class _It extends BwStrings {
   String get waterContainerBtn => 'Contenitore';
 
   String get goodMorning => 'Buongiorno,';
+  String get greetingFallbackName => 'a te';
   String get phase => 'Fase';
   String get waterToday => 'Acqua oggi';
   String get waterGlasses => 'bicchieri';
@@ -944,8 +1690,24 @@ class _It extends BwStrings {
   String get notifWaterBody => 'Hai bevuto abbastanza acqua oggi?';
   String get notifEveningTitle => 'Be Well 🌱';
   String get notifEveningBody => 'Come stai andando con le tue abitudini oggi?';
+  String get notifHabitTitle => '🌱 Be Well';
+  String get notifHabitBody => 'È il momento di lavorare alle tue abitudini — anche una piccola azione conta.';
   String get notifHabitChoiceTitle => '✨ Nuova abitudine disponibile';
   String get notifHabitChoiceBody => 'Apri Be Well per scegliere la tua prossima abitudine.';
+
+  String get notifFrequencyLabel => 'Frequenza reminder';
+  String get notifFreqOff => 'Nessuna';
+  String get notifFreqLow => 'Poche';
+  String get notifFreqNormal => 'Normale';
+  String get notifFreqHigh => 'Tutte';
+  String get notifFreqOffDesc => 'Nessun reminder';
+  String get notifFreqLowDesc => '2 al giorno — mattina e sera';
+  String get notifFreqNormalDesc => '4 al giorno, distribuiti nella giornata';
+  String get notifFreqHighDesc => 'Ogni ~2h nelle ore di veglia';
+  String get notifSnoozeLabel => 'Metti in pausa i reminder';
+  String notifSnoozeActive(String until) => 'In pausa fino alle $until';
+  String get notifSnoozeCancel => 'Riattiva ora';
+  String notifSnoozeHours(int h) => '$h h';
 
   String get navHome => 'Home';
   String get navHabits => 'Abitudini';
@@ -992,6 +1754,36 @@ class _It extends BwStrings {
   String get habitFocusPhoneName => 'Focus senza telefono'; String get habitFocusPhoneDesc => 'Telefono capovolto durante il focus';
   String get habitMicroWalkName => 'Micro-camminata 5 min'; String get habitMicroWalkDesc => '5 minuti di camminata ogni 90 minuti — ciclo ultradiano';
   String get habitDigitalSunsetName => 'Digital sunset'; String get habitDigitalSunsetDesc => 'Niente social media nell\'ora prima di dormire';
+  String get breathingInhale => 'Inspira';
+  String get breathingHold => 'Trattieni';
+  String get breathingExhale => 'Espira';
+  String get breathingCycles => 'Cicli:';
+  String get breathingTapToStart => 'Tocca per\ncominciare';
+  String get breathingStart => 'Inizia respirazione';
+  String get breathingStop => 'Interrompi';
+  String get breathingAgain => 'Di nuovo';
+  String get breathingWellDone => '🌿 Ottimo lavoro!';
+  String breathingCyclesCompleted(int n) => '$n cicli completati.';
+  String breathingPointsEarned(int pts) => '+$pts punti ⭐';
+
+  String get guideTapToStart => 'Tocca per\ncominciare';
+  String get guideStart => 'Inizia sequenza';
+  String get guideWellDone => '💪 Ottimo lavoro!';
+  String guideStepProgress(int i, int total) => 'Passo $i di $total';
+  String guideStepsCompleted(int n) => '$n passi completati.';
+  String get guideDeskStep1 => 'Rotazione spalle indietro × 5';
+  String get guideDeskStep2 => 'Torsione dorsale seduta × 3 per lato';
+  String get guideDeskStep3 => 'Cerchi polsi e avambracci × 10';
+  String get guideDeskStep4 => 'Inclinazione laterale collo × 3 per lato';
+  String get guideDeskStep5 => 'Cat-cow seduto × 5';
+  String get guideNeckStep1 => 'Rotazioni lente del collo × 5 per verso';
+  String get guideNeckStep2 => 'Alza e rilascia le spalle × 8';
+  String get guideNeckStep3 => 'Stretching laterale collo × 3 per lato';
+  String get guideStretchStep1 => 'Allungo braccia verso l\'alto × 5';
+  String get guideStretchStep2 => 'Flessione laterale busto × 3 per lato';
+  String get guideStretchStep3 => 'Cerchi con i fianchi × 8';
+  String get guideStretchStep4 => 'Sollevamento polpacci × 10';
+  String get guideStretchStep5 => 'Flessione in avanti da in piedi × 20s';
 
   String get neverMissTwiceTitle => 'Stai per saltare due giorni di fila.';
   String get neverMissTwiceBody => 'Una sola azione conta. Anche un bicchiere d\'acqua.';
@@ -1016,11 +1808,25 @@ class _It extends BwStrings {
   String get badgeFocused => 'In focus'; String get badgeFocusedDesc => 'Focus 25 min consolidato';
   String get badgeWalker => 'Camminatore'; String get badgeWalkerDesc => 'Passeggiata pranzo consolidata';
   String get badgeBreath => 'Respiro'; String get badgeBreathDesc => 'Respirazione consolidata';
+  String get badgeRootedName => 'Abitudini radicate';
+  String get badgeRootedDesc => 'Abitudini diventate una seconda natura';
+  String get badgeTierBronze => 'Bronzo';
+  String get badgeTierSilver => 'Argento';
+  String get badgeTierGold => 'Oro';
+  String get growthNextGoal => 'Prossimo obiettivo';
+  String growthHabitsToRoot(int n) => n == 1 ? 'Manca 1 abitudine' : 'Mancano $n abitudini';
 
   String get habitChoiceTitle => 'È il momento di aggiungere\nqualcosa di nuovo.';
   String get habitChoiceSub => 'Scegli dove concentrarti adesso.';
   String get habitChoiceShowOther => 'mostrami altre opzioni ›';
+  String get habitChoiceNotReady => 'Non mi sento pronto/a';
   String get habitChoiceOpen => 'Scegli la prossima abitudine';
+  String get habitNotReadySnoozed => 'Nessun problema — te lo richiederò tra una settimana.';
+  String get consolidatedTitle => '🏆 Complimenti!';
+  String consolidatedBody(String habitName) => 'Hai reso "$habitName" una vera abitudine — il tuo cervello ha costruito un circuito duraturo per lei.';
+  String get consolidatedBadge => 'Abitudine consolidata';
+  String get consolidatedCta => 'Continua';
+  String habitStartsTomorrow(String habitName) => 'Molto bene! Oggi goditi il traguardo — inizieremo a lavorare su "$habitName" da domani.';
   String get habitEffortLow => 'facile';
   String get habitEffortMedium => 'moderato';
   String get habitEffortHigh => 'impegnativo';
@@ -1031,6 +1837,222 @@ class _It extends BwStrings {
   String get errorWeakPassword => 'La password è troppo debole';
   String get errorEmailInUse => 'Questa email è già in uso';
   String get errorInvalidCredentials => 'Email o password errati';
+  String get errorTooManyAttempts => 'Troppi tentativi. Account bloccato temporaneamente';
+  String get errorTimeout => 'Il server non risponde. Riprova tra poco';
+  String get errorCancelled => 'Accesso annullato';
+  String get errorAccountDisabled => 'Account disabilitato. Contatta il supporto';
+  String get passwordStrengthWeak => 'Debole';
+  String get passwordStrengthMedium => 'Media';
+  String get passwordStrengthStrong => 'Forte';
+  String get passwordStrengthVeryStrong => 'Molto forte';
+  String get validationEmailRequired => 'Inserisci la tua email';
+  String get validationPasswordRequired => 'Inserisci una password';
+  String get validationPasswordTooShort => 'Minimo 8 caratteri';
+  String get validationNameRequired => 'Inserisci il tuo nome';
+  String get validationNameTooShort => 'Minimo 2 caratteri';
+  String get accountLockedBody => 'Troppi tentativi falliti.\nRiprova tra';
+  String get accountLockedEmailSent => 'Hai ricevuto un\'email con le istruzioni.';
+  String get offlineLoginRequired => 'Nessuna connessione — il login richiede internet';
+  String get forgotCheckEmailTitle => 'Controlla la tua email';
+  String forgotEmailSentBody(String email) =>
+      'Se esiste un account per $email, riceverai un link per reimpostare la password.';
+  String get forgotLinkExpiry => 'Il link scade tra 30 minuti.';
+  String get forgotResendLimitReached => 'Limite reinvii raggiunto';
+  String forgotResendIn(int seconds) => 'Reinvia tra ${seconds}s';
+  String get verifyEmailCta => 'Clicca il link per attivare il tuo account.';
+  String get verifyResendCta => 'Reinvia email di verifica';
+  String get verifyChecked => 'Ho verificato l\'email';
+  String get verifyDifferentEmail => 'Usare un\'email diversa?';
+  String get verifySendError => 'Invio non riuscito, riprova tra poco';
+  String get welcomeSlide1Title => 'Il tuo piano\ndi benessere personale';
+  String get welcomeSlide1Sub => 'Be Well costruisce un piano su misura per te, basato sulle tue abitudini e obiettivi.';
+  String get welcomeSlide2Title => 'Reminder che\nconosco il tuo calendario';
+  String get welcomeSlide2Sub => 'I promemoria si adattano ai tuoi meeting e orari, così non ti interrompono mai nel momento sbagliato.';
+  String get welcomeSlide3Title => 'Trasforma le abitudini\nin premi reali';
+  String get welcomeSlide3Sub => 'Guadagna punti completando attività e riscattali per sconti, voucher e molto altro.';
+  String get welcomeSkip => 'Salta';
+  String get welcomeNext => 'Avanti →';
+  String get welcomeStart => 'Inizia la configurazione →';
+  String get welcomeConfigureLater => 'Configura dopo';
+
+  String get qProfileTitle => 'Parlaci di te';
+  String get qProfileSub => 'Ci aiuta a costruire il piano giusto per te.';
+  String get qGoalsTitle => 'Obiettivi & Stress';
+  String get qGoalsSub => 'La schermata più importante per personalizzare il tuo piano.';
+  String get qHealthTitle => 'Le tue abitudini';
+  String get qHealthSub => 'Calibra la frequenza e il tipo di reminder.';
+  String get qScheduleTitle => 'Il tuo orario';
+  String get qScheduleSub => 'Impostiamo i reminder nei momenti giusti.';
+  String get qEnvTitle => 'Ambiente & Produttività';
+  String get qEnvSub => 'Gli ultimi dettagli per il tuo piano.';
+  String get qBuildPlan => 'Fatto ✓';
+  String get q1Label => 'Q1 · Sono principalmente…';
+  String get q2Label => 'Q2 · Lavoro/studio principalmente…';
+  String get q3Label => 'Q3 · Cosa vuoi migliorare? (più opzioni)';
+  String get q4Label => 'Q4 · Livello di stress attuale';
+  String get q23Label => 'Q5 · Hai già usato app di benessere?';
+  String get q15Label => 'Q6 · Di solito dormo…';
+  String get q16Label => 'Q7 · Bevo circa…';
+  String get q17Label => 'Q8 · Tempo schermo (svago, escluso lavoro)';
+  String get q18Label => 'Q9 · Faccio esercizio fisico…';
+  String get q5Label => 'Q10 · Il mio orario è…';
+  String get q6Label => 'Q11 · Vuoi sincronizzare il calendario?';
+  String get q7Label => 'Q12 · Quanti reminder vuoi al giorno?';
+  String get q8Label => 'Q13 · Pausa ideale…';
+  String get q9q10Label => 'Q14–Q15 · Pausa pranzo';
+  String get q11q14Label => 'Q16–Q19 · Ho accesso a…';
+  String get q19Label => 'Q20 · Livello di distrazioni nell\'ambiente';
+  String get q20Label => 'Q21 · Quando sei più concentrato?';
+  String get q21Label => 'Q22 · Quanto riesci a concentrarti di fila?';
+  String get q22Label => 'Q23 · Quanti meeting hai al giorno (in media)?';
+  String get q1Student => 'Studente';
+  String get q1Employee => 'Dipendente';
+  String get q1Freelancer => 'Freelancer';
+  String get q1Other => 'Altro';
+  String get q1Both => 'Entrambe';
+  String get q2Home => 'Da casa';
+  String get q2Office => 'In ufficio';
+  String get q2Hybrid => 'Ibrido';
+  String get q2Varies => 'Varia';
+  String get goalStress => 'Ridurre lo stress';
+  String get goalFocus => 'Migliorare il focus';
+  String get goalHealth => 'Salute generale';
+  String get goalSleep => 'Dormire meglio';
+  String get goalEnergy => 'Più energia';
+  String get goalWeight => 'Forma fisica';
+  String get stress1 => 'Molto calmo';
+  String get stress2 => 'Abbastanza calmo';
+  String get stress3 => 'Normale';
+  String get stress4 => 'Un po\' stressato';
+  String get stress5 => 'Molto stressato';
+  String get stressCalmEnd => 'Calmo';
+  String get stressStressedEnd => 'Stressato';
+  String get priorNone => 'No, mai';
+  String get priorHeadspace => 'Headspace';
+  String get priorCalm => 'Calm';
+  String get priorMultiple => 'Più di una';
+  String get priorOther => 'Altra app';
+  String get hydroLow => 'poco';
+  String get hydroGreat => 'ottimo';
+  String get exNever => 'Mai';
+  String get ex12x => '1-2x/settimana';
+  String get ex34x => '3-4x/settimana';
+  String get exDaily => 'Ogni giorno';
+  String get schedFixed => 'Fisso';
+  String get schedFlexible => 'Flessibile';
+  String get schedShift => 'A turni';
+  String get schedIrregular => 'Irregolare';
+  String get calNoneLabel => 'No grazie, per ora';
+  String get calSyncNote => '✓ Ti chiederemo i permessi dopo aver confermato il piano';
+  String get remMinimal => 'Minimi';
+  String get remMinimalSub => '~2/giorno';
+  String get remModerate => 'Moderati';
+  String get remModerateSub => '~4/giorno';
+  String get remFrequent => 'Frequenti';
+  String get remFrequentSub => '~6/giorno';
+  String get remVeryFrequent => 'Molto freq.';
+  String get remVeryFrequentSub => '8+/giorno';
+  String get lunchTimeLabel => 'Ora';
+  String get lunchDurationLabel => 'Durata';
+  String get resParkLabel => 'Parco o spazio verde';
+  String get resParkSub => 'Per camminate durante la pausa pranzo';
+  String get resGymLabel => 'Palestra o spazio fitness';
+  String get resGymSub => 'In ufficio o nelle vicinanze';
+  String get resWindowLabel => 'Finestra con vista';
+  String get resWindowSub => 'Per la regola 20-20-20 degli occhi';
+  String get resQuietLabel => 'Spazio tranquillo';
+  String get resQuietSub => 'Per meditazione e concentrazione profonda';
+  String get distLow => 'Basso';
+  String get distMedium => 'Medio';
+  String get distHigh => 'Alto';
+  String get distVeryHigh => 'Molto alto';
+  String get focusMorning => 'Mattina';
+  String get focusMidday => 'Mezzogiorno';
+  String get focusAfternoon => 'Pomeriggio';
+  String get focusEvening => 'Sera';
+  String get meeting02 => '0-2 / giorno';
+  String get meeting24 => '2-4 / giorno';
+  String get meeting46 => '4-6 / giorno';
+  String get meeting6plus => '6+ / giorno';
+  String get screenTimeWarning => 'Attiveremo i reminder occhi più frequenti';
+  String get crisisTitle => 'Stai attraversando un momento difficile';
+  String get crisisBody => 'Be Well è qui per supportarti. Se hai bisogno di aiuto immediato: Telefono Amico 02 2327 2327';
+  String get qOptional => 'opzionale';
+  String get qBack => '← Indietro';
+  String get qSkipAll => 'Salta tutto';
+  String qOfTotal(int current, int total) => '$current di $total';
+  String get planGenTitle => 'Costruendo il tuo piano…';
+  String get planGenSub => 'Stiamo applicando le regole di personalizzazione';
+  String get planStep1 => 'Analizzo il tuo profilo';
+  String get planStep2 => 'Configuro i reminder';
+  String get planStep3 => 'Seleziono le attività';
+  String get planStep4 => 'Configuro la dashboard';
+  String get planReadyBadge => '🎉 Piano pronto!';
+  String get planPreviewTitle => 'Il tuo piano\ndi benessere';
+  String get planPreviewSub => 'Personalizzato sulle tue risposte. Potrai sempre modificarlo da Impostazioni.';
+  String get planRemindersPerDay => 'reminder/giorno';
+  String get planFocusSessions => 'sessioni focus';
+  String get planPointsPerDay => 'punti/giorno';
+  String get planMorning => '🌅 Mattina';
+  String get planAfternoon => '☀️ Pomeriggio';
+  String get planEvening => '🌙 Sera';
+  String planFromTime(String time) => 'dalle $time';
+  String planConnectCalendar(String name) => 'Connetti $name';
+  String get planConnectCalendarSub => 'Richiederemo il permesso dopo la conferma';
+  String get planFallbackNote => 'Abbiamo usato un piano di default. Lo raffineremo man mano che usi l\'app.';
+  String get planConfirmCta => 'Inizia con Be Well  ';
+  String get planConfirmSub => 'Potrai modificare il piano in qualsiasi momento da Impostazioni';
+  String planMinutes(int n) => '$n min';
+  String get profileTitle => 'Profilo';
+  String get accountSection => 'Account';
+  String get emailAccountLabel => 'Email account';
+  String get supportSection => 'Supporto';
+  String get editNameTitle => 'Modifica nome';
+  String get yourNameHint => 'Il tuo nome';
+  String get resetTutorialTitle => 'Reset tutorial';
+  String get resetTutorialBody => 'Welly mostrerà di nuovo tutti i dialoghi tutorial come se fosse la prima volta. Utile per testare il flusso.';
+  String get resetTutorialCta => 'Reset';
+  String get resetTutorialSnackbar => 'Tutorial resettato ✓';
+  String genericError(String msg) => 'Errore: $msg';
+  String get settingsTitle => 'Impostazioni';
+  String get styleCardDesc => 'Contenuti in schede,\ntipografia chiara';
+  String get styleAmbientDesc => 'Paesaggio atmosferico,\nfont editoriale';
+  String get toneSection => 'Tonalità';
+  String get accessibilitySection => 'Accessibilità';
+  String get contrastDesc => 'Aumenta il contrasto dei testi';
+  String get textSizeDesc => 'Aumenta la dimensione dei caratteri';
+  String get remindersLabel => 'Promemoria attività';
+  String get remindersDesc => 'Notifiche per le attività pianificate';
+  String get comingSoonTitle => 'Prossimamente';
+  String get comingSoonBody => 'Questa sezione non è ancora disponibile — è nella nostra roadmap.';
+  String get habitMarkDone => 'Fatto';
+  String get slowdownReasonHeavy => 'Questa abitudine mi pesa troppo';
+  String heatmapDaysAgo(int n) => '$n giorni fa';
+  String get heatmapToday => 'oggi';
+  String phaseStarted(String date) => 'iniziato $date';
+  String phaseReached(String date) => 'raggiunto $date';
+  String get marketAdTitle => 'Aiuta Be Well';
+  String get marketAdSubtitle => 'Guadagna 10 pt guardando uno spot';
+  String get marketAdDialogBody => 'Guarda uno spot pubblicitario: ci aiuti a mantenere l\'app gratuita e guadagni subito 10 punti.';
+  String get marketWatchNow => 'Guarda ora';
+  String get dialogGotIt => 'Capito';
+  String get marketAdUnavailable => 'Spot non disponibile al momento';
+  String get referralTitle => 'Invita un amico';
+  String get referralSubtitle => 'Guadagna 50 pt per ogni amico che si iscrive';
+  String get referralApply => 'Applica';
+  String get referralApplied => 'Codice applicato! Il tuo amico riceverà presto il bonus. 🎉';
+  String get referralErrorInvalid => 'Codice non valido';
+  String get referralErrorOwn => 'Non puoi usare il tuo codice';
+  String get referralErrorAlready => 'Hai già riscattato un codice invito';
+  String get referralErrorNotSignedIn => 'Devi essere loggato';
+  String get referralErrorGeneric => 'Qualcosa è andato storto, riprova';
+  String get referralHint => 'Hai un codice invito?';
+  String premiumPrice(String price) => '$price/mese';
+  String referralShareButton(String code) => 'Condividi il mio codice · $code';
+  String get referralRetry => 'Generazione codice non riuscita — tocca per riprovare';
+  String referralShareMessage(String code) =>
+      'Sto usando Be Well per costruire abitudini più sane, giorno dopo giorno 🌱\n'
+      'Scarica l\'app e usa il mio codice invito "$code" — per te 50 punti bonus non appena inizi!';
 
   String get waterContainerGlass => 'bicchiere';
   String get waterContainerBottle => 'borraccia';
@@ -1043,6 +2065,10 @@ class _It extends BwStrings {
   String get habitsEveningTitle => 'Come è andata oggi?';
   String get habitsNowLabel => 'Adesso';
   String get habitsComingSoon => 'Prossimamente';
+  String get configuratorTitle => 'Personalizza il tuo piano';
+  String get configuratorSubtitle => 'Rispondi a qualche domanda: Be Well ti suggerirà le abitudini più adatte a te';
+  String get configuratorDoneTitle => 'Il tuo piano è personalizzato';
+  String get configuratorDoneSubtitle => 'Tocca per aggiornare le tue risposte';
   String get habitsAllDone => 'Tutto sotto controllo per ora. Welly è con te.';
   String get habitsToday => 'In lista oggi';
   String get completedToday => 'completate oggi';
@@ -1070,7 +2096,8 @@ class _It extends BwStrings {
   String get slowdownYes => 'Sì, rallentiamo';
   String get slowdownNo => 'No, continuo';
   String get slowdownHabitMenu => 'Ho bisogno di più tempo con questa';
-  String get slowdownWellyResponse => 'Nessun problema — rafforziamo questa prima di aggiungere altro. È esattamente la scelta giusta.';
+  String get slowdownMenuSubtitle => 'Le nuove proposte di abitudini vengono messe in pausa per 2 settimane — questa resta comunque nel tuo piano.';
+  String get slowdownWellyResponse => 'Nessun problema — le nuove proposte sono in pausa per 2 settimane. Questa abitudine resta nel tuo piano, prenditi il tempo che ti serve.';
   String get speedupPrompt => 'Stai andando molto bene — sei pronto per qualcosa di nuovo prima del previsto?';
   String get speedupYes => 'Sì, sono pronto';
   String get speedupNo => 'No, resto qui';
@@ -1083,11 +2110,83 @@ class _It extends BwStrings {
   String get tutorialOk   => 'Capito!';
   String get tutorialMore => 'Di più →';
   String get tutorialSkip => 'Salta';
+  String get tutorialNext => 'Avanti →';
+
+  // ── Marketplace ───────────────────────────────────────────────────────────
+  String get pointsAvailable         => 'punti disponibili';
+  String get marketplaceTabRewards   => 'Premi';
+  String get marketplaceTabDiscounts => 'Sconti';
+  String get marketplaceTabInApp     => 'In-app';
+  String get rewardsToRedeem         => 'da riscattare';
+  String get rewardRedeemed          => 'Eccolo. Te lo sei guadagnato.';
+  String get rewardConfirmTitle      => 'Sei sicuro?';
+  String get rewardConfirmBody       => 'Verranno scalati X punti dal tuo saldo.';
+  String get rewardRedeemFailed => 'Non è stato possibile riscattare questo premio — punti insufficienti, oppure non è più disponibile.';
+  String get copyCode                => 'Copia codice';
+  String get codeCopied              => 'Copiato';
+  String get watchAd                 => 'Guarda uno spot · +10 pt';
+  String get whyAds                  => 'perché?';
+  String get whyAdsTitle             => 'Be Well è gratuita per tutti';
+  String get whyAdsBody              => 'Be Well è un\'app gratuita per essere accessibile a chiunque. Come ogni servizio, ha costi di gestione. Guardando le inserzioni quando puoi, ci aiuti a tenere il servizio attivo e migliorarlo per tutti. Grazie davvero.';
+  String get discountsActive         => 'sconti attivi';
+  String get discountsNote           => 'Gli sconti sono aggiornati ogni mese. Nessun punto richiesto.';
+  String get discountExclusive       => 'esclusivo Be Well';
+  String get goToSite                => 'Vai al sito';
+  String get affiliateNote           => 'Questo link supporta Be Well';
+  String get inAppWelly              => 'welly';
+  String get inAppSoundscape         => 'soundscape';
+  String get inAppMinigame           => 'minigame';
+  String get inAppPercorsi           => 'percorsi';
+  String get unlockItem              => 'Sblocca';
+  String get itemUnlocked            => 'Sbloccato';
+  String get premiumAllContent       => 'Tutti i contenuti in-app inclusi';
+  String get premiumPoints           => '+20% punti su ogni abitudine';
+  String get premiumWelly            => 'Welly personalizzabile completo';
+  String get premiumDiscounts        => 'Sconti esclusivi in anteprima';
+  String get premiumTrial            => 'Prova 7 giorni gratis';
+  String get premiumOr               => 'oppure acquista singolarmente con i punti';
+
+  String get feedbackTitle => 'Lascia un feedback';
+  String get feedbackSubtitle => 'Ci aiuta a migliorare Be Well per te.';
+  String get feedbackHint => 'Scrivi qui il tuo feedback…';
+  String get feedbackSubmit => 'Invia feedback';
+  String get feedbackThanks => 'Grazie per il tuo feedback!';
+  String get feedbackError => 'Invio non riuscito, riprova tra poco';
+  String get feedbackCategoryBug => 'Bug';
+  String get feedbackCategoryIdea => 'Idea';
+  String get feedbackCategoryFeature => 'Funzionalità';
+  String get feedbackCategoryOther => 'Altro';
+
+  String spotlightText(String id) {
+    switch (id) {
+      case 'home_welcome':    return 'Benvenuto! Sono Welly. Ti mostro tutto così puoi iniziare nel modo giusto.';
+      case 'home_water':      return 'Questa è la tua prima abitudine: bere acqua. 8 bicchieri al giorno è il tuo obiettivo. Semplice e potente.';
+      case 'home_add_glass':  return 'Tocca qui ogni volta che bevi un bicchiere. Ogni tap costruisce la tua abitudine — prova subito!';
+      case 'home_welly':      return 'Questo sono io — Welly! Cambio espressione in base ai tuoi progressi. Più vai bene, più sono raggiante.';
+      case 'home_phase':      return 'Questa è la tua Fase. Parti da Seme — Fase 1. Costruisci abitudini per crescere fino alla Fase 5: Fiorente.';
+      case 'home_nav':        return 'Nuove sezioni si sbloccano qui man mano che progredisci. Parti dall\'acqua — tutto il resto si apre da lì.';
+      case 'habits_welcome':  return 'Hai sbloccato la schermata Abitudini! Da qui gestisci tutte le tue routine.';
+      case 'habits_now':      return 'La card \'Adesso\' mostra l\'abitudine più rilevante per questo preciso momento della tua giornata.';
+      case 'habits_list':     return 'Tutte le abitudini sono ordinate per l\'orario migliore. Quelle mattutine compaiono prime al mattino — Welly conosce il tuo ritmo.';
+      case 'habits_ready':      return 'Pronto! Tocca \'Completa\' ogni giorno per costruire la tua streak. Piccole azioni, fatte con costanza, cambiano tutto.';
+      // Marketplace tour
+      case 'marketplace_welcome': return 'Questi sono i tuoi Premi Be Well! Ogni bicchiere d\'acqua, ogni abitudine completata ti porta qui — dove i tuoi sforzi diventano ricompense reali.';
+      case 'marketplace_points':  return 'Il tuo saldo punti è sempre visibile qui. Si accumula automaticamente mentre costruisci le abitudini — senza fare niente di extra.';
+      case 'marketplace_tabs':    return 'Tre tab: Premi da riscattare con i punti, Sconti gratuiti, e contenuti In-app da sbloccare. Tutto guadagnato con le tue abitudini quotidiane.';
+      case 'marketplace_card':    return 'Ogni premio ha un costo in punti. Tocca per riscattare — ricevi un codice subito. Più sei costante, più sblocchi.';
+      // Growth tour
+      case 'growth_welcome':      return 'Questa è la tua Crescita. Non è una classifica — è uno specchio. Mostra chi stai diventando, non solo cosa fai.';
+      case 'growth_phase':        return 'La tua fase riflette quanto le abitudini sono radicate. Dalla Fase 1 (Seme) alla Fase 5 (Radioso) — ogni passo è un cambiamento neurologico reale, non un livello di gioco.';
+      case 'growth_heatmap':      return 'Questa heatmap mostra la tua consistenza nel tempo. La scienza dice che il pattern conta più dell\'intensità: qualche giorno mancato non azzera tutto.';
+      case 'growth_badges':       return 'I badge non sono decorazioni. Ognuno corrisponde a un comportamento mantenuto per un periodo misurabile. Sono prove concrete del tuo percorso.';
+      default: return '';
+    }
+  }
 
   String tutorialText(String id) {
     if (id.startsWith('habit_chosen_')) {
       final hid = id.substring('habit_chosen_'.length);
-      return '✅ ${habitName(hid)} è ora nel tuo piano! ${habitDesc(hid)} Completala ogni giorno per consolidarla.';
+      return habitStartsTomorrow(habitName(hid));
     }
     switch (id) {
       case 'home_first_open':     return 'Benvenuto! Questa è la tua base. In cima trovi sempre l\'abitudine più urgente per adesso. Inizia sempre da lì — il resto può aspettare.';
@@ -1097,7 +2196,7 @@ class _It extends BwStrings {
       case 'streak_explain':      return 'Se torni domani, inizia la tua streak. L\'unica regola che conta: non saltare mai due giorni di fila. Uno stop è umano. Due sono un\'abitudine nuova — quella sbagliata.';
       case 'habits_tab_first':    return 'Qui trovi tutte le abitudini ordinate per il momento migliore della tua giornata. Welly conosce i tuoi ritmi — le abitudini mattutine si mostrano di mattina, quelle serali di sera.';
       case 'habit_card_explain':  return 'L\'arco circolare in basso a sinistra si riempie ogni volta che completi. A 7 giorni scatta qualcosa di interessante — il tuo cervello inizia a registrarla come routina.';
-      case 'focus_unlocked':      return 'Hai sbloccato il Focus da 25 minuti! Il cervello umano ha un ciclo naturale di concentrazione di circa 20–30 minuti. Hai guadagnato questa abilità costruendo l\'abitudine dell\'acqua.';
+      case 'focus_unlocked':      return 'Hai a disposizione il Focus da 25 minuti fin da subito! Il cervello umano ha un ciclo naturale di concentrazione di circa 20–30 minuti — usalo per un blocco di lavoro senza distrazioni.';
       case 'focus_unlocked_2':    return 'Regola d\'oro del Focus: quando il timer parte, il telefono va a faccia in giù. Anche Welly tace. La notifica che aspetti può aspettare 25 minuti — lo prometto.';
       case 'calendar_appears':    return 'Nuovo! Il calendario contestuale mostra solo le prossime ore, non l\'intera giornata. Meno cose da vedere = più spazio mentale per agire. Il futuro lontano non è ancora il tuo problema.';
       case 'growth_first_visit':  return 'Questa scheda mostra chi stai diventando, non solo cosa stai facendo. Le fasi non sono premi — sono descrizioni reali del tuo cambiamento neurologico. La scienza, non la motivazione, guida il percorso.';
@@ -1169,6 +2268,12 @@ class _Fr extends BwStrings {
   String get createAccount => 'Créer un compte';
   String get alreadyHaveAccount => 'Déjà un compte ? ';
   String get signIn => 'Se connecter';
+  String get registerSubtitle => 'Commencez votre parcours bien-être';
+  String get tosAccept => 'J\'accepte les ';
+  String get tosTerms => 'Conditions d\'utilisation';
+  String get tosAnd => ' et la ';
+  String get tosPrivacy => 'Politique de confidentialité';
+  String get tosSuffix => ' de Be Well';
   String get passwordForgotTitle => 'Réinitialiser le mot de passe';
   String get passwordForgotSub => 'Entrez votre email et nous vous enverrons un lien';
   String get sendResetEmail => 'Envoyer l\'email';
@@ -1182,8 +2287,8 @@ class _Fr extends BwStrings {
   String get wellyNameSub => 'Mon nom est Welly, mais vous pouvez me donner un nom qui vous plaît.';
   String get perfect => 'Parfait';
   String get firstHabitTitle => 'Première habitude : l\'eau.';
-  String get firstHabitBody1 => 'Votre corps est composé à 60% d\'eau. Quand vous êtes déshydraté de seulement 2%, la concentration baisse, l\'humeur se détériore et vous vous fatiguez plus vite. Pourtant la plupart des gens boivent moins de la moitié de ce qu\'ils devraient.';
-  String get firstHabitBody2 => 'On commence ici : 8 verres d\'eau. Je vous rappellerai quand boire. Puis, étape par étape, nous ajouterons de nouvelles activités — construisant ensemble de saines habitudes qui fonctionnent vraiment pour vous.';
+  String get firstHabitBody1 => 'Seulement 2% de déshydratation suffisent à réduire la concentration et l\'humeur.';
+  String get firstHabitBody2 => 'On commence ici : 8 verres par jour. Je vous rappellerai quand boire, puis nous ajouterons de nouvelles habitudes pas à pas.';
   String get drinkFirstGlass => 'Boire le premier verre maintenant';
   String get rewardTitle => 'Parfait. Un.';
   String get rewardBody => 'Chaque fois que vous terminez quelque chose, vous gagnez des points Be Well. Vous les accumulerez sans y penser — et pourrez les utiliser pour des bons de réduction, vouchers, accessoires, fonctionnalités premium et bien plus encore.';
@@ -1198,6 +2303,7 @@ class _Fr extends BwStrings {
   String get waterContainerBtn => 'Contenant';
 
   String get goodMorning => 'Bonjour,';
+  String get greetingFallbackName => 'à toi';
   String get phase => 'Phase';
   String get waterToday => 'Eau aujourd\'hui';
   String get waterGlasses => 'verres';
@@ -1309,8 +2415,24 @@ class _Fr extends BwStrings {
   String get notifWaterBody => 'As-tu bu assez d\'eau aujourd\'hui?';
   String get notifEveningTitle => 'Be Well 🌱';
   String get notifEveningBody => 'Comment se passent tes habitudes aujourd\'hui?';
+  String get notifHabitTitle => '🌱 Be Well';
+  String get notifHabitBody => 'C\'est le moment de travailler tes habitudes — même une petite action compte.';
   String get notifHabitChoiceTitle => '✨ Nouvelle habitude disponible';
   String get notifHabitChoiceBody => 'Ouvre Be Well pour choisir ta prochaine habitude.';
+
+  String get notifFrequencyLabel => 'Fréquence des rappels';
+  String get notifFreqOff => 'Aucun';
+  String get notifFreqLow => 'Peu';
+  String get notifFreqNormal => 'Normal';
+  String get notifFreqHigh => 'Tous';
+  String get notifFreqOffDesc => 'Aucun rappel';
+  String get notifFreqLowDesc => '2 par jour — matin et soir';
+  String get notifFreqNormalDesc => '4 par jour, répartis dans la journée';
+  String get notifFreqHighDesc => 'Toutes les ~2h aux heures d\'éveil';
+  String get notifSnoozeLabel => 'Mettre les rappels en pause';
+  String notifSnoozeActive(String until) => 'En pause jusqu\'à $until';
+  String get notifSnoozeCancel => 'Reprendre maintenant';
+  String notifSnoozeHours(int h) => '$h h';
 
   String get navHome => 'Accueil';
   String get navHabits => 'Habitudes';
@@ -1357,6 +2479,36 @@ class _Fr extends BwStrings {
   String get habitFocusPhoneName => 'Focus sans téléphone'; String get habitFocusPhoneDesc => 'Téléphone retourné pendant les sessions focus';
   String get habitMicroWalkName => 'Micro-marche 5 min'; String get habitMicroWalkDesc => '5 minutes de marche toutes les 90 minutes — cycle ultradien';
   String get habitDigitalSunsetName => 'Coucher digital'; String get habitDigitalSunsetDesc => 'Pas de réseaux sociaux dans l\'heure avant de dormir';
+  String get breathingInhale => 'Inspirez';
+  String get breathingHold => 'Retenez';
+  String get breathingExhale => 'Expirez';
+  String get breathingCycles => 'Cycles :';
+  String get breathingTapToStart => 'Touchez pour\ncommencer';
+  String get breathingStart => 'Commencer';
+  String get breathingStop => 'Arrêter';
+  String get breathingAgain => 'Encore';
+  String get breathingWellDone => '🌿 Bravo !';
+  String breathingCyclesCompleted(int n) => '$n cycles terminés.';
+  String breathingPointsEarned(int pts) => '+$pts points ⭐';
+
+  String get guideTapToStart => 'Touchez pour\ncommencer';
+  String get guideStart => 'Démarrer la séquence';
+  String get guideWellDone => '💪 Bravo !';
+  String guideStepProgress(int i, int total) => 'Étape $i sur $total';
+  String guideStepsCompleted(int n) => '$n étapes terminées.';
+  String get guideDeskStep1 => 'Rotations d\'épaules arrière × 5';
+  String get guideDeskStep2 => 'Torsion du dos assis × 3 de chaque côté';
+  String get guideDeskStep3 => 'Cercles poignets et avant-bras × 10';
+  String get guideDeskStep4 => 'Inclinaison latérale du cou × 3 de chaque côté';
+  String get guideDeskStep5 => 'Cat-cow assis × 5';
+  String get guideNeckStep1 => 'Rotations lentes du cou × 5 dans chaque sens';
+  String get guideNeckStep2 => 'Haussements d\'épaules × 8';
+  String get guideNeckStep3 => 'Étirement latéral du cou × 3 de chaque côté';
+  String get guideStretchStep1 => 'Bras tendus vers le haut × 5';
+  String get guideStretchStep2 => 'Flexion latérale du buste × 3 de chaque côté';
+  String get guideStretchStep3 => 'Cercles de hanches × 8';
+  String get guideStretchStep4 => 'Montées sur pointes × 10';
+  String get guideStretchStep5 => 'Flexion avant debout × 20s';
 
   String get neverMissTwiceTitle => 'Ne ratez pas deux jours de suite.';
   String get neverMissTwiceBody => 'Une seule action compte. Même un verre d\'eau.';
@@ -1381,11 +2533,25 @@ class _Fr extends BwStrings {
   String get badgeFocused => 'En focus'; String get badgeFocusedDesc => 'Focus 25 min consolidé';
   String get badgeWalker => 'Marcheur'; String get badgeWalkerDesc => 'Marche déjeuner consolidée';
   String get badgeBreath => 'Souffle'; String get badgeBreathDesc => 'Respiration consolidée';
+  String get badgeRootedName => 'Habitudes enracinées';
+  String get badgeRootedDesc => 'Habitudes devenues une seconde nature';
+  String get badgeTierBronze => 'Bronze';
+  String get badgeTierSilver => 'Argent';
+  String get badgeTierGold => 'Or';
+  String get growthNextGoal => 'Prochain objectif';
+  String growthHabitsToRoot(int n) => n == 1 ? 'Encore 1 habitude' : 'Encore $n habitudes';
 
   String get habitChoiceTitle => 'Il est temps d\'ajouter\nquelque chose de nouveau.';
   String get habitChoiceSub => 'Choisissez où vous concentrer.';
   String get habitChoiceShowOther => 'voir d\'autres options ›';
+  String get habitChoiceNotReady => 'Je ne suis pas encore prêt(e)';
   String get habitChoiceOpen => 'Choisir votre prochaine habitude';
+  String get habitNotReadySnoozed => 'Pas de souci — je te le redemanderai dans une semaine.';
+  String get consolidatedTitle => '🏆 Félicitations !';
+  String consolidatedBody(String habitName) => 'Tu as fait de « $habitName » une vraie habitude — ton cerveau a construit un circuit durable pour elle.';
+  String get consolidatedBadge => 'Habitude consolidée';
+  String get consolidatedCta => 'Continuer';
+  String habitStartsTomorrow(String habitName) => 'Très bien ! Profite de ta réussite aujourd\'hui — on commencera à travailler sur « $habitName » demain.';
   String get habitEffortLow => 'facile';
   String get habitEffortMedium => 'modéré';
   String get habitEffortHigh => 'exigeant';
@@ -1396,6 +2562,222 @@ class _Fr extends BwStrings {
   String get errorWeakPassword => 'Le mot de passe est trop faible';
   String get errorEmailInUse => 'Cet email est déjà utilisé';
   String get errorInvalidCredentials => 'Email ou mot de passe incorrect';
+  String get errorTooManyAttempts => 'Trop de tentatives. Compte temporairement bloqué';
+  String get errorTimeout => 'Le serveur ne répond pas. Réessayez bientôt';
+  String get errorCancelled => 'Connexion annulée';
+  String get errorAccountDisabled => 'Compte désactivé. Contactez le support';
+  String get passwordStrengthWeak => 'Faible';
+  String get passwordStrengthMedium => 'Moyen';
+  String get passwordStrengthStrong => 'Fort';
+  String get passwordStrengthVeryStrong => 'Très fort';
+  String get validationEmailRequired => 'Entrez votre email';
+  String get validationPasswordRequired => 'Entrez un mot de passe';
+  String get validationPasswordTooShort => '8 caractères minimum';
+  String get validationNameRequired => 'Entrez votre nom';
+  String get validationNameTooShort => '2 caractères minimum';
+  String get accountLockedBody => 'Trop de tentatives échouées.\nRéessayez dans';
+  String get accountLockedEmailSent => 'Vous avez reçu un email avec les instructions.';
+  String get offlineLoginRequired => 'Pas de connexion — la connexion nécessite internet';
+  String get forgotCheckEmailTitle => 'Vérifiez votre email';
+  String forgotEmailSentBody(String email) =>
+      'Si un compte existe pour $email, vous recevrez un lien pour réinitialiser le mot de passe.';
+  String get forgotLinkExpiry => 'Le lien expire dans 30 minutes.';
+  String get forgotResendLimitReached => 'Limite de renvois atteinte';
+  String forgotResendIn(int seconds) => 'Renvoyer dans ${seconds}s';
+  String get verifyEmailCta => 'Cliquez sur le lien pour activer votre compte.';
+  String get verifyResendCta => 'Renvoyer l\'email de vérification';
+  String get verifyChecked => 'J\'ai vérifié mon email';
+  String get verifyDifferentEmail => 'Utiliser un autre email ?';
+  String get verifySendError => 'Échec de l\'envoi, réessayez bientôt';
+  String get welcomeSlide1Title => 'Votre plan de\nbien-être personnel';
+  String get welcomeSlide1Sub => 'Be Well construit un plan sur mesure pour vous, basé sur vos habitudes et objectifs.';
+  String get welcomeSlide2Title => 'Des rappels qui\nconnaissent votre agenda';
+  String get welcomeSlide2Sub => 'Les rappels s\'adaptent à vos réunions et horaires, pour ne jamais vous interrompre au mauvais moment.';
+  String get welcomeSlide3Title => 'Transformez vos habitudes\nen récompenses réelles';
+  String get welcomeSlide3Sub => 'Gagnez des points en complétant des activités et échangez-les contre des réductions, des bons et plus encore.';
+  String get welcomeSkip => 'Passer';
+  String get welcomeNext => 'Suivant →';
+  String get welcomeStart => 'Commencer la configuration →';
+  String get welcomeConfigureLater => 'Configurer plus tard';
+
+  String get qProfileTitle => 'Parlez-nous de vous';
+  String get qProfileSub => 'Nous aide à construire le bon plan pour vous.';
+  String get qGoalsTitle => 'Objectifs & Stress';
+  String get qGoalsSub => 'L\'écran le plus important pour personnaliser votre plan.';
+  String get qHealthTitle => 'Vos habitudes';
+  String get qHealthSub => 'Calibre la fréquence et le type de rappels.';
+  String get qScheduleTitle => 'Votre emploi du temps';
+  String get qScheduleSub => 'Nous réglerons les rappels aux bons moments.';
+  String get qEnvTitle => 'Environnement & Productivité';
+  String get qEnvSub => 'Les derniers détails pour votre plan.';
+  String get qBuildPlan => 'Terminé ✓';
+  String get q1Label => 'Q1 · Je suis principalement…';
+  String get q2Label => 'Q2 · Je travaille/étudie principalement…';
+  String get q3Label => 'Q3 · Que voulez-vous améliorer ? (plusieurs choix)';
+  String get q4Label => 'Q4 · Niveau de stress actuel';
+  String get q23Label => 'Q5 · Avez-vous déjà utilisé des apps de bien-être ?';
+  String get q15Label => 'Q6 · Je dors habituellement…';
+  String get q16Label => 'Q7 · Je bois environ…';
+  String get q17Label => 'Q8 · Temps d\'écran (loisirs, hors travail)';
+  String get q18Label => 'Q9 · Je fais de l\'exercice…';
+  String get q5Label => 'Q10 · Mon emploi du temps est…';
+  String get q6Label => 'Q11 · Voulez-vous synchroniser votre calendrier ?';
+  String get q7Label => 'Q12 · Combien de rappels par jour ?';
+  String get q8Label => 'Q13 · Pause idéale…';
+  String get q9q10Label => 'Q14–Q15 · Pause déjeuner';
+  String get q11q14Label => 'Q16–Q19 · J\'ai accès à…';
+  String get q19Label => 'Q20 · Niveau de distractions dans votre environnement';
+  String get q20Label => 'Q21 · Quand êtes-vous le plus concentré ?';
+  String get q21Label => 'Q22 · Combien de temps pouvez-vous vous concentrer d\'affilée ?';
+  String get q22Label => 'Q23 · Combien de réunions par jour (en moyenne) ?';
+  String get q1Student => 'Étudiant(e)';
+  String get q1Employee => 'Salarié(e)';
+  String get q1Freelancer => 'Freelance';
+  String get q1Other => 'Autre';
+  String get q1Both => 'Les deux';
+  String get q2Home => 'Depuis la maison';
+  String get q2Office => 'Au bureau';
+  String get q2Hybrid => 'Hybride';
+  String get q2Varies => 'Variable';
+  String get goalStress => 'Réduire le stress';
+  String get goalFocus => 'Améliorer la concentration';
+  String get goalHealth => 'Santé générale';
+  String get goalSleep => 'Mieux dormir';
+  String get goalEnergy => 'Plus d\'énergie';
+  String get goalWeight => 'Forme physique';
+  String get stress1 => 'Très calme';
+  String get stress2 => 'Assez calme';
+  String get stress3 => 'Normal';
+  String get stress4 => 'Un peu stressé(e)';
+  String get stress5 => 'Très stressé(e)';
+  String get stressCalmEnd => 'Calme';
+  String get stressStressedEnd => 'Stressé';
+  String get priorNone => 'Non, jamais';
+  String get priorHeadspace => 'Headspace';
+  String get priorCalm => 'Calm';
+  String get priorMultiple => 'Plusieurs';
+  String get priorOther => 'Autre app';
+  String get hydroLow => 'faible';
+  String get hydroGreat => 'excellent';
+  String get exNever => 'Jamais';
+  String get ex12x => '1-2x/semaine';
+  String get ex34x => '3-4x/semaine';
+  String get exDaily => 'Tous les jours';
+  String get schedFixed => 'Fixe';
+  String get schedFlexible => 'Flexible';
+  String get schedShift => 'Par équipes';
+  String get schedIrregular => 'Irrégulier';
+  String get calNoneLabel => 'Non merci, pas maintenant';
+  String get calSyncNote => '✓ Nous demanderons les permissions après confirmation du plan';
+  String get remMinimal => 'Minimaux';
+  String get remMinimalSub => '~2/jour';
+  String get remModerate => 'Modérés';
+  String get remModerateSub => '~4/jour';
+  String get remFrequent => 'Fréquents';
+  String get remFrequentSub => '~6/jour';
+  String get remVeryFrequent => 'Très fréq.';
+  String get remVeryFrequentSub => '8+/jour';
+  String get lunchTimeLabel => 'Heure';
+  String get lunchDurationLabel => 'Durée';
+  String get resParkLabel => 'Parc ou espace vert';
+  String get resParkSub => 'Pour les marches pendant la pause déjeuner';
+  String get resGymLabel => 'Salle de sport';
+  String get resGymSub => 'Au bureau ou à proximité';
+  String get resWindowLabel => 'Fenêtre avec vue';
+  String get resWindowSub => 'Pour la règle 20-20-20 des yeux';
+  String get resQuietLabel => 'Espace calme';
+  String get resQuietSub => 'Pour la méditation et la concentration profonde';
+  String get distLow => 'Faible';
+  String get distMedium => 'Moyen';
+  String get distHigh => 'Élevé';
+  String get distVeryHigh => 'Très élevé';
+  String get focusMorning => 'Matin';
+  String get focusMidday => 'Midi';
+  String get focusAfternoon => 'Après-midi';
+  String get focusEvening => 'Soir';
+  String get meeting02 => '0-2 / jour';
+  String get meeting24 => '2-4 / jour';
+  String get meeting46 => '4-6 / jour';
+  String get meeting6plus => '6+ / jour';
+  String get screenTimeWarning => 'Nous activerons des rappels yeux plus fréquents';
+  String get crisisTitle => 'Vous traversez un moment difficile';
+  String get crisisBody => 'Be Well est là pour vous soutenir. Si vous avez besoin d\'aide immédiate : contactez une ligne d\'écoute locale.';
+  String get qOptional => 'facultatif';
+  String get qBack => '← Retour';
+  String get qSkipAll => 'Tout passer';
+  String qOfTotal(int current, int total) => '$current sur $total';
+  String get planGenTitle => 'Construction de votre plan…';
+  String get planGenSub => 'Application des règles de personnalisation';
+  String get planStep1 => 'Analyse de votre profil';
+  String get planStep2 => 'Configuration des rappels';
+  String get planStep3 => 'Sélection des activités';
+  String get planStep4 => 'Configuration du tableau de bord';
+  String get planReadyBadge => '🎉 Plan prêt !';
+  String get planPreviewTitle => 'Votre plan\nbien-être';
+  String get planPreviewSub => 'Personnalisé selon vos réponses. Vous pourrez toujours le modifier depuis les paramètres.';
+  String get planRemindersPerDay => 'rappels/jour';
+  String get planFocusSessions => 'sessions focus';
+  String get planPointsPerDay => 'points/jour';
+  String get planMorning => '🌅 Matin';
+  String get planAfternoon => '☀️ Après-midi';
+  String get planEvening => '🌙 Soir';
+  String planFromTime(String time) => 'dès $time';
+  String planConnectCalendar(String name) => 'Connecter $name';
+  String get planConnectCalendarSub => 'Nous demanderons la permission après confirmation';
+  String get planFallbackNote => 'Nous avons utilisé un plan par défaut. Nous l\'affinerons au fur et à mesure.';
+  String get planConfirmCta => 'Commencer avec Be Well  ';
+  String get planConfirmSub => 'Vous pouvez modifier votre plan à tout moment depuis les paramètres';
+  String planMinutes(int n) => '$n min';
+  String get profileTitle => 'Profil';
+  String get accountSection => 'Compte';
+  String get emailAccountLabel => 'Email du compte';
+  String get supportSection => 'Support';
+  String get editNameTitle => 'Modifier le nom';
+  String get yourNameHint => 'Votre nom';
+  String get resetTutorialTitle => 'Réinitialiser le tutoriel';
+  String get resetTutorialBody => 'Welly affichera à nouveau tous les dialogues du tutoriel comme si c\'était la première fois. Utile pour tester le parcours.';
+  String get resetTutorialCta => 'Réinitialiser';
+  String get resetTutorialSnackbar => 'Tutoriel réinitialisé ✓';
+  String genericError(String msg) => 'Erreur : $msg';
+  String get settingsTitle => 'Paramètres';
+  String get styleCardDesc => 'Contenu en cartes,\ntypographie claire';
+  String get styleAmbientDesc => 'Paysage atmosphérique,\npolice éditoriale';
+  String get toneSection => 'Tonalité';
+  String get accessibilitySection => 'Accessibilité';
+  String get contrastDesc => 'Augmente le contraste du texte';
+  String get textSizeDesc => 'Augmente la taille du texte';
+  String get remindersLabel => 'Rappels d\'activités';
+  String get remindersDesc => 'Notifications pour les activités planifiées';
+  String get comingSoonTitle => 'Bientôt disponible';
+  String get comingSoonBody => 'Cette section n\'est pas encore disponible — elle est sur notre feuille de route.';
+  String get habitMarkDone => 'Fait';
+  String get slowdownReasonHeavy => 'Cette habitude me pèse trop en ce moment';
+  String heatmapDaysAgo(int n) => 'il y a $n jours';
+  String get heatmapToday => 'aujourd\'hui';
+  String phaseStarted(String date) => 'commencé le $date';
+  String phaseReached(String date) => 'atteint le $date';
+  String get marketAdTitle => 'Aidez Be Well';
+  String get marketAdSubtitle => 'Gagnez 10 pts en regardant une pub';
+  String get marketAdDialogBody => 'Regardez une pub : vous nous aidez à garder l\'app gratuite et gagnez immédiatement 10 points.';
+  String get marketWatchNow => 'Regarder maintenant';
+  String get dialogGotIt => 'Compris';
+  String get marketAdUnavailable => 'Pub non disponible pour le moment';
+  String get referralTitle => 'Inviter un ami';
+  String get referralSubtitle => 'Gagnez 50 pts pour chaque ami qui s\'inscrit';
+  String get referralApply => 'Appliquer';
+  String get referralApplied => 'Code appliqué ! Votre ami recevra bientôt le bonus. 🎉';
+  String get referralErrorInvalid => 'Code invalide';
+  String get referralErrorOwn => 'Vous ne pouvez pas utiliser votre propre code';
+  String get referralErrorAlready => 'Vous avez déjà utilisé un code d\'invitation';
+  String get referralErrorNotSignedIn => 'Vous devez être connecté';
+  String get referralErrorGeneric => 'Une erreur est survenue, réessayez';
+  String get referralHint => 'Vous avez un code d\'invitation ?';
+  String premiumPrice(String price) => '$price/mois';
+  String referralShareButton(String code) => 'Partager mon code · $code';
+  String get referralRetry => 'Échec de la génération du code — appuyez pour réessayer';
+  String referralShareMessage(String code) =>
+      'J\'utilise Be Well pour construire des habitudes plus saines, jour après jour 🌱\n'
+      'Téléchargez l\'app et utilisez mon code d\'invitation "$code" — vous recevrez 50 points bonus dès votre inscription !';
 
   String get waterContainerGlass => 'verre';
   String get waterContainerBottle => 'gourde';
@@ -1408,6 +2790,10 @@ class _Fr extends BwStrings {
   String get habitsEveningTitle => 'Comment s\'est passée ta journée ?';
   String get habitsNowLabel => 'Maintenant';
   String get habitsComingSoon => 'À venir';
+  String get configuratorTitle => 'Personnalise ton plan';
+  String get configuratorSubtitle => 'Réponds à quelques questions pour recevoir des suggestions d\'habitudes adaptées';
+  String get configuratorDoneTitle => 'Ton plan est personnalisé';
+  String get configuratorDoneSubtitle => 'Touche pour mettre à jour tes réponses';
   String get habitsAllDone => 'Tout est bon pour l\'instant. Welly est avec toi.';
   String get habitsToday => 'Aujourd\'hui';
   String get completedToday => 'complétées aujourd\'hui';
@@ -1435,7 +2821,8 @@ class _Fr extends BwStrings {
   String get slowdownYes => 'Oui, ralentissons';
   String get slowdownNo => 'Non, je continue';
   String get slowdownHabitMenu => 'J\'ai besoin de plus de temps avec celle-ci';
-  String get slowdownWellyResponse => 'Pas de problème — renforçons celle-ci avant d\'en ajouter une autre. C\'est exactement le bon choix.';
+  String get slowdownMenuSubtitle => 'Les nouvelles suggestions d\'habitudes sont mises en pause pendant 2 semaines — celle-ci reste dans ton plan.';
+  String get slowdownWellyResponse => 'Pas de problème — les nouvelles suggestions sont en pause pendant 2 semaines. Cette habitude reste dans ton plan, prends le temps qu\'il te faut.';
   String get speedupPrompt => 'Tu vas très bien — es-tu prêt pour quelque chose de nouveau avant le temps prévu ?';
   String get speedupYes => 'Oui, je suis prêt';
   String get speedupNo => 'Non, je reste ici';
@@ -1448,11 +2835,83 @@ class _Fr extends BwStrings {
   String get tutorialOk   => 'Compris !';
   String get tutorialMore => 'En savoir plus →';
   String get tutorialSkip => 'Passer';
+  String get tutorialNext => 'Suivant →';
+
+  // ── Marketplace ───────────────────────────────────────────────────────────
+  String get pointsAvailable         => 'points disponibles';
+  String get marketplaceTabRewards   => 'Récompenses';
+  String get marketplaceTabDiscounts => 'Réductions';
+  String get marketplaceTabInApp     => 'In-app';
+  String get rewardsToRedeem         => 'à échanger';
+  String get rewardRedeemed          => 'Le voilà. Tu l\'as mérité.';
+  String get rewardConfirmTitle      => 'Êtes-vous sûr ?';
+  String get rewardConfirmBody       => 'X points seront déduits de votre solde.';
+  String get rewardRedeemFailed => 'Impossible d\'échanger cette récompense — points insuffisants, ou elle n\'est plus disponible.';
+  String get copyCode                => 'Copier le code';
+  String get codeCopied              => 'Copié';
+  String get watchAd                 => 'Regarder une pub · +10 pt';
+  String get whyAds                  => 'pourquoi ?';
+  String get whyAdsTitle             => 'Be Well est gratuit pour tous';
+  String get whyAdsBody              => 'Be Well est une application gratuite pour être accessible à tous. Comme tout service, elle a des coûts de fonctionnement. En regardant les publicités quand vous le pouvez, vous nous aidez à maintenir le service actif et à l\'améliorer pour tous. Merci.';
+  String get discountsActive         => 'réductions actives';
+  String get discountsNote           => 'Les réductions sont mises à jour chaque mois. Aucun point requis.';
+  String get discountExclusive       => 'exclusif Be Well';
+  String get goToSite                => 'Aller sur le site';
+  String get affiliateNote           => 'Ce lien soutient Be Well';
+  String get inAppWelly              => 'welly';
+  String get inAppSoundscape         => 'soundscape';
+  String get inAppMinigame           => 'minijeu';
+  String get inAppPercorsi           => 'parcours';
+  String get unlockItem              => 'Débloquer';
+  String get itemUnlocked            => 'Débloqué';
+  String get premiumAllContent       => 'Tous les contenus in-app inclus';
+  String get premiumPoints           => '+20% de points pour chaque habitude';
+  String get premiumWelly            => 'Welly entièrement personnalisable';
+  String get premiumDiscounts        => 'Réductions exclusives en avant-première';
+  String get premiumTrial            => 'Essayez 7 jours gratuits';
+  String get premiumOr               => 'ou achetez individuellement avec des points';
+
+  String get feedbackTitle => 'Laisser un avis';
+  String get feedbackSubtitle => 'Cela nous aide à améliorer Be Well pour vous.';
+  String get feedbackHint => 'Écrivez votre avis ici…';
+  String get feedbackSubmit => 'Envoyer';
+  String get feedbackThanks => 'Merci pour votre avis !';
+  String get feedbackError => 'Échec de l\'envoi, réessayez bientôt';
+  String get feedbackCategoryBug => 'Bug';
+  String get feedbackCategoryIdea => 'Idée';
+  String get feedbackCategoryFeature => 'Fonctionnalité';
+  String get feedbackCategoryOther => 'Autre';
+
+  String spotlightText(String id) {
+    switch (id) {
+      case 'home_welcome':    return 'Bienvenue ! Je suis Welly. Laisse-moi te montrer tout ça pour bien commencer.';
+      case 'home_water':      return 'Voici ta première habitude : boire de l\'eau. 8 verres par jour est ton objectif. Simple et puissant.';
+      case 'home_add_glass':  return 'Appuie ici chaque fois que tu bois un verre. Chaque tap construit ton habitude — essaie maintenant !';
+      case 'home_welly':      return 'C\'est moi — Welly ! Je change d\'expression selon tes progrès. Plus tu avances, plus je rayonne.';
+      case 'home_phase':      return 'C\'est ta Phase. Tu commences à Graine — Phase 1. Construis des habitudes pour atteindre la Phase 5 : Radieux.';
+      case 'home_nav':        return 'De nouvelles sections se débloquent ici au fil de tes progrès. Commence par l\'eau — tout le reste s\'ouvre à partir de là.';
+      case 'habits_welcome':  return 'Tu as débloqué l\'écran Habitudes ! D\'ici tu gères toutes tes routines.';
+      case 'habits_now':      return 'La carte \'Maintenant\' montre l\'habitude la plus pertinente pour ce moment précis de ta journée.';
+      case 'habits_list':     return 'Toutes les habitudes sont triées par leur meilleur moment. Les habitudes matinales apparaissent en premier le matin — Welly connaît ton rythme.';
+      case 'habits_ready':      return 'Prêt ! Appuie sur \'Terminé\' chaque jour pour construire ta série. De petites actions, faites régulièrement, changent tout.';
+      // Marketplace tour
+      case 'marketplace_welcome': return 'Voici tes Récompenses Be Well ! Chaque verre d\'eau, chaque habitude accomplie t\'amène ici — là où tes efforts deviennent de vraies récompenses.';
+      case 'marketplace_points':  return 'Ton solde de points est toujours visible ici. Il s\'accumule automatiquement pendant que tu construis tes habitudes.';
+      case 'marketplace_tabs':    return 'Trois onglets : Récompenses à échanger avec des points, Réductions gratuites, et contenus In-app à débloquer. Tout gagné grâce à tes habitudes.';
+      case 'marketplace_card':    return 'Chaque récompense a un coût en points. Appuie pour échanger — tu reçois un code instantanément. Plus tu es régulier, plus tu débloque.';
+      // Growth tour
+      case 'growth_welcome':      return 'Voici ta Croissance. Ce n\'est pas un classement — c\'est un miroir. Il montre qui tu deviens, pas seulement ce que tu fais.';
+      case 'growth_phase':        return 'Ta phase reflète à quel point tes habitudes sont enracinées. De la Phase 1 (Graine) à la Phase 5 (Radieux) — chaque étape est un vrai changement neurologique.';
+      case 'growth_heatmap':      return 'Cette heatmap montre ta régularité dans le temps. La science dit que le schéma compte plus que l\'intensité : quelques jours manqués ne remettent pas tout à zéro.';
+      case 'growth_badges':       return 'Les badges ne sont pas des décorations. Chacun correspond à un comportement maintenu pendant une période mesurable. Ce sont des preuves concrètes de ton parcours.';
+      default: return '';
+    }
+  }
 
   String tutorialText(String id) {
     if (id.startsWith('habit_chosen_')) {
       final hid = id.substring('habit_chosen_'.length);
-      return '✅ ${habitName(hid)} est maintenant dans ton plan ! ${habitDesc(hid)} Accomplis-la chaque jour pour l\'ancrer.';
+      return habitStartsTomorrow(habitName(hid));
     }
     switch (id) {
       case 'home_first_open':     return 'Bienvenue ! Voici ta base. En haut, tu trouveras toujours l\'habitude la plus urgente du moment. Commence toujours par là — le reste peut attendre.';
@@ -1462,7 +2921,7 @@ class _Fr extends BwStrings {
       case 'streak_explain':      return 'Si tu reviens demain, ta série commence. La seule règle qui compte : ne jamais sauter deux jours de suite. Un arrêt, c\'est humain. Deux, c\'est une nouvelle habitude — la mauvaise.';
       case 'habits_tab_first':    return 'Ici tu trouves toutes tes habitudes organisées pour le meilleur moment de ta journée. Welly connaît tes rythmes — les habitudes matinales apparaissent le matin, celles du soir le soir.';
       case 'habit_card_explain':  return 'L\'arc circulaire se remplit chaque fois que tu complètes. À 7 jours, quelque chose d\'intéressant se passe — ton cerveau commence à l\'enregistrer comme une routine.';
-      case 'focus_unlocked':      return 'Tu as débloqué le Focus de 25 minutes ! Le cerveau humain a un cycle naturel de concentration d\'environ 20–30 minutes. Tu as gagné cette capacité en construisant l\'habitude de l\'eau.';
+      case 'focus_unlocked':      return 'Tu as le Focus de 25 minutes disponible dès le départ ! Le cerveau humain a un cycle naturel de concentration d\'environ 20–30 minutes — utilise-le pour un bloc de travail sans distraction.';
       case 'focus_unlocked_2':    return 'Règle d\'or du Focus : quand le minuteur part, le téléphone est posé face en bas. Même Welly se tait. La notification que tu attends peut attendre 25 minutes — promis.';
       case 'calendar_appears':    return 'Nouveau ! Le calendrier contextuel montre uniquement les prochaines heures, pas toute la journée. Moins à voir = plus d\'espace mental pour agir. Le futur lointain n\'est pas encore ton problème.';
       case 'growth_first_visit':  return 'Cette section montre qui tu deviens, pas seulement ce que tu fais. Les phases ne sont pas des récompenses — ce sont de vraies descriptions de ton changement neurologique. La science, pas la motivation, guide le parcours.';
@@ -1534,6 +2993,12 @@ class _De extends BwStrings {
   String get createAccount => 'Konto erstellen';
   String get alreadyHaveAccount => 'Bereits ein Konto? ';
   String get signIn => 'Anmelden';
+  String get registerSubtitle => 'Starte deine Wellness-Reise';
+  String get tosAccept => 'Ich akzeptiere die ';
+  String get tosTerms => 'Nutzungsbedingungen';
+  String get tosAnd => ' und die ';
+  String get tosPrivacy => 'Datenschutzerklärung';
+  String get tosSuffix => ' von Be Well';
   String get passwordForgotTitle => 'Passwort zurücksetzen';
   String get passwordForgotSub => 'Gib deine E-Mail ein und wir senden dir einen Link';
   String get sendResetEmail => 'Reset-E-Mail senden';
@@ -1547,8 +3012,8 @@ class _De extends BwStrings {
   String get wellyNameSub => 'Mein Name ist Welly, aber du kannst mir auch einen eigenen Namen geben.';
   String get perfect => 'Perfekt';
   String get firstHabitTitle => 'Erste Gewohnheit: Wasser.';
-  String get firstHabitBody1 => 'Dein Körper besteht zu 60% aus Wasser. Wenn du nur 2% dehydriert bist, sinkt die Konzentration, die Stimmung verschlechtert sich und du wirst schneller müde. Dennoch trinken die meisten Menschen weniger als die Hälfte dessen, was sie sollten.';
-  String get firstHabitBody2 => 'Wir beginnen hier: 8 Gläser Wasser. Ich erinnere dich daran, wann du trinken sollst. Dann fügen wir Schritt für Schritt neue Aktivitäten hinzu — und bauen gemeinsam gesunde Gewohnheiten auf, die wirklich für dich funktionieren.';
+  String get firstHabitBody1 => 'Schon 2% Dehydrierung senken Konzentration und Stimmung — die meisten trinken zu wenig.';
+  String get firstHabitBody2 => 'Wir beginnen hier: 8 Gläser täglich. Ich erinnere dich ans Trinken, dann fügen wir Schritt für Schritt neue Gewohnheiten hinzu.';
   String get drinkFirstGlass => 'Erstes Glas jetzt trinken';
   String get rewardTitle => 'Perfekt. Eins.';
   String get rewardBody => 'Jedes Mal, wenn du etwas abschließt, verdienst du Be Well-Punkte. Du sammelst sie, ohne nachzudenken — und kannst sie für Rabattgutscheine, Voucher, Zubehör, Premium-Funktionen und vieles mehr einlösen.';
@@ -1563,6 +3028,7 @@ class _De extends BwStrings {
   String get waterContainerBtn => 'Behälter';
 
   String get goodMorning => 'Guten Morgen,';
+  String get greetingFallbackName => 'dir';
   String get phase => 'Phase';
   String get waterToday => 'Wasser heute';
   String get waterGlasses => 'Gläser';
@@ -1674,8 +3140,24 @@ class _De extends BwStrings {
   String get notifWaterBody => 'Hast du heute genug Wasser getrunken?';
   String get notifEveningTitle => 'Be Well 🌱';
   String get notifEveningBody => 'Wie laufen deine Gewohnheiten heute?';
+  String get notifHabitTitle => '🌱 Be Well';
+  String get notifHabitBody => 'Zeit, an deinen Gewohnheiten zu arbeiten — auch eine kleine Aktion zählt.';
   String get notifHabitChoiceTitle => '✨ Neue Gewohnheit verfügbar';
   String get notifHabitChoiceBody => 'Öffne Be Well, um deine nächste Gewohnheit zu wählen.';
+
+  String get notifFrequencyLabel => 'Erinnerungsfrequenz';
+  String get notifFreqOff => 'Aus';
+  String get notifFreqLow => 'Wenige';
+  String get notifFreqNormal => 'Normal';
+  String get notifFreqHigh => 'Alle';
+  String get notifFreqOffDesc => 'Keine Erinnerungen';
+  String get notifFreqLowDesc => '2 pro Tag — morgens und abends';
+  String get notifFreqNormalDesc => '4 pro Tag, über den Tag verteilt';
+  String get notifFreqHighDesc => 'Alle ~2h während der Wachzeit';
+  String get notifSnoozeLabel => 'Erinnerungen pausieren';
+  String notifSnoozeActive(String until) => 'Pausiert bis $until';
+  String get notifSnoozeCancel => 'Jetzt fortsetzen';
+  String notifSnoozeHours(int h) => '$h h';
 
   String get navHome => 'Startseite';
   String get navHabits => 'Gewohnheiten';
@@ -1722,6 +3204,36 @@ class _De extends BwStrings {
   String get habitFocusPhoneName => 'Fokus ohne Telefon'; String get habitFocusPhoneDesc => 'Telefon während Fokus-Sitzungen umgedreht';
   String get habitMicroWalkName => 'Mikro-Spaziergang 5 Min'; String get habitMicroWalkDesc => '5 Minuten Gehen alle 90 Minuten — Ultradianischer Zyklus';
   String get habitDigitalSunsetName => 'Digitaler Sonnenuntergang'; String get habitDigitalSunsetDesc => 'Kein Social Media in der Stunde vor dem Schlafen';
+  String get breathingInhale => 'Einatmen';
+  String get breathingHold => 'Halten';
+  String get breathingExhale => 'Ausatmen';
+  String get breathingCycles => 'Zyklen:';
+  String get breathingTapToStart => 'Tippen zum\nStarten';
+  String get breathingStart => 'Atmung starten';
+  String get breathingStop => 'Stopp';
+  String get breathingAgain => 'Nochmal';
+  String get breathingWellDone => '🌿 Gut gemacht!';
+  String breathingCyclesCompleted(int n) => '$n Zyklen abgeschlossen.';
+  String breathingPointsEarned(int pts) => '+$pts Punkte ⭐';
+
+  String get guideTapToStart => 'Tippen zum\nStarten';
+  String get guideStart => 'Sequenz starten';
+  String get guideWellDone => '💪 Gut gemacht!';
+  String guideStepProgress(int i, int total) => 'Schritt $i von $total';
+  String guideStepsCompleted(int n) => '$n Schritte abgeschlossen.';
+  String get guideDeskStep1 => 'Schulterkreisen rückwärts × 5';
+  String get guideDeskStep2 => 'Sitzende Rumpfdrehung × 3 pro Seite';
+  String get guideDeskStep3 => 'Handgelenk- und Unterarmkreisen × 10';
+  String get guideDeskStep4 => 'Seitliche Nackenneigung × 3 pro Seite';
+  String get guideDeskStep5 => 'Sitzende Katze-Kuh × 5';
+  String get guideNeckStep1 => 'Langsames Nackenkreisen × 5 pro Richtung';
+  String get guideNeckStep2 => 'Schulterheben und Loslassen × 8';
+  String get guideNeckStep3 => 'Seitliche Nackendehnung × 3 pro Seite';
+  String get guideStretchStep1 => 'Arme nach oben strecken × 5';
+  String get guideStretchStep2 => 'Seitliche Rumpfbeuge × 3 pro Seite';
+  String get guideStretchStep3 => 'Hüftkreisen × 8';
+  String get guideStretchStep4 => 'Wadenheben × 10';
+  String get guideStretchStep5 => 'Stehende Vorbeuge × 20s';
 
   String get neverMissTwiceTitle => 'Nicht zwei Tage hintereinander auslassen.';
   String get neverMissTwiceBody => 'Eine kleine Aktion zählt. Sogar ein Glas Wasser.';
@@ -1746,11 +3258,25 @@ class _De extends BwStrings {
   String get badgeFocused => 'Im Fokus'; String get badgeFocusedDesc => 'Fokus 25 Min gefestigt';
   String get badgeWalker => 'Spaziergänger'; String get badgeWalkerDesc => 'Mittagsspaziergang gefestigt';
   String get badgeBreath => 'Atem'; String get badgeBreathDesc => 'Atmung gefestigt';
+  String get badgeRootedName => 'Verwurzelte Gewohnheiten';
+  String get badgeRootedDesc => 'Gewohnheiten, die zur zweiten Natur wurden';
+  String get badgeTierBronze => 'Bronze';
+  String get badgeTierSilver => 'Silber';
+  String get badgeTierGold => 'Gold';
+  String get growthNextGoal => 'Nächstes Ziel';
+  String growthHabitsToRoot(int n) => n == 1 ? 'Noch 1 Gewohnheit' : 'Noch $n Gewohnheiten';
 
   String get habitChoiceTitle => 'Zeit für etwas Neues.';
   String get habitChoiceSub => 'Wähle, worauf du dich jetzt konzentrierst.';
   String get habitChoiceShowOther => 'andere Optionen zeigen ›';
+  String get habitChoiceNotReady => 'Ich bin noch nicht bereit dafür';
   String get habitChoiceOpen => 'Nächste Gewohnheit wählen';
+  String get habitNotReadySnoozed => 'Kein Problem — ich frage in einer Woche noch einmal.';
+  String get consolidatedTitle => '🏆 Glückwunsch!';
+  String consolidatedBody(String habitName) => 'Du hast „$habitName" zu einer echten Gewohnheit gemacht — dein Gehirn hat dafür einen dauerhaften Schaltkreis aufgebaut.';
+  String get consolidatedBadge => 'Gewohnheit gefestigt';
+  String get consolidatedCta => 'Weiter';
+  String habitStartsTomorrow(String habitName) => 'Sehr gut! Genieße heute deinen Erfolg — wir beginnen morgen mit „$habitName".';
   String get habitEffortLow => 'leicht';
   String get habitEffortMedium => 'moderat';
   String get habitEffortHigh => 'anspruchsvoll';
@@ -1761,6 +3287,222 @@ class _De extends BwStrings {
   String get errorWeakPassword => 'Das Passwort ist zu schwach';
   String get errorEmailInUse => 'Diese E-Mail wird bereits verwendet';
   String get errorInvalidCredentials => 'Falsche E-Mail oder falsches Passwort';
+  String get errorTooManyAttempts => 'Zu viele Versuche. Konto vorübergehend gesperrt';
+  String get errorTimeout => 'Der Server antwortet nicht. Versuche es gleich nochmal';
+  String get errorCancelled => 'Anmeldung abgebrochen';
+  String get errorAccountDisabled => 'Konto deaktiviert. Kontaktiere den Support';
+  String get passwordStrengthWeak => 'Schwach';
+  String get passwordStrengthMedium => 'Mittel';
+  String get passwordStrengthStrong => 'Stark';
+  String get passwordStrengthVeryStrong => 'Sehr stark';
+  String get validationEmailRequired => 'Gib deine E-Mail ein';
+  String get validationPasswordRequired => 'Gib ein Passwort ein';
+  String get validationPasswordTooShort => 'Mindestens 8 Zeichen';
+  String get validationNameRequired => 'Gib deinen Namen ein';
+  String get validationNameTooShort => 'Mindestens 2 Zeichen';
+  String get accountLockedBody => 'Zu viele fehlgeschlagene Versuche.\nVersuch es erneut in';
+  String get accountLockedEmailSent => 'Du hast eine E-Mail mit den Anweisungen erhalten.';
+  String get offlineLoginRequired => 'Keine Verbindung — Anmeldung erfordert Internet';
+  String get forgotCheckEmailTitle => 'Überprüfe deine E-Mail';
+  String forgotEmailSentBody(String email) =>
+      'Falls ein Konto für $email existiert, erhältst du einen Link zum Zurücksetzen des Passworts.';
+  String get forgotLinkExpiry => 'Der Link läuft in 30 Minuten ab.';
+  String get forgotResendLimitReached => 'Wiederholungslimit erreicht';
+  String forgotResendIn(int seconds) => 'Erneut senden in ${seconds}s';
+  String get verifyEmailCta => 'Klicke auf den Link, um dein Konto zu aktivieren.';
+  String get verifyResendCta => 'Bestätigungs-E-Mail erneut senden';
+  String get verifyChecked => 'Ich habe meine E-Mail bestätigt';
+  String get verifyDifferentEmail => 'Andere E-Mail verwenden?';
+  String get verifySendError => 'Senden fehlgeschlagen, versuch es gleich nochmal';
+  String get welcomeSlide1Title => 'Dein persönlicher\nWellness-Plan';
+  String get welcomeSlide1Sub => 'Be Well erstellt einen maßgeschneiderten Plan basierend auf deinen Gewohnheiten und Zielen.';
+  String get welcomeSlide2Title => 'Erinnerungen, die\ndeinen Kalender kennen';
+  String get welcomeSlide2Sub => 'Erinnerungen passen sich deinen Terminen und Zeiten an, damit sie dich nie zur falschen Zeit unterbrechen.';
+  String get welcomeSlide3Title => 'Verwandle Gewohnheiten\nin echte Belohnungen';
+  String get welcomeSlide3Sub => 'Sammle Punkte durch das Abschließen von Aktivitäten und tausche sie gegen Rabatte, Gutscheine und mehr.';
+  String get welcomeSkip => 'Überspringen';
+  String get welcomeNext => 'Weiter →';
+  String get welcomeStart => 'Einrichtung starten →';
+  String get welcomeConfigureLater => 'Später einrichten';
+
+  String get qProfileTitle => 'Erzähl uns von dir';
+  String get qProfileSub => 'Hilft uns, den richtigen Plan für dich zu erstellen.';
+  String get qGoalsTitle => 'Ziele & Stress';
+  String get qGoalsSub => 'Der wichtigste Bildschirm zur Personalisierung deines Plans.';
+  String get qHealthTitle => 'Deine Gewohnheiten';
+  String get qHealthSub => 'Kalibriert Häufigkeit und Art der Erinnerungen.';
+  String get qScheduleTitle => 'Dein Zeitplan';
+  String get qScheduleSub => 'Wir setzen Erinnerungen zu den richtigen Zeiten.';
+  String get qEnvTitle => 'Umgebung & Produktivität';
+  String get qEnvSub => 'Die letzten Details für deinen Plan.';
+  String get qBuildPlan => 'Fertig ✓';
+  String get q1Label => 'Q1 · Ich bin hauptsächlich…';
+  String get q2Label => 'Q2 · Ich arbeite/studiere hauptsächlich…';
+  String get q3Label => 'Q3 · Was möchtest du verbessern? (mehrere)';
+  String get q4Label => 'Q4 · Aktuelles Stresslevel';
+  String get q23Label => 'Q5 · Hast du schon Wellness-Apps genutzt?';
+  String get q15Label => 'Q6 · Ich schlafe normalerweise…';
+  String get q16Label => 'Q7 · Ich trinke etwa…';
+  String get q17Label => 'Q8 · Bildschirmzeit (Freizeit, ohne Arbeit)';
+  String get q18Label => 'Q9 · Ich mache Sport…';
+  String get q5Label => 'Q10 · Mein Zeitplan ist…';
+  String get q6Label => 'Q11 · Möchtest du deinen Kalender synchronisieren?';
+  String get q7Label => 'Q12 · Wie viele Erinnerungen pro Tag?';
+  String get q8Label => 'Q13 · Ideale Pause…';
+  String get q9q10Label => 'Q14–Q15 · Mittagspause';
+  String get q11q14Label => 'Q16–Q19 · Ich habe Zugang zu…';
+  String get q19Label => 'Q20 · Ablenkungsgrad in deiner Umgebung';
+  String get q20Label => 'Q21 · Wann bist du am konzentriertesten?';
+  String get q21Label => 'Q22 · Wie lange kannst du dich am Stück konzentrieren?';
+  String get q22Label => 'Q23 · Wie viele Meetings hast du täglich (im Schnitt)?';
+  String get q1Student => 'Student(in)';
+  String get q1Employee => 'Angestellte(r)';
+  String get q1Freelancer => 'Freelancer';
+  String get q1Other => 'Sonstiges';
+  String get q1Both => 'Beides';
+  String get q2Home => 'Von zu Hause';
+  String get q2Office => 'Im Büro';
+  String get q2Hybrid => 'Hybrid';
+  String get q2Varies => 'Wechselnd';
+  String get goalStress => 'Stress reduzieren';
+  String get goalFocus => 'Fokus verbessern';
+  String get goalHealth => 'Allgemeine Gesundheit';
+  String get goalSleep => 'Besser schlafen';
+  String get goalEnergy => 'Mehr Energie';
+  String get goalWeight => 'Fitness';
+  String get stress1 => 'Sehr ruhig';
+  String get stress2 => 'Ziemlich ruhig';
+  String get stress3 => 'Normal';
+  String get stress4 => 'Etwas gestresst';
+  String get stress5 => 'Sehr gestresst';
+  String get stressCalmEnd => 'Ruhig';
+  String get stressStressedEnd => 'Gestresst';
+  String get priorNone => 'Nein, nie';
+  String get priorHeadspace => 'Headspace';
+  String get priorCalm => 'Calm';
+  String get priorMultiple => 'Mehrere';
+  String get priorOther => 'Andere App';
+  String get hydroLow => 'wenig';
+  String get hydroGreat => 'optimal';
+  String get exNever => 'Nie';
+  String get ex12x => '1-2x/Woche';
+  String get ex34x => '3-4x/Woche';
+  String get exDaily => 'Täglich';
+  String get schedFixed => 'Fest';
+  String get schedFlexible => 'Flexibel';
+  String get schedShift => 'Schicht';
+  String get schedIrregular => 'Unregelmäßig';
+  String get calNoneLabel => 'Nein danke, jetzt nicht';
+  String get calSyncNote => '✓ Wir fragen nach der Berechtigung, sobald du deinen Plan bestätigt hast';
+  String get remMinimal => 'Minimal';
+  String get remMinimalSub => '~2/Tag';
+  String get remModerate => 'Moderat';
+  String get remModerateSub => '~4/Tag';
+  String get remFrequent => 'Häufig';
+  String get remFrequentSub => '~6/Tag';
+  String get remVeryFrequent => 'Sehr häufig';
+  String get remVeryFrequentSub => '8+/Tag';
+  String get lunchTimeLabel => 'Uhrzeit';
+  String get lunchDurationLabel => 'Dauer';
+  String get resParkLabel => 'Park oder Grünfläche';
+  String get resParkSub => 'Für Spaziergänge in der Mittagspause';
+  String get resGymLabel => 'Fitnessstudio oder Sportbereich';
+  String get resGymSub => 'Im Büro oder in der Nähe';
+  String get resWindowLabel => 'Fenster mit Aussicht';
+  String get resWindowSub => 'Für die 20-20-20-Augenregel';
+  String get resQuietLabel => 'Ruhiger Ort';
+  String get resQuietSub => 'Für Meditation und tiefe Konzentration';
+  String get distLow => 'Niedrig';
+  String get distMedium => 'Mittel';
+  String get distHigh => 'Hoch';
+  String get distVeryHigh => 'Sehr hoch';
+  String get focusMorning => 'Morgen';
+  String get focusMidday => 'Mittag';
+  String get focusAfternoon => 'Nachmittag';
+  String get focusEvening => 'Abend';
+  String get meeting02 => '0-2 / Tag';
+  String get meeting24 => '2-4 / Tag';
+  String get meeting46 => '4-6 / Tag';
+  String get meeting6plus => '6+ / Tag';
+  String get screenTimeWarning => 'Wir aktivieren häufigere Augen-Erinnerungen';
+  String get crisisTitle => 'Du machst gerade eine schwere Zeit durch';
+  String get crisisBody => 'Be Well ist da, um dich zu unterstützen. Bei akutem Bedarf: kontaktiere eine lokale Hilfshotline.';
+  String get qOptional => 'optional';
+  String get qBack => '← Zurück';
+  String get qSkipAll => 'Alles überspringen';
+  String qOfTotal(int current, int total) => '$current von $total';
+  String get planGenTitle => 'Dein Plan wird erstellt…';
+  String get planGenSub => 'Wir wenden deine Personalisierungsregeln an';
+  String get planStep1 => 'Analysiere dein Profil';
+  String get planStep2 => 'Konfiguriere Erinnerungen';
+  String get planStep3 => 'Wähle Aktivitäten aus';
+  String get planStep4 => 'Richte dein Dashboard ein';
+  String get planReadyBadge => '🎉 Plan bereit!';
+  String get planPreviewTitle => 'Dein Wellness-\nPlan';
+  String get planPreviewSub => 'Personalisiert nach deinen Antworten. Du kannst ihn jederzeit in den Einstellungen ändern.';
+  String get planRemindersPerDay => 'Erinnerungen/Tag';
+  String get planFocusSessions => 'Fokus-Sessions';
+  String get planPointsPerDay => 'Punkte/Tag';
+  String get planMorning => '🌅 Morgen';
+  String get planAfternoon => '☀️ Nachmittag';
+  String get planEvening => '🌙 Abend';
+  String planFromTime(String time) => 'ab $time';
+  String planConnectCalendar(String name) => '$name verbinden';
+  String get planConnectCalendarSub => 'Wir fragen nach der Berechtigung, sobald du bestätigst';
+  String get planFallbackNote => 'Wir haben einen Standardplan verwendet. Wir verfeinern ihn, während du die App nutzt.';
+  String get planConfirmCta => 'Mit Be Well starten  ';
+  String get planConfirmSub => 'Du kannst deinen Plan jederzeit in den Einstellungen ändern';
+  String planMinutes(int n) => '$n Min';
+  String get profileTitle => 'Profil';
+  String get accountSection => 'Konto';
+  String get emailAccountLabel => 'Konto-E-Mail';
+  String get supportSection => 'Support';
+  String get editNameTitle => 'Namen bearbeiten';
+  String get yourNameHint => 'Dein Name';
+  String get resetTutorialTitle => 'Tutorial zurücksetzen';
+  String get resetTutorialBody => 'Welly zeigt alle Tutorial-Dialoge erneut an, als wäre es das erste Mal. Nützlich zum Testen des Ablaufs.';
+  String get resetTutorialCta => 'Zurücksetzen';
+  String get resetTutorialSnackbar => 'Tutorial zurückgesetzt ✓';
+  String genericError(String msg) => 'Fehler: $msg';
+  String get settingsTitle => 'Einstellungen';
+  String get styleCardDesc => 'Inhalte in Karten,\nklare Typografie';
+  String get styleAmbientDesc => 'Atmosphärische Landschaft,\nredaktionelle Schrift';
+  String get toneSection => 'Farbton';
+  String get accessibilitySection => 'Barrierefreiheit';
+  String get contrastDesc => 'Erhöht den Textkontrast';
+  String get textSizeDesc => 'Vergrößert die Schriftgröße';
+  String get remindersLabel => 'Aktivitätserinnerungen';
+  String get remindersDesc => 'Benachrichtigungen für geplante Aktivitäten';
+  String get comingSoonTitle => 'Demnächst verfügbar';
+  String get comingSoonBody => 'Dieser Bereich ist noch nicht verfügbar — er steht auf unserer Roadmap.';
+  String get habitMarkDone => 'Erledigt';
+  String get slowdownReasonHeavy => 'Diese Gewohnheit fühlt sich gerade zu viel an';
+  String heatmapDaysAgo(int n) => 'vor $n Tagen';
+  String get heatmapToday => 'heute';
+  String phaseStarted(String date) => 'begonnen am $date';
+  String phaseReached(String date) => 'erreicht am $date';
+  String get marketAdTitle => 'Unterstütze Be Well';
+  String get marketAdSubtitle => 'Verdiene 10 Pkt. durch einen Werbespot';
+  String get marketAdDialogBody => 'Schau dir eine Werbung an: du hilfst uns, die App kostenlos zu halten, und erhältst sofort 10 Punkte.';
+  String get marketWatchNow => 'Jetzt ansehen';
+  String get dialogGotIt => 'Verstanden';
+  String get marketAdUnavailable => 'Spot momentan nicht verfügbar';
+  String get referralTitle => 'Freund einladen';
+  String get referralSubtitle => 'Verdiene 50 Pkt. für jeden Freund, der sich anmeldet';
+  String get referralApply => 'Anwenden';
+  String get referralApplied => 'Code angewendet! Dein Freund erhält den Bonus bald. 🎉';
+  String get referralErrorInvalid => 'Ungültiger Code';
+  String get referralErrorOwn => 'Du kannst deinen eigenen Code nicht verwenden';
+  String get referralErrorAlready => 'Du hast bereits einen Code eingelöst';
+  String get referralErrorNotSignedIn => 'Du musst angemeldet sein';
+  String get referralErrorGeneric => 'Etwas ist schiefgelaufen, versuch es erneut';
+  String get referralHint => 'Hast du einen Einladungscode?';
+  String premiumPrice(String price) => '$price/Monat';
+  String referralShareButton(String code) => 'Meinen Code teilen · $code';
+  String get referralRetry => 'Code konnte nicht erstellt werden — zum Wiederholen tippen';
+  String referralShareMessage(String code) =>
+      'Ich nutze Be Well, um Tag für Tag gesündere Gewohnheiten aufzubauen 🌱\n'
+      'Lade die App herunter und nutze meinen Einladungscode "$code" — du erhältst 50 Bonuspunkte, sobald du startest!';
 
   String get waterContainerGlass => 'Glas';
   String get waterContainerBottle => 'Flasche';
@@ -1773,6 +3515,10 @@ class _De extends BwStrings {
   String get habitsEveningTitle => 'Wie war dein Tag?';
   String get habitsNowLabel => 'Jetzt';
   String get habitsComingSoon => 'Demnächst';
+  String get configuratorTitle => 'Personalisiere deinen Plan';
+  String get configuratorSubtitle => 'Beantworte ein paar Fragen für passende Gewohnheitsvorschläge';
+  String get configuratorDoneTitle => 'Dein Plan ist personalisiert';
+  String get configuratorDoneSubtitle => 'Tippen, um deine Antworten zu aktualisieren';
   String get habitsAllDone => 'Alles gut für jetzt. Welly ist bei dir.';
   String get habitsToday => 'Heute';
   String get completedToday => 'heute erledigt';
@@ -1800,7 +3546,8 @@ class _De extends BwStrings {
   String get slowdownYes => 'Ja, langsamer';
   String get slowdownNo => 'Nein, ich mache weiter';
   String get slowdownHabitMenu => 'Ich brauche mehr Zeit mit dieser';
-  String get slowdownWellyResponse => 'Kein Problem — stärken wir diese, bevor wir etwas Neues hinzufügen. Das ist genau die richtige Entscheidung.';
+  String get slowdownMenuSubtitle => 'Neue Gewohnheitsvorschläge werden für 2 Wochen pausiert — diese hier bleibt trotzdem in deinem Plan.';
+  String get slowdownWellyResponse => 'Kein Problem — neue Vorschläge sind für 2 Wochen pausiert. Diese Gewohnheit bleibt in deinem Plan, nimm dir die Zeit, die du brauchst.';
   String get speedupPrompt => 'Du machst das sehr gut — bist du bereit für etwas Neues vor dem geplanten Zeitpunkt?';
   String get speedupYes => 'Ja, ich bin bereit';
   String get speedupNo => 'Nein, ich bleibe hier';
@@ -1813,11 +3560,83 @@ class _De extends BwStrings {
   String get tutorialOk   => 'Verstanden!';
   String get tutorialMore => 'Mehr →';
   String get tutorialSkip => 'Überspringen';
+  String get tutorialNext => 'Weiter →';
+
+  // ── Marketplace ───────────────────────────────────────────────────────────
+  String get pointsAvailable         => 'Punkte verfügbar';
+  String get marketplaceTabRewards   => 'Prämien';
+  String get marketplaceTabDiscounts => 'Rabatte';
+  String get marketplaceTabInApp     => 'In-App';
+  String get rewardsToRedeem         => 'einzulösen';
+  String get rewardRedeemed          => 'Da ist es. Du hast es verdient.';
+  String get rewardConfirmTitle      => 'Bist du sicher?';
+  String get rewardConfirmBody       => 'X Punkte werden von deinem Guthaben abgezogen.';
+  String get rewardRedeemFailed => 'Diese Belohnung konnte nicht eingelöst werden — zu wenig Punkte oder nicht mehr verfügbar.';
+  String get copyCode                => 'Code kopieren';
+  String get codeCopied              => 'Kopiert';
+  String get watchAd                 => 'Spot ansehen · +10 Pt';
+  String get whyAds                  => 'warum?';
+  String get whyAdsTitle             => 'Be Well ist für alle kostenlos';
+  String get whyAdsBody              => 'Be Well ist eine kostenlose App, um für alle zugänglich zu sein. Wie jeder Dienst hat es Betriebskosten. Indem du Werbung ansiehst, wenn du kannst, hilfst du uns, den Dienst am Laufen zu halten und ihn für alle zu verbessern. Danke.';
+  String get discountsActive         => 'aktive Rabatte';
+  String get discountsNote           => 'Rabatte werden monatlich aktualisiert. Keine Punkte erforderlich.';
+  String get discountExclusive       => 'exklusiv Be Well';
+  String get goToSite                => 'Zur Website';
+  String get affiliateNote           => 'Dieser Link unterstützt Be Well';
+  String get inAppWelly              => 'welly';
+  String get inAppSoundscape         => 'soundscape';
+  String get inAppMinigame           => 'minispiel';
+  String get inAppPercorsi           => 'pfade';
+  String get unlockItem              => 'Freischalten';
+  String get itemUnlocked            => 'Freigeschaltet';
+  String get premiumAllContent       => 'Alle In-App-Inhalte inklusive';
+  String get premiumPoints           => '+20% Punkte für jede Gewohnheit';
+  String get premiumWelly            => 'Vollständig anpassbarer Welly';
+  String get premiumDiscounts        => 'Exklusive Rabatte vorab';
+  String get premiumTrial            => '7 Tage kostenlos testen';
+  String get premiumOr               => 'oder einzeln mit Punkten kaufen';
+
+  String get feedbackTitle => 'Feedback geben';
+  String get feedbackSubtitle => 'Hilft uns, Be Well für dich zu verbessern.';
+  String get feedbackHint => 'Schreib dein Feedback hier…';
+  String get feedbackSubmit => 'Feedback senden';
+  String get feedbackThanks => 'Danke für dein Feedback!';
+  String get feedbackError => 'Senden fehlgeschlagen, versuch es gleich nochmal';
+  String get feedbackCategoryBug => 'Bug';
+  String get feedbackCategoryIdea => 'Idee';
+  String get feedbackCategoryFeature => 'Funktion';
+  String get feedbackCategoryOther => 'Sonstiges';
+
+  String spotlightText(String id) {
+    switch (id) {
+      case 'home_welcome':    return 'Willkommen! Ich bin Welly. Lass mich dir alles zeigen, damit du richtig starten kannst.';
+      case 'home_water':      return 'Das ist deine erste Gewohnheit: Wasser trinken. 8 Gläser pro Tag ist dein Ziel. Einfach und wirkungsvoll.';
+      case 'home_add_glass':  return 'Tippe hier jedes Mal, wenn du ein Glas trinkst. Jedes Tippen baut deine Gewohnheit auf — versuch es jetzt!';
+      case 'home_welly':      return 'Das bin ich — Welly! Ich ändere meinen Ausdruck je nach deinen Fortschritten. Je besser es läuft, desto strahlender werde ich.';
+      case 'home_phase':      return 'Das ist deine Phase. Du beginnst bei Samen — Phase 1. Baue Gewohnheiten auf, um bis Phase 5 zu wachsen: Strahlend.';
+      case 'home_nav':        return 'Neue Bereiche schalten sich hier frei, wenn du Fortschritte machst. Beginne mit Wasser — alles andere öffnet sich von dort.';
+      case 'habits_welcome':  return 'Du hast den Gewohnheiten-Bildschirm freigeschaltet! Von hier aus verwaltest du alle deine Routinen.';
+      case 'habits_now':      return 'Die \'Jetzt\'-Karte zeigt die Gewohnheit, die für diesen genauen Moment deines Tages am relevantesten ist.';
+      case 'habits_list':     return 'Alle Gewohnheiten sind nach ihrer besten Zeit sortiert. Morgengewohnheiten erscheinen morgens zuerst — Welly kennt deinen Rhythmus.';
+      case 'habits_ready':      return 'Bereit! Tippe täglich auf \'Erledigt\', um deine Serie aufzubauen. Kleine Handlungen, konsequent gemacht, verändern alles.';
+      // Marketplace tour
+      case 'marketplace_welcome': return 'Das sind deine Be Well Belohnungen! Jedes Glas Wasser, jede abgeschlossene Gewohnheit bringt dich hierher — wo deine Bemühungen zu echten Prämien werden.';
+      case 'marketplace_points':  return 'Dein Punktestand ist hier immer sichtbar. Er baut sich automatisch auf, während du Gewohnheiten aufbaust — kein zusätzlicher Aufwand.';
+      case 'marketplace_tabs':    return 'Drei Reiter: Prämien gegen Punkte einlösen, kostenlose Rabatte, und In-App-Inhalte freischalten. Alles durch deine täglichen Gewohnheiten verdient.';
+      case 'marketplace_card':    return 'Jede Prämie hat Punktekosten. Tippe zum Einlösen — du bekommst sofort einen Code. Je konsequenter du bist, desto mehr schaltest du frei.';
+      // Growth tour
+      case 'growth_welcome':      return 'Das ist dein Wachstum. Keine Rangliste — ein Spiegel. Er zeigt, wer du wirst, nicht nur, was du tust.';
+      case 'growth_phase':        return 'Deine Phase zeigt, wie tief verwurzelt deine Gewohnheiten sind. Von Phase 1 (Saat) bis Phase 5 (Strahlend) — jeder Schritt ist eine echte neurologische Veränderung.';
+      case 'growth_heatmap':      return 'Diese Heatmap zeigt deine Beständigkeit über die Zeit. Wissenschaft sagt: Das Muster zählt mehr als die Intensität — ein paar verpasste Tage setzen nicht alles zurück.';
+      case 'growth_badges':       return 'Abzeichen sind keine Dekoration. Jedes entspricht einem Verhalten, das du über einen messbaren Zeitraum aufrechterhalten hast. Sie sind Beweise deiner Reise.';
+      default: return '';
+    }
+  }
 
   String tutorialText(String id) {
     if (id.startsWith('habit_chosen_')) {
       final hid = id.substring('habit_chosen_'.length);
-      return '✅ ${habitName(hid)} ist jetzt in deinem Plan! ${habitDesc(hid)} Schließe sie täglich ab, um sie zu festigen.';
+      return habitStartsTomorrow(habitName(hid));
     }
     switch (id) {
       case 'home_first_open':     return 'Willkommen! Dies ist deine Basis. Oben findest du immer die dringendste Gewohnheit für den Moment. Fang dort an — der Rest kann warten.';
@@ -1827,7 +3646,7 @@ class _De extends BwStrings {
       case 'streak_explain':      return 'Wenn du morgen zurückkommst, beginnt deine Serie. Die einzige Regel: nie zwei Tage hintereinander auslassen. Eine Pause ist menschlich. Zwei sind eine neue Gewohnheit — die falsche.';
       case 'habits_tab_first':    return 'Hier findest du alle Gewohnheiten nach dem besten Moment deines Tages sortiert. Welly kennt deine Rhythmen — Morgengewohnheiten erscheinen morgens, Abendgewohnheiten abends.';
       case 'habit_card_explain':  return 'Der kreisförmige Bogen füllt sich bei jedem Abschluss. Nach 7 Tagen passiert etwas Interessantes — dein Gehirn beginnt, es als Routine zu registrieren.';
-      case 'focus_unlocked':      return 'Du hast den 25-Minuten-Fokus freigeschaltet! Das menschliche Gehirn hat einen natürlichen Konzentrationsrhythmus von etwa 20–30 Minuten. Du hast diese Fähigkeit durch die Wassergewohnheit erworben.';
+      case 'focus_unlocked':      return 'Du hast den 25-Minuten-Fokus von Anfang an zur Verfügung! Das menschliche Gehirn hat einen natürlichen Konzentrationsrhythmus von etwa 20–30 Minuten — nutze ihn für einen ablenkungsfreien Arbeitsblock.';
       case 'focus_unlocked_2':    return 'Goldene Regel des Fokus: Wenn der Timer läuft, kommt das Handy mit dem Display nach unten. Sogar Welly schweigt. Die Benachrichtigung, auf die du wartest, kann 25 Minuten warten — versprochen.';
       case 'calendar_appears':    return 'Neu! Der kontextuelle Kalender zeigt nur die nächsten Stunden, nicht den ganzen Tag. Weniger zu sehen = mehr mentaler Raum zum Handeln. Die ferne Zukunft ist noch nicht dein Problem.';
       case 'growth_first_visit':  return 'Dieser Bereich zeigt, wer du wirst, nicht nur was du tust. Die Phasen sind keine Belohnungen — sie sind echte Beschreibungen deiner neurologischen Veränderung. Wissenschaft, nicht Motivation, leitet den Weg.';
@@ -1899,6 +3718,12 @@ class _Es extends BwStrings {
   String get createAccount => 'Crear cuenta';
   String get alreadyHaveAccount => '¿Ya tienes cuenta? ';
   String get signIn => 'Iniciar sesión';
+  String get registerSubtitle => 'Empieza tu camino de bienestar';
+  String get tosAccept => 'Acepto los ';
+  String get tosTerms => 'Términos de Servicio';
+  String get tosAnd => ' y la ';
+  String get tosPrivacy => 'Política de Privacidad';
+  String get tosSuffix => ' de Be Well';
   String get passwordForgotTitle => 'Restablecer contraseña';
   String get passwordForgotSub => 'Ingresa tu correo y te enviaremos un enlace';
   String get sendResetEmail => 'Enviar correo de restablecimiento';
@@ -1912,8 +3737,8 @@ class _Es extends BwStrings {
   String get wellyNameSub => 'Mi nombre es Welly, pero puedes darme el nombre que prefieras.';
   String get perfect => 'Perfecto';
   String get firstHabitTitle => 'Primer hábito: el agua.';
-  String get firstHabitBody1 => 'Tu cuerpo está compuesto en un 60% de agua. Cuando estás deshidratado solo un 2%, la concentración baja, el humor empeora y te cansas antes. Sin embargo, la mayoría de las personas bebe menos de la mitad de lo que debería.';
-  String get firstHabitBody2 => 'Empezamos aquí: 8 vasos de agua. Yo te recordaré cuándo beber. Luego, paso a paso, añadiremos nuevas actividades a medida que consolidemos las anteriores — construyendo juntos hábitos saludables que realmente funcionen para ti.';
+  String get firstHabitBody1 => 'Con solo un 2% de deshidratación bajan la concentración y el ánimo.';
+  String get firstHabitBody2 => 'Empezamos aquí: 8 vasos al día. Yo te recordaré cuándo beber, luego añadiremos nuevos hábitos paso a paso.';
   String get drinkFirstGlass => 'Beber el primer vaso ahora';
   String get rewardTitle => 'Perfecto. Uno.';
   String get rewardBody => 'Cada vez que completas algo, ganas puntos Be Well. Los acumularás sin pensarlo — y podrás usarlos para descuentos, vouchers, accesorios, funciones premium y mucho más.';
@@ -1928,6 +3753,7 @@ class _Es extends BwStrings {
   String get waterContainerBtn => 'Recipiente';
 
   String get goodMorning => 'Buenos días,';
+  String get greetingFallbackName => 'a ti';
   String get phase => 'Fase';
   String get waterToday => 'Agua hoy';
   String get waterGlasses => 'vasos';
@@ -2039,8 +3865,24 @@ class _Es extends BwStrings {
   String get notifWaterBody => '¿Has bebido suficiente agua hoy?';
   String get notifEveningTitle => 'Be Well 🌱';
   String get notifEveningBody => '¿Cómo van tus hábitos hoy?';
+  String get notifHabitTitle => '🌱 Be Well';
+  String get notifHabitBody => 'Es hora de trabajar en tus hábitos — hasta una pequeña acción cuenta.';
   String get notifHabitChoiceTitle => '✨ Nuevo hábito disponible';
   String get notifHabitChoiceBody => 'Abre Be Well para elegir tu próximo hábito.';
+
+  String get notifFrequencyLabel => 'Frecuencia de recordatorios';
+  String get notifFreqOff => 'Ninguna';
+  String get notifFreqLow => 'Pocas';
+  String get notifFreqNormal => 'Normal';
+  String get notifFreqHigh => 'Todas';
+  String get notifFreqOffDesc => 'Sin recordatorios';
+  String get notifFreqLowDesc => '2 al día — mañana y noche';
+  String get notifFreqNormalDesc => '4 al día, repartidos en la jornada';
+  String get notifFreqHighDesc => 'Cada ~2h en horas de vigilia';
+  String get notifSnoozeLabel => 'Pausar recordatorios';
+  String notifSnoozeActive(String until) => 'En pausa hasta las $until';
+  String get notifSnoozeCancel => 'Reanudar ahora';
+  String notifSnoozeHours(int h) => '$h h';
 
   String get navHome => 'Inicio';
   String get navHabits => 'Hábitos';
@@ -2087,6 +3929,36 @@ class _Es extends BwStrings {
   String get habitFocusPhoneName => 'Enfoque sin teléfono'; String get habitFocusPhoneDesc => 'Teléfono boca abajo durante las sesiones de enfoque';
   String get habitMicroWalkName => 'Micro-caminata 5 min'; String get habitMicroWalkDesc => '5 minutos caminando cada 90 minutos — ciclo ultradiano';
   String get habitDigitalSunsetName => 'Atardecer digital'; String get habitDigitalSunsetDesc => 'Sin redes sociales en la hora antes de dormir';
+  String get breathingInhale => 'Inhala';
+  String get breathingHold => 'Retén';
+  String get breathingExhale => 'Exhala';
+  String get breathingCycles => 'Ciclos:';
+  String get breathingTapToStart => 'Toca para\nempezar';
+  String get breathingStart => 'Empezar respiración';
+  String get breathingStop => 'Detener';
+  String get breathingAgain => 'De nuevo';
+  String get breathingWellDone => '🌿 ¡Buen trabajo!';
+  String breathingCyclesCompleted(int n) => '$n ciclos completados.';
+  String breathingPointsEarned(int pts) => '+$pts puntos ⭐';
+
+  String get guideTapToStart => 'Toca para\nempezar';
+  String get guideStart => 'Iniciar secuencia';
+  String get guideWellDone => '💪 ¡Buen trabajo!';
+  String guideStepProgress(int i, int total) => 'Paso $i de $total';
+  String guideStepsCompleted(int n) => '$n pasos completados.';
+  String get guideDeskStep1 => 'Rotación de hombros hacia atrás × 5';
+  String get guideDeskStep2 => 'Torsión dorsal sentado × 3 por lado';
+  String get guideDeskStep3 => 'Círculos de muñecas y antebrazos × 10';
+  String get guideDeskStep4 => 'Inclinación lateral del cuello × 3 por lado';
+  String get guideDeskStep5 => 'Cat-cow sentado × 5';
+  String get guideNeckStep1 => 'Rotaciones lentas de cuello × 5 por sentido';
+  String get guideNeckStep2 => 'Encoger y soltar hombros × 8';
+  String get guideNeckStep3 => 'Estiramiento lateral de cuello × 3 por lado';
+  String get guideStretchStep1 => 'Brazos hacia arriba × 5';
+  String get guideStretchStep2 => 'Flexión lateral de tronco × 3 por lado';
+  String get guideStretchStep3 => 'Círculos de cadera × 8';
+  String get guideStretchStep4 => 'Elevación de talones × 10';
+  String get guideStretchStep5 => 'Flexión de pie hacia adelante × 20s';
 
   String get neverMissTwiceTitle => 'No faltes dos días seguidos.';
   String get neverMissTwiceBody => 'Una sola acción cuenta. Incluso un vaso de agua.';
@@ -2111,11 +3983,25 @@ class _Es extends BwStrings {
   String get badgeFocused => 'En foco'; String get badgeFocusedDesc => 'Focus 25 min consolidado';
   String get badgeWalker => 'Caminante'; String get badgeWalkerDesc => 'Caminata almuerzo consolidada';
   String get badgeBreath => 'Respiración'; String get badgeBreathDesc => 'Respiración consolidada';
+  String get badgeRootedName => 'Hábitos arraigados';
+  String get badgeRootedDesc => 'Hábitos que se volvieron una segunda naturaleza';
+  String get badgeTierBronze => 'Bronce';
+  String get badgeTierSilver => 'Plata';
+  String get badgeTierGold => 'Oro';
+  String get growthNextGoal => 'Próximo objetivo';
+  String growthHabitsToRoot(int n) => n == 1 ? 'Falta 1 hábito' : 'Faltan $n hábitos';
 
   String get habitChoiceTitle => 'Es hora de agregar\nalgo nuevo.';
   String get habitChoiceSub => 'Elige dónde centrarte ahora.';
   String get habitChoiceShowOther => 'mostrarme otras opciones ›';
+  String get habitChoiceNotReady => 'Aún no me siento listo/a';
   String get habitChoiceOpen => 'Elige tu próximo hábito';
+  String get habitNotReadySnoozed => 'No hay problema — te lo volveré a preguntar dentro de una semana.';
+  String get consolidatedTitle => '🏆 ¡Felicidades!';
+  String consolidatedBody(String habitName) => 'Has convertido "$habitName" en un hábito real — tu cerebro ha construido un circuito duradero para él.';
+  String get consolidatedBadge => 'Hábito consolidado';
+  String get consolidatedCta => 'Continuar';
+  String habitStartsTomorrow(String habitName) => '¡Muy bien! Disfruta hoy de tu logro — empezaremos a trabajar en "$habitName" mañana.';
   String get habitEffortLow => 'fácil';
   String get habitEffortMedium => 'moderado';
   String get habitEffortHigh => 'desafiante';
@@ -2126,6 +4012,222 @@ class _Es extends BwStrings {
   String get errorWeakPassword => 'La contraseña es demasiado débil';
   String get errorEmailInUse => 'Este correo ya está en uso';
   String get errorInvalidCredentials => 'Correo o contraseña incorrectos';
+  String get errorTooManyAttempts => 'Demasiados intentos. Cuenta bloqueada temporalmente';
+  String get errorTimeout => 'El servidor no responde. Inténtalo de nuevo en breve';
+  String get errorCancelled => 'Inicio de sesión cancelado';
+  String get errorAccountDisabled => 'Cuenta deshabilitada. Contacta con soporte';
+  String get passwordStrengthWeak => 'Débil';
+  String get passwordStrengthMedium => 'Media';
+  String get passwordStrengthStrong => 'Fuerte';
+  String get passwordStrengthVeryStrong => 'Muy fuerte';
+  String get validationEmailRequired => 'Introduce tu correo';
+  String get validationPasswordRequired => 'Introduce una contraseña';
+  String get validationPasswordTooShort => 'Mínimo 8 caracteres';
+  String get validationNameRequired => 'Introduce tu nombre';
+  String get validationNameTooShort => 'Mínimo 2 caracteres';
+  String get accountLockedBody => 'Demasiados intentos fallidos.\nInténtalo de nuevo en';
+  String get accountLockedEmailSent => 'Has recibido un correo con las instrucciones.';
+  String get offlineLoginRequired => 'Sin conexión — el inicio de sesión requiere internet';
+  String get forgotCheckEmailTitle => 'Revisa tu correo';
+  String forgotEmailSentBody(String email) =>
+      'Si existe una cuenta para $email, recibirás un enlace para restablecer la contraseña.';
+  String get forgotLinkExpiry => 'El enlace caduca en 30 minutos.';
+  String get forgotResendLimitReached => 'Límite de reenvíos alcanzado';
+  String forgotResendIn(int seconds) => 'Reenviar en ${seconds}s';
+  String get verifyEmailCta => 'Haz clic en el enlace para activar tu cuenta.';
+  String get verifyResendCta => 'Reenviar correo de verificación';
+  String get verifyChecked => 'He verificado mi correo';
+  String get verifyDifferentEmail => '¿Usar otro correo?';
+  String get verifySendError => 'No se pudo enviar, inténtalo de nuevo en breve';
+  String get welcomeSlide1Title => 'Tu plan de\nbienestar personal';
+  String get welcomeSlide1Sub => 'Be Well crea un plan a tu medida, basado en tus hábitos y objetivos.';
+  String get welcomeSlide2Title => 'Recordatorios que\nconocen tu calendario';
+  String get welcomeSlide2Sub => 'Los recordatorios se adaptan a tus reuniones y horarios, para no interrumpirte nunca en el momento equivocado.';
+  String get welcomeSlide3Title => 'Convierte hábitos\nen recompensas reales';
+  String get welcomeSlide3Sub => 'Gana puntos completando actividades y canjéalos por descuentos, vales y mucho más.';
+  String get welcomeSkip => 'Saltar';
+  String get welcomeNext => 'Siguiente →';
+  String get welcomeStart => 'Empezar configuración →';
+  String get welcomeConfigureLater => 'Configurar más tarde';
+
+  String get qProfileTitle => 'Cuéntanos sobre ti';
+  String get qProfileSub => 'Nos ayuda a crear el plan adecuado para ti.';
+  String get qGoalsTitle => 'Objetivos y estrés';
+  String get qGoalsSub => 'La pantalla más importante para personalizar tu plan.';
+  String get qHealthTitle => 'Tus hábitos';
+  String get qHealthSub => 'Calibra la frecuencia y el tipo de recordatorios.';
+  String get qScheduleTitle => 'Tu horario';
+  String get qScheduleSub => 'Configuraremos los recordatorios en los momentos adecuados.';
+  String get qEnvTitle => 'Entorno y productividad';
+  String get qEnvSub => 'Los últimos detalles para tu plan.';
+  String get qBuildPlan => 'Listo ✓';
+  String get q1Label => 'Q1 · Soy principalmente…';
+  String get q2Label => 'Q2 · Trabajo/estudio principalmente…';
+  String get q3Label => 'Q3 · ¿Qué quieres mejorar? (varias opciones)';
+  String get q4Label => 'Q4 · Nivel de estrés actual';
+  String get q23Label => 'Q5 · ¿Has usado apps de bienestar antes?';
+  String get q15Label => 'Q6 · Normalmente duermo…';
+  String get q16Label => 'Q7 · Bebo aproximadamente…';
+  String get q17Label => 'Q8 · Tiempo de pantalla (ocio, sin trabajo)';
+  String get q18Label => 'Q9 · Hago ejercicio…';
+  String get q5Label => 'Q10 · Mi horario es…';
+  String get q6Label => 'Q11 · ¿Quieres sincronizar tu calendario?';
+  String get q7Label => 'Q12 · ¿Cuántos recordatorios quieres al día?';
+  String get q8Label => 'Q13 · Descanso ideal…';
+  String get q9q10Label => 'Q14–Q15 · Pausa para comer';
+  String get q11q14Label => 'Q16–Q19 · Tengo acceso a…';
+  String get q19Label => 'Q20 · Nivel de distracciones en tu entorno';
+  String get q20Label => 'Q21 · ¿Cuándo estás más concentrado?';
+  String get q21Label => 'Q22 · ¿Cuánto tiempo puedes concentrarte seguido?';
+  String get q22Label => 'Q23 · ¿Cuántas reuniones tienes al día (de media)?';
+  String get q1Student => 'Estudiante';
+  String get q1Employee => 'Empleado/a';
+  String get q1Freelancer => 'Autónomo/a';
+  String get q1Other => 'Otro';
+  String get q1Both => 'Ambos';
+  String get q2Home => 'Desde casa';
+  String get q2Office => 'En la oficina';
+  String get q2Hybrid => 'Híbrido';
+  String get q2Varies => 'Varía';
+  String get goalStress => 'Reducir el estrés';
+  String get goalFocus => 'Mejorar el enfoque';
+  String get goalHealth => 'Salud general';
+  String get goalSleep => 'Dormir mejor';
+  String get goalEnergy => 'Más energía';
+  String get goalWeight => 'Forma física';
+  String get stress1 => 'Muy tranquilo';
+  String get stress2 => 'Bastante tranquilo';
+  String get stress3 => 'Normal';
+  String get stress4 => 'Algo estresado';
+  String get stress5 => 'Muy estresado';
+  String get stressCalmEnd => 'Tranquilo';
+  String get stressStressedEnd => 'Estresado';
+  String get priorNone => 'No, nunca';
+  String get priorHeadspace => 'Headspace';
+  String get priorCalm => 'Calm';
+  String get priorMultiple => 'Más de una';
+  String get priorOther => 'Otra app';
+  String get hydroLow => 'poco';
+  String get hydroGreat => 'óptimo';
+  String get exNever => 'Nunca';
+  String get ex12x => '1-2x/semana';
+  String get ex34x => '3-4x/semana';
+  String get exDaily => 'Todos los días';
+  String get schedFixed => 'Fijo';
+  String get schedFlexible => 'Flexible';
+  String get schedShift => 'Por turnos';
+  String get schedIrregular => 'Irregular';
+  String get calNoneLabel => 'No gracias, por ahora';
+  String get calSyncNote => '✓ Te pediremos permisos después de confirmar el plan';
+  String get remMinimal => 'Mínimos';
+  String get remMinimalSub => '~2/día';
+  String get remModerate => 'Moderados';
+  String get remModerateSub => '~4/día';
+  String get remFrequent => 'Frecuentes';
+  String get remFrequentSub => '~6/día';
+  String get remVeryFrequent => 'Muy frec.';
+  String get remVeryFrequentSub => '8+/día';
+  String get lunchTimeLabel => 'Hora';
+  String get lunchDurationLabel => 'Duración';
+  String get resParkLabel => 'Parque o zona verde';
+  String get resParkSub => 'Para caminar durante la pausa del almuerzo';
+  String get resGymLabel => 'Gimnasio o zona fitness';
+  String get resGymSub => 'En la oficina o cerca';
+  String get resWindowLabel => 'Ventana con vistas';
+  String get resWindowSub => 'Para la regla 20-20-20 de los ojos';
+  String get resQuietLabel => 'Espacio tranquilo';
+  String get resQuietSub => 'Para meditación y concentración profunda';
+  String get distLow => 'Bajo';
+  String get distMedium => 'Medio';
+  String get distHigh => 'Alto';
+  String get distVeryHigh => 'Muy alto';
+  String get focusMorning => 'Mañana';
+  String get focusMidday => 'Mediodía';
+  String get focusAfternoon => 'Tarde';
+  String get focusEvening => 'Noche';
+  String get meeting02 => '0-2 / día';
+  String get meeting24 => '2-4 / día';
+  String get meeting46 => '4-6 / día';
+  String get meeting6plus => '6+ / día';
+  String get screenTimeWarning => 'Activaremos recordatorios de ojos más frecuentes';
+  String get crisisTitle => 'Estás pasando por un momento difícil';
+  String get crisisBody => 'Be Well está aquí para apoyarte. Si necesitas ayuda inmediata: contacta con una línea de ayuda local.';
+  String get qOptional => 'opcional';
+  String get qBack => '← Atrás';
+  String get qSkipAll => 'Saltar todo';
+  String qOfTotal(int current, int total) => '$current de $total';
+  String get planGenTitle => 'Construyendo tu plan…';
+  String get planGenSub => 'Aplicando tus reglas de personalización';
+  String get planStep1 => 'Analizando tu perfil';
+  String get planStep2 => 'Configurando recordatorios';
+  String get planStep3 => 'Seleccionando actividades';
+  String get planStep4 => 'Configurando el panel';
+  String get planReadyBadge => '🎉 ¡Plan listo!';
+  String get planPreviewTitle => 'Tu plan de\nbienestar';
+  String get planPreviewSub => 'Personalizado según tus respuestas. Podrás modificarlo siempre desde Ajustes.';
+  String get planRemindersPerDay => 'recordatorios/día';
+  String get planFocusSessions => 'sesiones focus';
+  String get planPointsPerDay => 'puntos/día';
+  String get planMorning => '🌅 Mañana';
+  String get planAfternoon => '☀️ Tarde';
+  String get planEvening => '🌙 Noche';
+  String planFromTime(String time) => 'desde $time';
+  String planConnectCalendar(String name) => 'Conectar $name';
+  String get planConnectCalendarSub => 'Pediremos permiso después de confirmar';
+  String get planFallbackNote => 'Usamos un plan predeterminado. Lo iremos ajustando a medida que uses la app.';
+  String get planConfirmCta => 'Empezar con Be Well  ';
+  String get planConfirmSub => 'Puedes modificar tu plan en cualquier momento desde Ajustes';
+  String planMinutes(int n) => '$n min';
+  String get profileTitle => 'Perfil';
+  String get accountSection => 'Cuenta';
+  String get emailAccountLabel => 'Correo de la cuenta';
+  String get supportSection => 'Soporte';
+  String get editNameTitle => 'Editar nombre';
+  String get yourNameHint => 'Tu nombre';
+  String get resetTutorialTitle => 'Restablecer tutorial';
+  String get resetTutorialBody => 'Welly volverá a mostrar todos los diálogos del tutorial como si fuera la primera vez. Útil para probar el flujo.';
+  String get resetTutorialCta => 'Restablecer';
+  String get resetTutorialSnackbar => 'Tutorial restablecido ✓';
+  String genericError(String msg) => 'Error: $msg';
+  String get settingsTitle => 'Ajustes';
+  String get styleCardDesc => 'Contenido en tarjetas,\ntipografía clara';
+  String get styleAmbientDesc => 'Paisaje atmosférico,\nfuente editorial';
+  String get toneSection => 'Tono';
+  String get accessibilitySection => 'Accesibilidad';
+  String get contrastDesc => 'Aumenta el contraste del texto';
+  String get textSizeDesc => 'Aumenta el tamaño del texto';
+  String get remindersLabel => 'Recordatorios de actividades';
+  String get remindersDesc => 'Notificaciones para actividades planificadas';
+  String get comingSoonTitle => 'Próximamente';
+  String get comingSoonBody => 'Esta sección aún no está disponible — está en nuestra hoja de ruta.';
+  String get habitMarkDone => 'Hecho';
+  String get slowdownReasonHeavy => 'Este hábito me pesa demasiado ahora mismo';
+  String heatmapDaysAgo(int n) => 'hace $n días';
+  String get heatmapToday => 'hoy';
+  String phaseStarted(String date) => 'iniciado el $date';
+  String phaseReached(String date) => 'alcanzado el $date';
+  String get marketAdTitle => 'Ayuda a Be Well';
+  String get marketAdSubtitle => 'Gana 10 pt viendo un anuncio';
+  String get marketAdDialogBody => 'Mira un anuncio: nos ayudas a mantener la app gratis y ganas 10 puntos al instante.';
+  String get marketWatchNow => 'Ver ahora';
+  String get dialogGotIt => 'Entendido';
+  String get marketAdUnavailable => 'Anuncio no disponible por ahora';
+  String get referralTitle => 'Invita a un amigo';
+  String get referralSubtitle => 'Gana 50 pt por cada amigo que se registre';
+  String get referralApply => 'Aplicar';
+  String get referralApplied => '¡Código aplicado! Tu amigo recibirá el bono pronto. 🎉';
+  String get referralErrorInvalid => 'Código no válido';
+  String get referralErrorOwn => 'No puedes usar tu propio código';
+  String get referralErrorAlready => 'Ya has canjeado un código de invitación';
+  String get referralErrorNotSignedIn => 'Debes haber iniciado sesión';
+  String get referralErrorGeneric => 'Algo salió mal, inténtalo de nuevo';
+  String get referralHint => '¿Tienes un código de invitación?';
+  String premiumPrice(String price) => '$price/mes';
+  String referralShareButton(String code) => 'Compartir mi código · $code';
+  String get referralRetry => 'No se pudo generar el código — toca para reintentar';
+  String referralShareMessage(String code) =>
+      'Estoy usando Be Well para crear hábitos más saludables, día a día 🌱\n'
+      '¡Descarga la app y usa mi código de invitación "$code" — recibirás 50 puntos de bono en cuanto empieces!';
 
   String get waterContainerGlass => 'vaso';
   String get waterContainerBottle => 'botella';
@@ -2138,6 +4240,10 @@ class _Es extends BwStrings {
   String get habitsEveningTitle => '¿Cómo te fue hoy?';
   String get habitsNowLabel => 'Ahora';
   String get habitsComingSoon => 'Próximamente';
+  String get configuratorTitle => 'Personaliza tu plan';
+  String get configuratorSubtitle => 'Responde algunas preguntas para recibir sugerencias de hábitos hechas a tu medida';
+  String get configuratorDoneTitle => 'Tu plan está personalizado';
+  String get configuratorDoneSubtitle => 'Toca para actualizar tus respuestas';
   String get habitsAllDone => 'Todo bien por ahora. Welly está contigo.';
   String get habitsToday => 'Hoy';
   String get completedToday => 'completadas hoy';
@@ -2165,7 +4271,8 @@ class _Es extends BwStrings {
   String get slowdownYes => 'Sí, vamos más despacio';
   String get slowdownNo => 'No, sigo adelante';
   String get slowdownHabitMenu => 'Necesito más tiempo con este hábito';
-  String get slowdownWellyResponse => 'Sin problema — reforcemos este antes de añadir algo nuevo. Es exactamente la decisión correcta.';
+  String get slowdownMenuSubtitle => 'Las nuevas sugerencias de hábitos se pausan durante 2 semanas — este se queda en tu plan de todas formas.';
+  String get slowdownWellyResponse => 'Sin problema — las nuevas sugerencias están en pausa durante 2 semanas. Este hábito se queda en tu plan, tómate el tiempo que necesites.';
   String get speedupPrompt => 'Lo estás haciendo muy bien — ¿estás listo para algo nuevo antes de lo previsto?';
   String get speedupYes => 'Sí, estoy listo';
   String get speedupNo => 'No, me quedo aquí';
@@ -2178,11 +4285,83 @@ class _Es extends BwStrings {
   String get tutorialOk   => '¡Entendido!';
   String get tutorialMore => 'Más →';
   String get tutorialSkip => 'Saltar';
+  String get tutorialNext => 'Siguiente →';
+
+  // ── Marketplace ───────────────────────────────────────────────────────────
+  String get pointsAvailable         => 'puntos disponibles';
+  String get marketplaceTabRewards   => 'Premios';
+  String get marketplaceTabDiscounts => 'Descuentos';
+  String get marketplaceTabInApp     => 'En la app';
+  String get rewardsToRedeem         => 'para canjear';
+  String get rewardRedeemed          => 'Ahí está. Te lo ganaste.';
+  String get rewardConfirmTitle      => '¿Estás seguro?';
+  String get rewardConfirmBody       => 'Se deducirán X puntos de tu saldo.';
+  String get rewardRedeemFailed => 'No se pudo canjear esta recompensa — puntos insuficientes, o ya no está disponible.';
+  String get copyCode                => 'Copiar código';
+  String get codeCopied              => 'Copiado';
+  String get watchAd                 => 'Ver un anuncio · +10 pt';
+  String get whyAds                  => '¿por qué?';
+  String get whyAdsTitle             => 'Be Well es gratuito para todos';
+  String get whyAdsBody              => 'Be Well es una aplicación gratuita para ser accesible para todos. Como cualquier servicio, tiene costos operativos. Al ver anuncios cuando puedas, nos ayudas a mantener el servicio activo y mejorarlo para todos. Gracias.';
+  String get discountsActive         => 'descuentos activos';
+  String get discountsNote           => 'Los descuentos se actualizan mensualmente. No se requieren puntos.';
+  String get discountExclusive       => 'exclusivo Be Well';
+  String get goToSite                => 'Ir al sitio';
+  String get affiliateNote           => 'Este enlace apoya Be Well';
+  String get inAppWelly              => 'welly';
+  String get inAppSoundscape         => 'soundscape';
+  String get inAppMinigame           => 'minijuego';
+  String get inAppPercorsi           => 'recorridos';
+  String get unlockItem              => 'Desbloquear';
+  String get itemUnlocked            => 'Desbloqueado';
+  String get premiumAllContent       => 'Todo el contenido in-app incluido';
+  String get premiumPoints           => '+20% puntos en cada hábito';
+  String get premiumWelly            => 'Welly completamente personalizable';
+  String get premiumDiscounts        => 'Descuentos exclusivos por adelantado';
+  String get premiumTrial            => 'Prueba 7 días gratis';
+  String get premiumOr               => 'o compra individualmente con puntos';
+
+  String get feedbackTitle => 'Enviar comentario';
+  String get feedbackSubtitle => 'Nos ayuda a mejorar Be Well para ti.';
+  String get feedbackHint => 'Escribe aquí tu comentario…';
+  String get feedbackSubmit => 'Enviar comentario';
+  String get feedbackThanks => '¡Gracias por tu comentario!';
+  String get feedbackError => 'No se pudo enviar, inténtalo de nuevo en breve';
+  String get feedbackCategoryBug => 'Error';
+  String get feedbackCategoryIdea => 'Idea';
+  String get feedbackCategoryFeature => 'Función';
+  String get feedbackCategoryOther => 'Otro';
+
+  String spotlightText(String id) {
+    switch (id) {
+      case 'home_welcome':    return '¡Bienvenido! Soy Welly. Déjame mostrarte todo para que puedas empezar bien.';
+      case 'home_water':      return 'Este es tu primer hábito: beber agua. 8 vasos al día es tu objetivo. Simple y poderoso.';
+      case 'home_add_glass':  return 'Toca aquí cada vez que bebas un vaso. Cada toque construye tu hábito — ¡pruébalo ahora!';
+      case 'home_welly':      return 'Ese soy yo — ¡Welly! Cambio de expresión según tus progresos. Cuanto mejor lo haces, más radiante me vuelvo.';
+      case 'home_phase':      return 'Esta es tu Fase. Empiezas en Semilla — Fase 1. Construye hábitos para crecer hasta la Fase 5: Radiante.';
+      case 'home_nav':        return 'Nuevas secciones se desbloquean aquí a medida que progresas. Empieza con el agua — todo lo demás se abre desde ahí.';
+      case 'habits_welcome':  return '¡Desbloqueaste la pantalla de Hábitos! Desde aquí gestionas todas tus rutinas.';
+      case 'habits_now':      return 'La tarjeta \'Ahora\' muestra el hábito más relevante para este preciso momento de tu día.';
+      case 'habits_list':     return 'Todos los hábitos están ordenados por su mejor momento. Los hábitos matutinos aparecen primero por la mañana — Welly conoce tu ritmo.';
+      case 'habits_ready':      return '¡Listo! Toca \'Completar\' cada día para construir tu racha. Pequeñas acciones, hechas con constancia, cambian todo.';
+      // Marketplace tour
+      case 'marketplace_welcome': return '¡Estos son tus Premios Be Well! Cada vaso de agua, cada hábito completado te trae aquí — donde tus esfuerzos se convierten en recompensas reales.';
+      case 'marketplace_points':  return 'Tu saldo de puntos siempre es visible aquí. Se acumula automáticamente mientras construyes hábitos — sin hacer nada extra.';
+      case 'marketplace_tabs':    return 'Tres pestañas: Premios para canjear con puntos, Descuentos gratuitos, y contenido En la app para desbloquear. Todo ganado con tus hábitos diarios.';
+      case 'marketplace_card':    return 'Cada premio tiene un costo en puntos. Toca para canjear — recibes un código al instante. Cuanto más constante seas, más desbloqueas.';
+      // Growth tour
+      case 'growth_welcome':      return 'Este es tu Crecimiento. No es un ranking — es un espejo. Muestra en quién te estás convirtiendo, no solo lo que haces.';
+      case 'growth_phase':        return 'Tu fase refleja qué tan arraigados están tus hábitos. De la Fase 1 (Semilla) a la Fase 5 (Radiante) — cada paso es un cambio neurológico real.';
+      case 'growth_heatmap':      return 'Este mapa de calor muestra tu consistencia en el tiempo. La ciencia dice que el patrón importa más que la intensidad: unos días perdidos no reinician todo.';
+      case 'growth_badges':       return 'Las insignias no son decoración. Cada una corresponde a un comportamiento mantenido durante un período medible. Son pruebas concretas de tu recorrido.';
+      default: return '';
+    }
+  }
 
   String tutorialText(String id) {
     if (id.startsWith('habit_chosen_')) {
       final hid = id.substring('habit_chosen_'.length);
-      return '✅ ${habitName(hid)} está ahora en tu plan. ${habitDesc(hid)} Complétalo cada día para consolidarlo.';
+      return habitStartsTomorrow(habitName(hid));
     }
     switch (id) {
       case 'home_first_open':     return '¡Bienvenido! Esta es tu base. En la parte superior siempre encontrarás el hábito más urgente para ahora. Empieza siempre por ahí — el resto puede esperar.';

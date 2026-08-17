@@ -9,6 +9,8 @@ import '../../providers/tutorial_provider.dart';
 import '../../widgets/bw_scaffold.dart';
 import '../settings/settings_screen.dart';
 import '../../widgets/locale_selector.dart';
+import '../../widgets/banner_ad_widget.dart';
+import '../../widgets/feedback_sheet.dart';
 import '../../l10n/app_localizations.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -24,10 +26,11 @@ class ProfileScreen extends StatelessWidget {
         if (user == null) return const SizedBox();
 
         return BwScaffold(
+          bottomNavigationBar: const BannerAdWidget(),
           appBar: AppBar(
             backgroundColor: p.bg,
             elevation: 0,
-            title: Text('Profilo',
+            title: Text(context.sL.profileTitle,
                 style: TextStyle(
                     color: p.text,
                     fontSize: 17,
@@ -106,7 +109,7 @@ class ProfileScreen extends StatelessWidget {
                 _StatBox(label: context.sL.points, value: '${user.points}', p: p),
                 const SizedBox(width: 10),
                 _StatBox(
-                    label: context.sL.daysStreak, value: '${user.streak} gg', p: p),
+                    label: context.sL.daysStreak, value: '${app.liveStreak} gg', p: p),
                 const SizedBox(width: 10),
                 _StatBox(
                     label: context.sL.focusSessions,
@@ -117,7 +120,7 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 28),
 
               // ── Account ───────────────────────────────────────────────
-              _SectionLabel(label: 'Account', p: p),
+              _SectionLabel(label: context.sL.accountSection, p: p),
               const SizedBox(height: 10),
               _Card(p: p, children: [
                 _Tile(
@@ -134,8 +137,8 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 _Tile(
                   icon: Icons.email_outlined,
-                  label: user.email.isNotEmpty ? user.email : 'Email account',
-                  subtitle: 'Email account',
+                  label: user.email.isNotEmpty ? user.email : context.sL.emailAccountLabel,
+                  subtitle: context.sL.emailAccountLabel,
                   p: p,
                   onTap: null,
                 ),
@@ -164,6 +167,20 @@ _Tile(
                 _LocaleTile(p: p),
               ]),
 
+              const SizedBox(height: 20),
+
+              // ── Supporto ──────────────────────────────────────────────
+              _SectionLabel(label: context.sL.supportSection, p: p),
+              const SizedBox(height: 10),
+              _Card(p: p, children: [
+                _Tile(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: context.sL.feedbackTitle,
+                  p: p,
+                  onTap: () => FeedbackSheet.show(context),
+                ),
+              ]),
+
               const SizedBox(height: 28),
 
               // ── Logout ────────────────────────────────────────────────
@@ -173,8 +190,8 @@ _Tile(
                   onPressed: () => _confirmLogout(context, p),
                   icon: const Icon(Icons.logout,
                       color: Colors.redAccent, size: 18),
-                  label: const Text('Esci dall\'account',
-                      style: TextStyle(color: Colors.redAccent)),
+                  label: Text(context.sL.logout,
+                      style: const TextStyle(color: Colors.redAccent)),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
                         color: Colors.redAccent.withValues(alpha: 0.4)),
@@ -193,8 +210,7 @@ _Tile(
                 _Card(p: p, children: [
                   _Tile(
                     icon: Icons.smart_toy_outlined,
-                    label: 'Reset tutorial Welly',
-                    subtitle: 'Mostra di nuovo tutti i dialoghi',
+                    label: context.sL.resetTutorialTitle,
                     p: p,
                     onTap: () => _resetTutorial(context, p),
                   ),
@@ -214,13 +230,13 @@ _Tile(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.card,
-        title: Text('Modifica nome',
+        title: Text(context.sL.editNameTitle,
             style: TextStyle(color: p.text, fontSize: 16)),
         content: TextField(
           controller: ctrl,
           style: TextStyle(color: p.text),
           decoration: InputDecoration(
-            hintText: 'Il tuo nome',
+            hintText: context.sL.yourNameHint,
             hintStyle: TextStyle(color: p.textMut),
             enabledBorder: UnderlineInputBorder(
                 borderSide: BorderSide(color: p.cardBorder)),
@@ -239,7 +255,7 @@ _Tile(
               if (name.isNotEmpty) await app.updateDisplayName(name);
               if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: Text('Salva',
+            child: Text(context.sL.save,
                 style: TextStyle(color: p.primary)),
           ),
         ],
@@ -266,7 +282,7 @@ _Tile(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: p.card,
-        title: Text('Esci dall\'account',
+        title: Text(context.sL.logoutConfirm,
             style: TextStyle(color: p.text)),
         content: Text(context.sL.logoutConfirmSub,
             style: TextStyle(color: p.textSec)),
@@ -284,8 +300,8 @@ _Tile(
                 Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
               }
             },
-            child: const Text('Esci',
-                style: TextStyle(color: Colors.redAccent)),
+            child: Text(context.sL.logout,
+                style: const TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
@@ -299,26 +315,26 @@ _Tile(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: p.card,
-        title: Text('Reset tutorial', style: TextStyle(color: p.text)),
+        title: Text(context.sL.resetTutorialTitle, style: TextStyle(color: p.text)),
         content: Text(
-          'Welly mostrerà di nuovo tutti i dialoghi tutorial come se fosse '
-          'la prima volta. Utile per testare il flusso.',
+          context.sL.resetTutorialBody,
           style: TextStyle(color: p.textSec, fontSize: 13, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Annulla', style: TextStyle(color: p.textSec)),
+            child: Text(context.sL.cancel, style: TextStyle(color: p.textSec)),
           ),
           TextButton(
             onPressed: () async {
               final tutorial = context.read<TutorialProvider>();
+              final s = context.sL;
               await tutorial.resetAll();
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: const Text('Tutorial resettato ✓'),
+                    content: Text(s.resetTutorialSnackbar),
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
@@ -328,7 +344,7 @@ _Tile(
                 );
               }
             },
-            child: Text('Reset', style: TextStyle(color: p.primary,
+            child: Text(context.sL.resetTutorialCta, style: TextStyle(color: p.primary,
                 fontWeight: FontWeight.w700)),
           ),
         ],
@@ -479,12 +495,13 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   }
 
   Future<void> _submit() async {
+    final s = context.sL;
     if (_new.text != _conf.text) {
-      setState(() => _error = 'Le password non coincidono');
+      setState(() => _error = s.passwordMismatch);
       return;
     }
     if (_new.text.length < 8) {
-      setState(() => _error = 'Minimo 8 caratteri');
+      setState(() => _error = s.validationPasswordTooShort);
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -502,8 +519,8 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     } on FirebaseAuthException catch (e) {
       setState(() {
         _error = e.code == 'wrong-password'
-            ? 'Password attuale errata'
-            : 'Errore: ${e.message}';
+            ? s.wrongPassword
+            : s.genericError(e.message ?? '');
         _loading = false;
       });
     }
@@ -514,7 +531,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     final p = widget.p;
     return AlertDialog(
       backgroundColor: p.card,
-      title: Text('Cambia password',
+      title: Text(context.sL.changePassword,
           style: TextStyle(color: p.text, fontSize: 16)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -544,7 +561,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : Text('Salva', style: TextStyle(color: p.primary)),
+              : Text(context.sL.save, style: TextStyle(color: p.primary)),
         ),
       ],
     );
@@ -592,8 +609,7 @@ class _PwdFieldState extends State<_PwdField> {
 
 
 
-// -- Voce lingua ---------------------------------------------------------------
-// -- Voce lingua ---------------------------------------------------------------
+// ── Voce lingua ───────────────────────────────────────────────────────────────
 class _LocaleTile extends StatelessWidget {
   final BwPaletteData p;
   const _LocaleTile({required this.p});

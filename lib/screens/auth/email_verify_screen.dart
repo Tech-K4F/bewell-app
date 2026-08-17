@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 // FIX: import esplicito per evitare conflitto con firebase_auth AuthProvider
 import 'package:bewell/providers/auth_provider.dart' as bw;
+import '../../providers/theme_provider.dart';
+import '../../widgets/bw_scaffold.dart';
+import '../../l10n/app_localizations.dart';
 
 /// S-04 · Email Verification
 class EmailVerifyScreen extends StatefulWidget {
@@ -55,9 +58,19 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
 
   Future<void> _resendEmail() async {
     if (_resendCooldown > 0 || _resendCount >= _maxResends) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final s = context.sL;
     try {
       await FirebaseAuth.instance.currentUser?.sendEmailVerification();
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text(s.verifySendError),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return;
+    }
 
     setState(() {
       _resendCount++;
@@ -77,11 +90,12 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.watch<ThemeProvider>().paletteData;
+    final s = context.sL;
     final canResend =
         _resendCooldown == 0 && _resendCount < _maxResends;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B1929),
+    return BwScaffold(
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 40, 24, 40),
@@ -93,20 +107,18 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E9E87).withValues(alpha: 0.12),
+                  color: p.primaryLight,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: const Color(0xFF1E9E87).withValues(alpha: 0.25),
-                  ),
+                  border: Border.all(color: p.primary.withValues(alpha: 0.25)),
                 ),
                 child: const Center(
                     child: Text('📧', style: TextStyle(fontSize: 28))),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Controlla\nla tua email',
+              Text(
+                s.verifyEmail,
                 style: TextStyle(
-                  color: Colors.white,
+                  color: p.text,
                   fontSize: 30,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.5,
@@ -117,21 +129,17 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
               RichText(
                 text: TextSpan(
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: p.textSec,
                     fontSize: 15,
                     height: 1.5,
                   ),
                   children: [
-                    const TextSpan(
-                        text: 'Ti abbiamo inviato un link di verifica a '),
+                    TextSpan(text: '${s.verifyEmailSent} '),
                     TextSpan(
                       text: widget.email,
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: p.text, fontWeight: FontWeight.w600),
                     ),
-                    const TextSpan(
-                        text:
-                            '.\n\nClicca il link per attivare il tuo account.'),
+                    TextSpan(text: '.\n\n${s.verifyEmailCta}'),
                   ],
                 ),
               ),
@@ -142,22 +150,21 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
                 child: ElevatedButton(
                   onPressed: canResend ? _resendEmail : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E9E87),
-                    disabledBackgroundColor:
-                        const Color(0xFF1E9E87).withValues(alpha: 0.3),
+                    backgroundColor: p.btn,
+                    disabledBackgroundColor: p.btn.withValues(alpha: 0.3),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
                     _resendCount >= _maxResends
-                        ? 'Limite reinvii raggiunto'
+                        ? s.forgotResendLimitReached
                         : _resendCooldown > 0
-                            ? 'Reinvia tra ${_resendCooldown}s'
-                            : 'Reinvia email di verifica',
-                    style: const TextStyle(
+                            ? s.forgotResendIn(_resendCooldown)
+                            : s.verifyResendCta,
+                    style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white),
+                        color: p.btnText),
                   ),
                 ),
               ),
@@ -168,13 +175,12 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
                 child: OutlinedButton(
                   onPressed: _checkVerified,
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.15)),
+                    side: BorderSide(color: p.cardBorder),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Ho verificato l\'email',
-                      style: TextStyle(color: Colors.white, fontSize: 15)),
+                  child: Text(s.verifyChecked,
+                      style: TextStyle(color: p.text, fontSize: 15)),
                 ),
               ),
               const Spacer(flex: 2),
@@ -187,13 +193,12 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
                         .pushReplacementNamed('/register');
                   },
                   child: Text(
-                    'Usare un\'email diversa?',
+                    s.verifyDifferentEmail,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
+                      color: p.textMut,
                       fontSize: 13,
                       decoration: TextDecoration.underline,
-                      decorationColor:
-                          Colors.white.withValues(alpha: 0.3),
+                      decorationColor: p.textMut,
                     ),
                   ),
                 ),

@@ -14,6 +14,8 @@ import '../../l10n/app_localizations.dart';
 import '../../providers/schedule_provider.dart';
 import '../../providers/tutorial_provider.dart';
 import '../../services/analytics_service.dart';
+import '../../widgets/spotlight_overlay.dart';
+import '../../widgets/banner_ad_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,7 +29,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _waterTargetN = 8;
   int _containerMl = 250;
   String _containerType = 'glass'; // 'glass' | 'bottle'
-  String _wellyName = 'Welly';
   bool _showWorkBanner = false;
   bool _slowdownDismissed = false;
   // Persistito in prefs come 'never_miss_twice_dismissed_date' (YYYY-M-D)
@@ -51,14 +52,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _loadData();
     // Ascolta ProgressionProvider per ricaricare quando debug simulate/reset
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       _progressionRef = context.read<ProgressionProvider>()
         ..addListener(_loadData);
       // Prima valutazione sblocchi dell'app (una volta al giorno)
       context.read<ProgressionProvider>().evaluateIfNewDay();
-      // Tutorial: prima apertura home (scheduleTrigger riprova se init() non è ancora completo)
-      context.read<TutorialProvider>().scheduleTrigger('home_first_open', context);
+      // Spotlight tutorial: nuovi utenti → guida interattiva stile videogame.
+      // Utenti esistenti → popup Welly classico.
+      await _checkHomeSpotlight();
     });
   }
 
@@ -135,12 +137,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (mounted) {
       setState(() {
         _waterCount = prefs.getInt('water_count') ?? 0;
-        _wellyName = prefs.getString('welly_name') ?? 'Welly';
         _waterTargetN = prefs.getInt('water_target_n') ?? 8;
         _containerMl = prefs.getInt('water_container_ml') ?? 250;
         _neverMissTwiceDismissedDate = neverMissDismissed;
         _containerType = prefs.getString('water_container_type') ?? 'glass';
-        _showWorkBanner = userType == 'worker' && !scheduleConfirmed && appDay >= 2;
+        // ScheduleProvider tratta 'both' come 'worker' (usa gli stessi orari
+        // di lavoro per suggerire le abitudini, vedi getHabitForNow) — ma
+        // qui il banner per confermarli veniva mostrato solo a 'worker',
+        // lasciando gli utenti 'both' bloccati sugli orari di default senza
+        // mai poterli modificare.
+        _showWorkBanner = (userType == 'worker' || userType == 'both') &&
+            !scheduleConfirmed && appDay >= 2;
         _waterCooldownActive = cooldownActive;
         _lastGlassAddedAt = lastGlassAt;
         _lastGlassPoints = lastGlassPts;
@@ -153,6 +160,50 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _waterCooldownTimer = Timer(remaining, () {
           if (mounted) setState(() => _waterCooldownActive = false);
         });
+      }
+    }
+  }
+
+  // ── Spotlight tutorial (guida interattiva nuovi utenti) ──────────────────
+
+  /// Non più `static const`: lo step "prova ora" del bicchiere deve poter
+  /// chiamare il vero `_addWater` dell'istanza (onTargetTap), non solo
+  /// mostrare testo — altrimenti il pulsante sotto il faro resta un pulsante
+  /// "finto" e l'utente è costretto a usare "Avanti" invece di provare.
+  List<SpotlightStep> _buildHomeSpotlightSteps() => [
+    const SpotlightStep(textId: 'home_welcome'),                                    // intro a schermo intero
+    const SpotlightStep(textId: 'home_water',    targetId: 'spot_water_section'),   // tracker acqua
+    SpotlightStep(textId: 'home_add_glass',targetId: 'spot_add_glass',
+                  onTargetTap: _addWater),                                    // pulsante bicchiere — davvero cliccabile
+    const SpotlightStep(textId: 'home_welly',    targetId: 'spot_welly',            // companion
+                  shape: SpotlightShape.circle, padding: 20),
+    const SpotlightStep(textId: 'home_phase',    targetId: 'spot_phase'),           // badge fase
+    const SpotlightStep(textId: 'home_nav',      targetId: 'spot_nav'),             // nav bar
+  ];
+
+  Future<void> _checkHomeSpotlight() async {
+    if (!mounted) return;
+    final ctrl = context.read<SpotlightController>();
+    final seen = await ctrl.hasSeenTutorial('home_tour');
+    if (!mounted) return;
+    if (!seen) {
+      // Nuovo utente: aspetta che l'UI sia completamente renderizzata
+      await Future.delayed(const Duration(milliseconds: 700));
+      if (mounted) ctrl.startTutorial('home_tour', _buildHomeSpotlightSteps());
+      // Marca home_first_open (e il suo seguito in catena) come già visto:
+      // lo spotlight copre lo stesso contenuto. In precedenza questo
+      // scriveva un bool SharedPreferences che TutorialProvider non legge
+      // mai — il vecchio dialogo Welly ricompariva comunque alla visita
+      // successiva.
+      if (mounted) {
+        final tutorial = context.read<TutorialProvider>();
+        await tutorial.markSeenExternally('home_first_open');
+        await tutorial.markSeenExternally('home_first_open_2');
+      }
+    } else {
+      // Utente esistente: popup Welly classico
+      if (mounted) {
+        context.read<TutorialProvider>().scheduleTrigger('home_first_open', context);
       }
     }
   }
@@ -239,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context.read<TutorialProvider>().scheduleTrigger('first_completion', context);
       await context.read<ProgressionProvider>().markCompleted('water');
       if (mounted) {
-        await context.read<AppProvider>().completeActivity('water');
+        await context.read<AppProvider>().completeHabit('water');
       }
     }
   }
@@ -354,6 +405,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
 
         return BwScaffold(
+          bottomNavigationBar: const BannerAdWidget(),
           body: SafeArea(
             child: ListView(
               padding: EdgeInsets.fromLTRB(20, isAmb ? 80 : 24, 20, 32),
@@ -376,7 +428,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ),
                           ),
                           Text(
-                            user?.name ?? _wellyName,
+                            // Nome dell'utente — prima cadeva sul nome scelto
+                            // per il companion (welly_name) se assente,
+                            // scambiando i due concetti.
+                            user?.name ?? s.greetingFallbackName,
                             style: TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.w300,
@@ -387,19 +442,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: p.primaryLight,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        '${s.phase} $phase',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: p.primaryText,
+                    SpotlightTarget(
+                      id: 'spot_phase',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: p.primaryLight,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${s.phase} $phase',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: p.primaryText,
+                          ),
                         ),
                       ),
                     ),
@@ -459,10 +517,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                 // ── Companion ────────────────────────────────────────
                 Center(
-                  child: DebugTrigger(
-                    child: CompanionWidget(
-                      size: 180,
-                      mood: _wellyMood,
+                  child: SpotlightTarget(
+                    id: 'spot_welly',
+                    child: DebugTrigger(
+                      child: CompanionWidget(
+                        size: 180,
+                        mood: _wellyMood,
+                      ),
                     ),
                   ),
                 ),
@@ -483,28 +544,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ],
 
                 // ── Tracker acqua ────────────────────────────────────
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      s.waterToday,
-                      style: TextStyle(
-                        fontSize: isAmb ? 18 : 16,
-                        fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
-                        color: p.text,
-                        fontStyle: isAmb ? FontStyle.italic : FontStyle.normal,
-                        letterSpacing: isAmb ? 1 : 0,
+                SpotlightTarget(
+                  id: 'spot_water_section',
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        s.waterToday,
+                        style: TextStyle(
+                          fontSize: isAmb ? 18 : 16,
+                          fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
+                          color: p.text,
+                          fontStyle: isAmb ? FontStyle.italic : FontStyle.normal,
+                          letterSpacing: isAmb ? 1 : 0,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '$_waterCount / $_waterTargetN ${s.waterGlasses}',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: isWaterDone ? p.primary : p.accent,
+                      Text(
+                        '$_waterCount / $_waterTargetN ${s.waterGlasses}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: isWaterDone ? p.primary : p.accent,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 6),
                 // Testo contestuale Welly
@@ -557,25 +621,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   )
                 else
-                  GestureDetector(
-                    onTap: _waterCooldownActive ? null : _addWater,
-                    child: AnimatedOpacity(
-                      opacity: _waterCooldownActive ? 0.55 : 1.0,
-                      duration: const Duration(milliseconds: 200),
-                      child: Container(
-                        width: double.infinity,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: p.btn,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Center(
-                          child: Text(
-                            _waterCooldownActive ? s.waterCooldown : s.addGlass,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: p.btnText,
+                  SpotlightTarget(
+                    id: 'spot_add_glass',
+                    child: GestureDetector(
+                      onTap: _waterCooldownActive ? null : _addWater,
+                      child: AnimatedOpacity(
+                        opacity: _waterCooldownActive ? 0.55 : 1.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Container(
+                          width: double.infinity,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: p.btn,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _waterCooldownActive ? s.waterCooldown : s.addGlass,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: p.btnText,
+                              ),
                             ),
                           ),
                         ),
@@ -659,7 +726,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   children: [
                     _StatPill(
                       emoji: '🔥',
-                      label: '${user?.streak ?? 0} ${s.daysStreak}',
+                      label: '${context.watch<AppProvider>().liveStreak} ${s.daysStreak}',
                       p: p,
                     ),
                     const SizedBox(width: 8),

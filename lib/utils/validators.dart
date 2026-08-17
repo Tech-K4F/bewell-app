@@ -1,45 +1,38 @@
+import '../l10n/app_localizations.dart';
+
 /// Validatori condivisi tra le schermate auth
 class BwValidators {
   BwValidators._();
 
   /// Email RFC 5322 semplificato
-  static String? email(String? value) {
+  static String? email(String? value, BwStrings s) {
     if (value == null || value.trim().isEmpty) {
-      return 'Inserisci la tua email';
+      return s.validationEmailRequired;
     }
     final regex = RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
     if (!regex.hasMatch(value.trim())) {
-      return 'Inserisci un\'email valida';
+      return s.errorInvalidEmail;
     }
     return null;
   }
 
   /// Password solo per login (min 1 char)
-  static String? loginPassword(String? value) {
-    if (value == null || value.isEmpty) return 'Inserisci la password';
+  static String? loginPassword(String? value, BwStrings s) {
+    if (value == null || value.isEmpty) return s.validationPasswordRequired;
     return null;
   }
 
   /// Password per registrazione (min 8 char)
-  static String? registerPassword(String? value) {
-    if (value == null || value.isEmpty) return 'Inserisci una password';
-    if (value.length < 8) return 'Minimo 8 caratteri';
+  static String? registerPassword(String? value, BwStrings s) {
+    if (value == null || value.isEmpty) return s.validationPasswordRequired;
+    if (value.length < 8) return s.validationPasswordTooShort;
     return null;
   }
 
-  /// Conferma password
-  static String? Function(String?) confirmPassword(String password) {
-    return (String? value) {
-      if (value == null || value.isEmpty) return 'Conferma la password';
-      if (value != password) return 'Le password non coincidono';
-      return null;
-    };
-  }
-
   /// Nome utente
-  static String? name(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Inserisci il tuo nome';
-    if (value.trim().length < 2) return 'Minimo 2 caratteri';
+  static String? name(String? value, BwStrings s) {
+    if (value == null || value.trim().isEmpty) return s.validationNameRequired;
+    if (value.trim().length < 2) return s.validationNameTooShort;
     return null;
   }
 }
@@ -59,13 +52,13 @@ class PasswordStrength {
     return PasswordStrength(score.clamp(1, 4));
   }
 
-  String get label {
+  String label(BwStrings s) {
     switch (score) {
       case 0: return '';
-      case 1: return 'Debole';
-      case 2: return 'Media';
-      case 3: return 'Forte';
-      default: return 'Molto forte';
+      case 1: return s.passwordStrengthWeak;
+      case 2: return s.passwordStrengthMedium;
+      case 3: return s.passwordStrengthStrong;
+      default: return s.passwordStrengthVeryStrong;
     }
   }
 

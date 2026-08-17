@@ -3,7 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/progression_provider.dart';
+import '../../providers/app_provider.dart';
+import '../../providers/inapp_provider.dart';
 import '../../models/habit_library.dart';
+import 'spotlight_overlay.dart';
 
 // ── Config globale debug ──────────────────────────────────────────────────────
 class DebugConfig {
@@ -388,6 +391,7 @@ class _DebugPanelState extends State<DebugPanel> {
                           final prefs = await SharedPreferences.getInstance();
                           await prefs.remove('welly_welcomed');
                           await prefs.remove('welly_name');
+                          await prefs.remove('is_onboarded');
                           nav.pop();
                           nav.pushReplacementNamed('/welly-welcome');
                         },
@@ -398,9 +402,28 @@ class _DebugPanelState extends State<DebugPanel> {
                         danger: true,
                         onTap: () async {
                           final nav = Navigator.of(context);
+                          final app = context.read<AppProvider>();
+                          final inApp = context.read<InAppProvider>();
+                          final spotlight = context.read<SpotlightController>();
                           final prefs = await SharedPreferences.getInstance();
                           await prefs.clear();
                           await progression.resetAll();
+                          // Prima non veniva mai toccato: l'AppProvider in
+                          // memoria restava con punti/utente vecchi, e la
+                          // prossima _saveUser() li riscriveva su prefs
+                          // appena svuotate — il "reset" non teneva.
+                          await app.resetOnLogout();
+                          // Ricrea subito un profilo pulito dalla sessione
+                          // Firebase corrente (l'utente resta loggato) —
+                          // altrimenti AppProvider.user resta null finché
+                          // non si passa di nuovo dal login vero.
+                          await app.onLoginComplete();
+                          await inApp.debugReset();
+                          for (final tour in [
+                            'home_tour', 'habits_tour', 'growth_tour', 'marketplace_tour',
+                          ]) {
+                            await spotlight.debugReset(tour);
+                          }
                           nav.pop();
                           nav.pushReplacementNamed('/welly-welcome');
                         },

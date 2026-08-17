@@ -9,13 +9,16 @@ import '../../services/notification_service.dart';
 import '../../services/analytics_service.dart';
 import '../../widgets/badge_toast.dart';
 import '../../widgets/habits/habit_intro_sheet.dart';
+import '../../widgets/habit_consolidated_dialog.dart';
 import '../../providers/tutorial_provider.dart';
 import '../home/home_screen.dart';
 import '../habits/habits_screen.dart';
 import '../growth/growth_screen.dart';
+import '../marketplace/marketplace_screen.dart';
 import '../profile/profile_screen.dart';
+import '../../widgets/spotlight_overlay.dart';
 
-enum NavItem { home, habits, growth, profile }
+enum NavItem { home, habits, growth, marketplace, profile }
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -35,6 +38,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _knownPhase = 1;
   bool _knownFocusUnlocked = false;
   int _knownStreak = -1; // -1 = not yet seeded
+  /// key delle famiglie badge (ProgressionProvider.allBadges) già maxate —
+  /// seminato al primo caricamento, poi diffato per mostrare il toast solo
+  /// quando una famiglia raggiunge il suo livello più alto proprio ora.
+  /// Solo "maxed" (non ogni singolo livello): quando un livello intermedio
+  /// (es. bronzo) viene appena raggiunto, la tile mostrata da allBadges()
+  /// punta già al livello SUCCESSIVO da sbloccare — un toast in quel momento
+  /// mostrerebbe il nome/emoji del livello sbagliato.
+  Set<String> _knownMaxedBadgeKeys = {};
   // Evita popup di fase/sblocco al primo caricamento (progression.init() è asincrono
   // e il seeding iniziale avviene prima che gli stati siano caricati da prefs).
   bool _progressionSeeded = false;
@@ -56,6 +67,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       // _knownStreak = -1 → primo _checkStreakTutorials lo inizializzerà senza sparare.
       // Controlla inattività al primo avvio (una tantum — TutorialProvider deduplica)
       _checkInactivityTutorial();
+      context.read<SpotlightController>().loadCompanionName();
     });
   }
 
@@ -73,6 +85,17 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     switch (state) {
       case AppLifecycleState.resumed:
         NotificationService.instance.setForeground(true);
+        // Rivaluta i nuovi sblocchi al resume — qui, non solo in
+        // HomeScreen.didChangeAppLifecycleState, perché HomeShell mostra un
+        // solo screen alla volta (non un IndexedStack): se l'utente torna in
+        // app mentre è su Habits/Growth/Marketplace/Profile, HomeScreen non
+        // esiste nell'albero e il suo observer non riceve questo evento —
+        // la valutazione giornaliera restava bloccata finché non si tornava
+        // manualmente sul tab Home. evaluateIfNewDay() è dedup'd per data,
+        // quindi chiamarla anche da HomeScreen.initState() resta innocuo.
+        if (_progressionRef != null) {
+          _progressionRef!.evaluateIfNewDay();
+        }
         // Controlla se l'utente è stato inattivo 3+ giorni al ritorno in app
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _checkInactivityTutorial();
@@ -99,15 +122,48 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       _knownPhase = prog.currentPhase;
       _knownActiveIds = prog.activeHabits.map((h) => h.id).toSet();
       _knownFocusUnlocked = prog.activeHabits.any((h) => h.id == 'focus_25');
+      _knownMaxedBadgeKeys = prog.allBadges(context.sL)
+          .where((b) => b.isMaxed)
+          .map((b) => b.key)
+          .toSet();
       return; // Non sparare alcun popup/toast sul primo caricamento
     }
+    _checkConsolidationCelebration(prog);
+  }
+
+  // ── Celebrazione consolidamento ───────────────────────────────────────────
+  // Mostrata PRIMA di proporre una nuova abitudine: il traguardo va
+  // festeggiato per sé, non liquidato come passo intermedio verso la
+  // prossima cosa da fare.
+  void _checkConsolidationCelebration(ProgressionProvider prog) {
+    final habitId = prog.nextConsolidationToCelebrate;
+    if (habitId == null) {
+      _afterConsolidationChecks();
+      return;
+    }
+    if (_introShowing) return; // riproverà al prossimo notifyListeners()
+    _introShowing = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _introShowing = false;
+        return;
+      }
+      await HabitConsolidatedDialog.show(context, habitId);
+      prog.consumeNextConsolidation();
+      if (!mounted) return;
+      _introShowing = false;
+      _afterConsolidationChecks();
+    });
+  }
+
+  void _afterConsolidationChecks() {
     _checkPendingChoice();
     _checkNewHabits();
     _checkProgressionTutorials();
+    _checkNewBadges();
   }
 
   void _onAppChange() {
-    _checkNewBadges();
     _checkStreakTutorials();
   }
 
@@ -148,7 +204,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     final app = context.read<AppProvider>();
     final tutorial = context.read<TutorialProvider>();
     final prev = _knownStreak;
-    final curr = app.user?.streak ?? 0;
+    final curr = app.liveStreak;
 
     // Prima esecuzione: inizializza senza sparare trigger
     if (prev < 0) {
@@ -272,12 +328,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   void _checkNewBadges() {
     if (!mounted) return;
-    final app = context.read<AppProvider>();
-    final badges = List<String>.from(app.newlyEarnedBadges);
-    if (badges.isEmpty) return;
-    app.clearNewBadges();
-    for (final badgeId in badges) {
-      BwBanner.showBadge(context, badgeId);
+    final progression = context.read<ProgressionProvider>();
+    final s = context.sL;
+    for (final b in progression.allBadges(s)) {
+      final justMaxed = b.isMaxed && !_knownMaxedBadgeKeys.contains(b.key);
+      if (b.isMaxed) _knownMaxedBadgeKeys.add(b.key);
+      if (justMaxed) {
+        BwBanner.showBadge(context, emoji: b.emoji, title: b.name, subtitle: b.description);
+      }
     }
   }
 
@@ -311,7 +369,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   // ── Navigazione con analytics ─────────────────────────────────────────────
 
   void _onNavTap(int i) {
-    const tabNames = ['home', 'habits', 'growth', 'profile'];
+    const tabNames = ['home', 'habits', 'growth', 'marketplace', 'profile'];
     final tabName = tabNames[i.clamp(0, tabNames.length - 1)];
     AnalyticsService.instance.logTabOpened(tabName);
     if (i == 2 && _progressionRef != null) {
@@ -334,14 +392,19 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         final screens = _buildScreens(progression);
         final currentIndex = app.currentNavIndex.clamp(0, tabs.length - 1);
 
-        return Scaffold(
-          backgroundColor: p.bg,
-          body: screens[currentIndex],
-          bottomNavigationBar: _ProgressiveNavBar(
-            tabs: tabs,
-            currentIndex: currentIndex,
-            p: p,
-            onTap: _onNavTap,
+        return SpotlightOverlay(
+          child: Scaffold(
+            backgroundColor: p.bg,
+            body: screens[currentIndex],
+            bottomNavigationBar: SpotlightTarget(
+              id: 'spot_nav',
+              child: _ProgressiveNavBar(
+                tabs: tabs,
+                currentIndex: currentIndex,
+                p: p,
+                onTap: _onNavTap,
+              ),
+            ),
           ),
         );
       },
@@ -380,6 +443,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         unlockHint: s.navUnlockGrowthMsg,
       ),
       const _NavTab(
+        icon: Icons.card_giftcard_outlined,
+        activeIcon: Icons.card_giftcard_rounded,
+        item: NavItem.marketplace,
+        available: true,
+      ),
+      const _NavTab(
         icon: Icons.person_outline,
         activeIcon: Icons.person_rounded,
         item: NavItem.profile,
@@ -397,6 +466,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       _growthUnlocked(progression)
           ? const GrowthScreen()
           : const _ComingSoonScreen(item: NavItem.growth),
+      const MarketplaceScreen(),
       const ProfileScreen(),
     ];
   }
@@ -529,10 +599,11 @@ class _ProgressiveNavBar extends StatelessWidget {
   String _translateLabel(BuildContext context, NavItem item) {
     final s = context.sL;
     switch (item) {
-      case NavItem.home:    return s.navHome;
-      case NavItem.habits:  return s.navHabits;
-      case NavItem.growth:  return s.navGrowth;
-      case NavItem.profile: return s.navProfile;
+      case NavItem.home:        return s.navHome;
+      case NavItem.habits:      return s.navHabits;
+      case NavItem.growth:      return s.navGrowth;
+      case NavItem.marketplace: return s.navRewards;
+      case NavItem.profile:     return s.navProfile;
     }
   }
 

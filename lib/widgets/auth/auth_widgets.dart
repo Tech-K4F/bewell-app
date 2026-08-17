@@ -1,18 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../l10n/app_localizations.dart';
 import 'package:bewell/utils/validators.dart';
-
-// ── Palette colori auth ────────────────────────────────────────────────────
-const _teal = Color(0xFF1E9E87);
-const _tealLight = Color(0x1A1E9E87);
-const _coral = Color(0xFFE05640);
-const _coralLight = Color(0x1AE05640);
-const _panel = Color(0xFF0F1F33);
-const _panelBorder = Color(0xFF1A2E42);
-const _darkPanel = Color(0xFF0B1929);
-const _textSecondary = Color(0x99FFFFFF);
-const _textMuted = Color(0x40FFFFFF);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BOTTONI SSO
@@ -109,17 +99,18 @@ class OrDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     return Row(
       children: [
-        Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
+        Expanded(child: Divider(color: p.cardBorder)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Text(
-            'oppure con email',
-            style: TextStyle(color: Colors.black87.withValues(alpha: 0.3), fontSize: 12),
+            context.sL.orDivider,
+            style: TextStyle(color: p.textMut, fontSize: 12),
           ),
         ),
-        Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
+        Expanded(child: Divider(color: p.cardBorder)),
       ],
     );
   }
@@ -149,7 +140,7 @@ class BwEmailField extends StatelessWidget {
   Widget build(BuildContext context) {
     return _BwTextField(
       controller: controller,
-      label: 'Indirizzo email',
+      label: context.sL.email,
       keyboardType: TextInputType.emailAddress,
       textInputAction: TextInputAction.next,
       autocorrect: false,
@@ -170,7 +161,7 @@ class BwPasswordField extends StatefulWidget {
   final TextEditingController controller;
   final String? errorText;
   final bool enabled;
-  final String label;
+  final String? label;
   final FocusNode? focusNode;
   final VoidCallback? onEditingComplete;
   final bool showStrengthBar;
@@ -180,7 +171,7 @@ class BwPasswordField extends StatefulWidget {
     required this.controller,
     this.errorText,
     this.enabled = true,
-    this.label = 'Password',
+    this.label,
     this.focusNode,
     this.onEditingComplete,
     this.showStrengthBar = false,
@@ -195,6 +186,7 @@ class _BwPasswordFieldState extends State<BwPasswordField> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     final strength = widget.showStrengthBar
         ? PasswordStrength.of(widget.controller.text)
         : null;
@@ -204,7 +196,7 @@ class _BwPasswordFieldState extends State<BwPasswordField> {
       children: [
         _BwTextField(
           controller: widget.controller,
-          label: widget.label,
+          label: widget.label ?? context.sL.password,
           obscureText: _obscure,
           enabled: widget.enabled,
           focusNode: widget.focusNode,
@@ -215,7 +207,7 @@ class _BwPasswordFieldState extends State<BwPasswordField> {
           suffixIcon: IconButton(
             icon: Icon(
               _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-              color: Colors.white.withValues(alpha: 0.25),
+              color: p.textMut,
               size: 20,
             ),
             onPressed: () => setState(() => _obscure = !_obscure),
@@ -237,6 +229,7 @@ class _PasswordStrengthBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     final color = Color(strength.colorHex);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,7 +243,7 @@ class _PasswordStrengthBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: i < strength.score
                       ? color
-                      : Colors.white.withValues(alpha: 0.1),
+                      : p.cardBorder,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -259,7 +252,7 @@ class _PasswordStrengthBar extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          strength.label,
+          strength.label(context.sL),
           style: TextStyle(
             fontSize: 11,
             color: color,
@@ -295,7 +288,7 @@ class BwNameField extends StatelessWidget {
   Widget build(BuildContext context) {
     return _BwTextField(
       controller: controller,
-      label: 'Il tuo nome',
+      label: context.sL.name,
       keyboardType: TextInputType.name,
       textInputAction: TextInputAction.next,
       enabled: enabled,
@@ -342,8 +335,11 @@ class _BwTextField extends StatelessWidget {
     this.suffixIcon,
   });
 
+  static const _error = Color(0xFFE05640);
+
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     final hasError = errorText != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,50 +354,47 @@ class _BwTextField extends StatelessWidget {
           focusNode: focusNode,
           onEditingComplete: onEditingComplete,
           onChanged: onChanged,
-          style: const TextStyle(color: Colors.white, fontSize: 15),
+          style: TextStyle(color: p.text, fontSize: 15),
           decoration: InputDecoration(
             labelText: label,
             prefixIcon: prefixIcon != null
                 ? Icon(prefixIcon,
-                    color: hasError ? _coral : _teal, size: 20)
+                    color: hasError ? _error : p.primary, size: 20)
                 : null,
             suffixIcon: suffixIcon,
             labelStyle: TextStyle(
-              color: hasError
-                  ? _coral
-                  : Colors.white.withValues(alpha: 0.5),
+              color: hasError ? _error : p.textMut,
               fontSize: 14,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
                 color: hasError
-                    ? _coral.withValues(alpha: 0.6)
-                    : _panelBorder,
+                    ? _error.withValues(alpha: 0.6)
+                    : p.cardBorder,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: hasError ? _coral : _teal,
+                color: hasError ? _error : p.primary,
                 width: 1.5,
               ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: _coral),
+              borderSide: const BorderSide(color: _error),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: _coral, width: 1.5),
+              borderSide: const BorderSide(color: _error, width: 1.5),
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                  color: _panelBorder.withValues(alpha: 0.3)),
+              borderSide: BorderSide(color: p.cardBorder.withValues(alpha: 0.3)),
             ),
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.04),
+            fillColor: p.card,
             contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16, vertical: 16),
           ),
@@ -410,11 +403,11 @@ class _BwTextField extends StatelessWidget {
           const SizedBox(height: 5),
           Row(
             children: [
-              const Icon(Icons.error_outline, color: _coral, size: 13),
+              const Icon(Icons.error_outline, color: _error, size: 13),
               const SizedBox(width: 4),
               Text(
                 errorText!,
-                style: const TextStyle(color: _coral, fontSize: 11),
+                style: const TextStyle(color: _error, fontSize: 11),
               ),
             ],
           ),
@@ -442,33 +435,34 @@ class BwAuthButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     return SizedBox(
       width: double.infinity,
       height: 54,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _teal,
-          disabledBackgroundColor: _teal.withValues(alpha: 0.4),
+          backgroundColor: p.btn,
+          disabledBackgroundColor: p.btn.withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 22,
                 height: 22,
                 child: CircularProgressIndicator(
-                  color: Colors.white,
+                  color: p.btnText,
                   strokeWidth: 2.5,
                 ),
               )
             : Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                  color: p.btnText,
                 ),
               ),
       ),
@@ -522,23 +516,27 @@ class _AccountLockedWidgetState extends State<AccountLockedWidget> {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
+  static const _error = Color(0xFFE05640);
+
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
+    final s = context.sL;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: _coralLight,
+        color: _error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _coral.withValues(alpha: 0.3)),
+        border: Border.all(color: _error.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
           const Text('🔒', style: TextStyle(fontSize: 44)),
           const SizedBox(height: 12),
-          const Text(
-            'Account temporaneamente bloccato',
+          Text(
+            s.accountLocked,
             style: TextStyle(
-              color: Colors.white,
+              color: p.text,
               fontWeight: FontWeight.w700,
               fontSize: 15,
             ),
@@ -546,9 +544,9 @@ class _AccountLockedWidgetState extends State<AccountLockedWidget> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Troppi tentativi falliti.\nRiprova tra',
+            s.accountLockedBody,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: p.textSec,
               fontSize: 13,
             ),
             textAlign: TextAlign.center,
@@ -557,16 +555,16 @@ class _AccountLockedWidgetState extends State<AccountLockedWidget> {
           Text(
             _formatted,
             style: const TextStyle(
-              color: _coral,
+              color: _error,
               fontSize: 36,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 16),
           Text(
-            'Hai ricevuto un\'email con le istruzioni.',
+            s.accountLockedEmailSent,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
+              color: p.textMut,
               fontSize: 11,
             ),
           ),
@@ -593,14 +591,14 @@ class OfflineBanner extends StatelessWidget {
           bottom: BorderSide(color: Colors.orange.withValues(alpha: 0.3)),
         ),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.wifi_off, color: Colors.orange, size: 16),
-          SizedBox(width: 8),
+          const Icon(Icons.wifi_off, color: Colors.orange, size: 16),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Nessuna connessione — il login richiede internet',
-              style: TextStyle(color: Colors.orange, fontSize: 12),
+              context.sL.offlineLoginRequired,
+              style: const TextStyle(color: Colors.orange, fontSize: 12),
             ),
           ),
         ],

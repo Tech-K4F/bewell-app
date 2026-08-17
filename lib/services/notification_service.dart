@@ -12,10 +12,20 @@ class _Channel {
 
 /// ID notifiche (univoci)
 class _NId {
-  static const int water          = 1;
-  static const int eveningCheckin = 2;
   static const int habitChoice    = 99998;
   static int forHabit(String id)  => id.hashCode.abs() % 90000 + 10000;
+  // Reminder periodici — fascia riservata 100-119 (max ~7 al giorno).
+  static const int reminderBase   = 100;
+  static const int reminderSlots  = 20;
+  // ID del VECCHIO sistema di reminder (un solo promemoria acqua + un solo
+  // check-in serale, id fissi 1/2) da prima che diventasse multi-slot con
+  // frequenza configurabile. flutter_local_notifications schedula allarmi
+  // a livello OS che sopravvivono agli aggiornamenti dell'app: chi aveva
+  // già l'app installata continuava a ricevere QUESTI oltre ai nuovi
+  // (stessa ora, testo nella lingua in cui erano stati schedulati l'ultima
+  // volta — da cui il doppio avviso, a volte in due lingue diverse).
+  static const int legacyWater    = 1;
+  static const int legacyEvening  = 2;
 }
 
 /// Servizio notifiche locale.
@@ -108,40 +118,57 @@ class NotificationService {
   }
 
   // ── Reminder giornalieri scheduelati (localizzati) ───────────────────────────
-  // Chiamare su cambio lingua o primo avvio. Le notifiche schedulate vengono
-  // mostrate dall'OS sempre, indipendentemente dal foreground dell'app.
-
-  Future<void> rescheduleReminders({
+  // Chiamata su cambio lingua, cambio frequenza/pausa nelle impostazioni, o
+  // primo avvio. Le notifiche schedulate vengono mostrate dall'OS sempre,
+  // indipendentemente dal foreground dell'app.
+  //
+  // [hours] è la lista di ore (0-23) a cui inviare un reminder — vuota se
+  // l'utente ha disattivato le notifiche o è in pausa. Il primo orario usa
+  // sempre il messaggio "acqua" (naturalmente mattutino), l'ultimo il
+  // messaggio "check-in serale", quelli intermedi il messaggio generico
+  // sulle abitudini — così non è più sempre lo stesso testo ripetuto.
+  Future<void> scheduleReminders({
+    required List<int> hours,
     required String waterTitle,
     required String waterBody,
+    required String habitTitle,
+    required String habitBody,
     required String eveningTitle,
     required String eveningBody,
   }) async {
     if (!_initialized) return;
     try {
-      // Cancella i vecchi reminder prima di ripianificare
-      await _plugin.cancel(_NId.water);
-      await _plugin.cancel(_NId.eveningCheckin);
+      await cancelReminders();
+      if (hours.isEmpty) return;
 
-      await _scheduleDaily(
-        id: _NId.water,
-        title: waterTitle,
-        body: waterBody,
-        hour: 10,
-        minute: 0,
-        channel: _Channel.water,
-      );
-      await _scheduleDaily(
-        id: _NId.eveningCheckin,
-        title: eveningTitle,
-        body: eveningBody,
-        hour: 20,
-        minute: 0,
-        channel: _Channel.habits,
-      );
+      for (var i = 0; i < hours.length && i < _NId.reminderSlots; i++) {
+        final isFirst = i == 0;
+        final isLast = i == hours.length - 1;
+        final title = isFirst ? waterTitle : (isLast ? eveningTitle : habitTitle);
+        final body = isFirst ? waterBody : (isLast ? eveningBody : habitBody);
+        await _scheduleDaily(
+          id: _NId.reminderBase + i,
+          title: title,
+          body: body,
+          hour: hours[i],
+          minute: 0,
+          channel: isFirst ? _Channel.water : _Channel.habits,
+        );
+      }
     } catch (e) {
-      debugPrint('NotificationService rescheduleReminders error: $e');
+      debugPrint('NotificationService scheduleReminders error: $e');
     }
+  }
+
+  Future<void> cancelReminders() async {
+    if (!_initialized) return;
+    for (var i = 0; i < _NId.reminderSlots; i++) {
+      await _plugin.cancel(_NId.reminderBase + i);
+    }
+    // Migrazione: elimina eventuali allarmi del vecchio sistema (id 1/2)
+    // ancora registrati presso l'OS da un'installazione precedente.
+    await _plugin.cancel(_NId.legacyWater);
+    await _plugin.cancel(_NId.legacyEvening);
   }
 
   Future<void> _scheduleDaily({

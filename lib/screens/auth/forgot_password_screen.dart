@@ -2,8 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../utils/validators.dart';
 import '../../widgets/auth/auth_widgets.dart';
+import '../../widgets/bw_scaffold.dart';
+import '../../l10n/app_localizations.dart';
 
 /// S-05 · Forgot Password
 /// Flusso 3 step: richiesta → email inviata → (nuova password via deep link).
@@ -29,7 +32,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   void _submit() {
-    final err = BwValidators.email(_emailCtrl.text);
+    final s = context.sL;
+    final err = BwValidators.email(_emailCtrl.text, s);
     setState(() => _emailError = err);
     if (err != null) return;
     context.read<AuthProvider>().sendPasswordReset(_emailCtrl.text.trim());
@@ -53,18 +57,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, auth, _) {
+    return Consumer2<AuthProvider, ThemeProvider>(
+      builder: (context, auth, theme, _) {
+        final p = theme.paletteData;
+        final s = context.sL;
         final isLoading = auth.state == AuthState.loading;
         final sent = auth.state == AuthState.passwordResetSent;
 
-        return Scaffold(
-          backgroundColor: const Color(0xFF0B1929),
+        return BwScaffold(
           appBar: AppBar(
-            backgroundColor: Colors.transparent,
+            backgroundColor: p.bg,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
+              icon: Icon(Icons.arrow_back_ios, color: p.text, size: 20),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
@@ -73,8 +78,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
               child: sent
-                  ? _buildSentState(auth)
-                  : _buildRequestState(auth, isLoading),
+                  ? _buildSentState(auth, p, s)
+                  : _buildRequestState(auth, isLoading, p, s),
             ),
           ),
         );
@@ -82,7 +87,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildRequestState(AuthProvider auth, bool isLoading) {
+  Widget _buildRequestState(AuthProvider auth, bool isLoading, BwPaletteData p, BwStrings s) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -91,20 +96,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            color: const Color(0xFF1E9E87).withOpacity(0.12),
+            color: p.primaryLight,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-                color: const Color(0xFF1E9E87).withOpacity(0.25)),
+            border: Border.all(color: p.primary.withValues(alpha: 0.25)),
           ),
           child: const Center(
             child: Text('🔑', style: TextStyle(fontSize: 24)),
           ),
         ),
         const SizedBox(height: 20),
-        const Text(
-          'Password dimenticata?',
+        Text(
+          s.passwordForgotTitle,
           style: TextStyle(
-            color: Colors.white,
+            color: p.text,
             fontSize: 26,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.5,
@@ -112,9 +116,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Inserisci l\'email collegata al tuo account. Ti manderemo un link per reimpostare la password.',
+          s.passwordForgotSub,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
+            color: p.textSec,
             fontSize: 14,
             height: 1.5,
           ),
@@ -130,7 +134,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 24),
 
         BwAuthButton(
-          label: 'Invia link di reset',
+          label: s.sendResetEmail,
           isLoading: isLoading,
           onPressed: isLoading ? null : _submit,
         ),
@@ -138,7 +142,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildSentState(AuthProvider auth) {
+  Widget _buildSentState(AuthProvider auth, BwPaletteData p, BwStrings s) {
     final canResend = _resendCooldown == 0 && _resendCount < 3;
 
     return Column(
@@ -149,44 +153,31 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           width: 64,
           height: 64,
           decoration: BoxDecoration(
-            color: const Color(0xFF1E9E87).withOpacity(0.12),
+            color: p.primaryLight,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-                color: const Color(0xFF1E9E87).withOpacity(0.25)),
+            border: Border.all(color: p.primary.withValues(alpha: 0.25)),
           ),
           child: const Center(
             child: Text('✉️', style: TextStyle(fontSize: 28)),
           ),
         ),
         const SizedBox(height: 24),
-        const Text(
-          'Controlla la tua email',
+        Text(
+          s.forgotCheckEmailTitle,
           style: TextStyle(
-            color: Colors.white,
+            color: p.text,
             fontSize: 26,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.5,
           ),
         ),
         const SizedBox(height: 10),
-        RichText(
-          text: TextSpan(
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-              fontSize: 14,
-              height: 1.5,
-            ),
-            children: [
-              const TextSpan(text: 'Se esiste un account per '),
-              TextSpan(
-                text: _emailCtrl.text.trim(),
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-              const TextSpan(
-                  text:
-                      ', riceverai un link per reimpostare la password.\n\nIl link scade tra 30 minuti.'),
-            ],
+        Text(
+          '${s.forgotEmailSentBody(_emailCtrl.text.trim())}\n\n${s.forgotLinkExpiry}',
+          style: TextStyle(
+            color: p.textSec,
+            fontSize: 14,
+            height: 1.5,
           ),
         ),
         const SizedBox(height: 32),
@@ -198,22 +189,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: ElevatedButton(
             onPressed: canResend ? _resend : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E9E87),
-              disabledBackgroundColor:
-                  const Color(0xFF1E9E87).withOpacity(0.3),
+              backgroundColor: p.btn,
+              disabledBackgroundColor: p.btn.withValues(alpha: 0.3),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(
               _resendCount >= 3
-                  ? 'Limite reinvii raggiunto'
+                  ? s.forgotResendLimitReached
                   : _resendCooldown > 0
-                      ? 'Reinvia tra ${_resendCooldown}s'
-                      : 'Rinvia email',
-              style: const TextStyle(
+                      ? s.forgotResendIn(_resendCooldown)
+                      : s.resendEmail,
+              style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white),
+                  color: p.btnText),
             ),
           ),
         ),
@@ -227,13 +217,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             onPressed: () =>
                 Navigator.of(context).pushReplacementNamed('/login'),
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.white.withOpacity(0.15)),
+              side: BorderSide(color: p.cardBorder),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text(
-              'Torna al login',
-              style: TextStyle(color: Colors.white, fontSize: 15),
+            child: Text(
+              s.backToLogin,
+              style: TextStyle(color: p.text, fontSize: 15),
             ),
           ),
         ),
@@ -242,5 +232,3 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 }
-
-

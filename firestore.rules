@@ -1,0 +1,80 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // users/{uid} — profilo referral minimo:
+    //   referralCode        (string, immutabile una volta impostato)
+    //   referredBy          (string uid, scrivibile una sola volta, da chiunque
+    //                        sia autenticato — è il nuovo utente a settarlo su
+    //                        se stesso quando riscatta un codice)
+    //   pendingReferralBonus (number, incrementabile da chiunque sia autenticato
+    //                        — è chi riscatta il codice ad accreditare il bonus
+    //                        al proprietario del codice — azzerabile solo dal
+    //                        proprietario stesso)
+    match /users/{uid} {
+      allow read: if request.auth != null;
+
+      // Il proprietario può scrivere liberamente il proprio documento,
+      // tranne sovrascrivere un referralCode o un referredBy già impostati.
+      // `resource == null` copre la primissima scrittura (documento non
+      // ancora esistente) — senza questo controllo, accedere a
+      // resource.data su un documento inesistente nega SEMPRE la scrittura,
+      // bloccando la generazione del codice invito al primo utilizzo.
+      allow write: if request.auth != null && request.auth.uid == uid
+        && (
+          resource == null ||
+          (
+            (
+              !('referralCode' in resource.data) ||
+              request.resource.data.referralCode == resource.data.referralCode
+            )
+            &&
+            (
+              !('referredBy' in resource.data) ||
+              request.resource.data.referredBy == resource.data.referredBy
+            )
+          )
+        );
+
+      // Un altro utente autenticato può SOLO incrementare pendingReferralBonus
+      // di ESATTAMENTE referralBonusPoints (50, vedi ReferralService) per
+      // scrittura — non un valore arbitrario. Senza questo vincolo, chiunque
+      // autenticato potrebbe scrivere direttamente su Firestore (bypassando
+      // ReferralService.redeemCode()) e impostare pendingReferralBonus di un
+      // altro utente a un numero enorme, che quello poi si accrediterebbe
+      // come punti reali al prossimo avvio via claimPendingBonus().
+      allow update: if request.auth != null && request.auth.uid != uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['pendingReferralBonus'])
+        && request.resource.data.pendingReferralBonus is number
+        && request.resource.data.pendingReferralBonus ==
+             (resource.data.pendingReferralBonus is number
+                 ? resource.data.pendingReferralBonus : 0) + 50;
+    }
+
+    // referralCodes/{code} — indice inverso codice → uid proprietario.
+    // Chiunque autenticato può leggere (serve per validare un codice inserito).
+    // Solo il proprietario può creare il proprio codice, ed è immutabile.
+    match /referralCodes/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // feedback/{autoId} — scrittura sola andata dall'app, mai letta dal
+    // client (consultata manualmente dalla Firebase Console). L'utente può
+    // solo creare un feedback a proprio nome, mai leggerlo/modificarlo/
+    // cancellarlo — evita che un utente veda il feedback di un altro.
+    match /feedback/{feedbackId} {
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.category is string
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000;
+      allow read, update, delete: if false;
+    }
+  }
+}

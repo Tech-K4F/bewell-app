@@ -3,8 +3,6 @@ import 'package:provider/provider.dart';
 import '../../providers/onboarding_provider.dart';
 import 'welcome_carousel.dart';
 import 'questionnaire_screens.dart';
-import 'plan_generation_screen.dart';
-import 'plan_preview_screen.dart';
 
 /// Shell dell'onboarding — mostra lo step corretto in base all'OnboardingProvider.
 /// Non conosce il contenuto di ogni step — delega alle schermate figlie.
@@ -28,12 +26,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     return Consumer<OnboardingProvider>(
       builder: (context, onb, _) {
-        // Onboarding completato → naviga a Home
+        // Configuratore completato → torna alla schermata da cui è stato
+        // aperto (sempre un push da Abitudini ora, mai più un passaggio
+        // obbligato dell'auth flow — pop invece di sostituire la route,
+        // altrimenti si accumulerebbe una seconda HomeShell nello stack).
         if (onb.step == OnboardingStep.done) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              Navigator.of(context).pushReplacementNamed('/home');
-            }
+            if (mounted) Navigator.of(context).pop();
           });
         }
 
@@ -79,10 +78,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return const ScheduleQuestionnaireScreen(key: ValueKey('schedule'));
       case OnboardingStep.environmentQ:
         return const EnvironmentQuestionnaireScreen(key: ValueKey('env'));
-      case OnboardingStep.generating:
-        return const PlanGenerationScreen(key: ValueKey('generating'));
-      case OnboardingStep.planPreview:
-        return const PlanPreviewScreen(key: ValueKey('preview'));
       default:
         return const SizedBox();
     }
@@ -107,7 +102,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              onb.skipAll();
+              onb.restart();
             },
             child: Text(
               'Ricomincia',

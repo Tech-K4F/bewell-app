@@ -2,27 +2,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/activity_model.dart';
+import '../models/habit_library.dart';
 import '../models/user_profile.dart';
-import '../models/badge_model.dart' as bw;
-import '../models/planner_model.dart';
 import '../models/reward_model.dart';
 import '../services/analytics_service.dart';
+import '../services/referral_service.dart';
 
 class AppProvider extends ChangeNotifier {
   bool _isLoading = true;
   bool _isOnboarded = false;
   UserProfile? _user;
-  List<Activity> _allActivities = [];
-  List<Activity> _todayPlan = [];
   Set<String> _completedToday = {};
   int _currentNavIndex = 0;
-  PlannerSettings _plannerSettings = const PlannerSettings();
-  List<ScheduleBlock> _scheduleBlocks = [];
-  Map<String, bool> _enabledActivities = {};
-  List<String> _newlyEarnedBadges = [];
   List<RedeemedReward> _redeemedRewards = [];
 
   // ── Variable ratio reward (Skinner) ───────────────────────────────────────
@@ -36,20 +28,9 @@ class AppProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isOnboarded => _isOnboarded;
   UserProfile? get user => _user;
-  List<Activity> get allActivities => _allActivities;
-  List<Activity> get todayPlan => _todayPlan;
   Set<String> get completedToday => _completedToday;
   int get currentNavIndex => _currentNavIndex;
-  PlannerSettings get plannerSettings => _plannerSettings;
-  List<ScheduleBlock> get scheduleBlocks => _scheduleBlocks;
-  Map<String, bool> get enabledActivities => _enabledActivities;
-  List<String> get newlyEarnedBadges => _newlyEarnedBadges;
   List<RedeemedReward> get redeemedRewards => _redeemedRewards;
-
-  double get todayCompletionPct {
-    if (_todayPlan.isEmpty) return 0;
-    return _completedToday.length / _todayPlan.length;
-  }
 
   /// True quando l'utente non ha completato nulla né ieri né (finora) oggi.
   /// Segnale di "rischio abbandono" — James Clear never-miss-twice rule.
@@ -62,14 +43,22 @@ class AppProvider extends ChangeNotifier {
     return todayCount == 0 && yesterdayCount == 0;
   }
 
-  int get completedCount => _completedToday.length;
-  int get totalCount => _todayPlan.length;
-
-  List<Activity> activitiesByCategory(String cat) =>
-      _allActivities.where((a) => a.category == cat).toList();
-
-  List<String> get categories =>
-      _allActivities.map((a) => a.category).toSet().toList()..sort();
+  /// Streak reale calcolata al momento della lettura, non un valore
+  /// congelato all'ultimo completamento. `_user.streak` viene aggiornato
+  /// solo dentro completeHabit(): senza questo getter, riaprire l'app dopo
+  /// un giorno saltato mostrava ancora l'ultimo streak "vivo" accanto al
+  /// banner "non fai niente da due giorni" — due segnali contraddittori
+  /// nella stessa schermata.
+  int get liveStreak {
+    if (_user == null) return 0;
+    int streak = 0;
+    var day = DateTime.now();
+    while ((_user!.weeklyCompletions[_dateKey(day)] ?? 0) > 0) {
+      streak++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
 
   // ── Init ───────────────────────────────────────────────────────────────────
   Future<void> init() async {
@@ -82,16 +71,6 @@ class AppProvider extends ChangeNotifier {
         _user = UserProfile.fromJson(json.decode(userJson));
       }
 
-      final plannerJson = prefs.getString('planner_settings');
-      if (plannerJson != null) {
-        _plannerSettings = PlannerSettings.fromJson(json.decode(plannerJson));
-      }
-
-      final enabledJson = prefs.getString('enabled_activities');
-      if (enabledJson != null) {
-        _enabledActivities = Map<String, bool>.from(json.decode(enabledJson));
-      }
-
       final redeemedJson = prefs.getString('redeemed_rewards');
       if (redeemedJson != null) {
         final list = json.decode(redeemedJson) as List;
@@ -99,37 +78,45 @@ class AppProvider extends ChangeNotifier {
             list.map((j) => RedeemedReward.fromJson(j)).toList();
       }
 
-      await _loadActivities();
       await _loadCompletedToday(prefs);
-      _buildTodayPlan();
-      _generateScheduleBlocks();
     } catch (e) {
       debugPrint('AppProvider init error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+    _claimReferralBonus();
   }
 
-  Future<void> _loadActivities() async {
+  /// Riscuote in background eventuali punti bonus maturati perché altri utenti
+  /// hanno riscattato il nostro codice invito (vedi ReferralService).
+  ///
+  /// claimPendingBonus() azzera il contatore lato server e restituisce
+  /// l'importo in un'unica transazione atomica — ma tra quel momento e
+  /// l'accredito locale (addPoints) c'è una finestra in cui un crash
+  /// perderebbe i punti per sempre (il server è già a zero, niente da
+  /// ri-reclamare al prossimo avvio). Li mettiamo prima in una chiave
+  /// SharedPreferences "da accreditare": se l'app muore nel mezzo, il
+  /// prossimo avvio la trova ancora lì e completa l'accredito.
+  Future<void> _claimReferralBonus() async {
+    const pendingKey = 'referral_bonus_pending_credit';
     try {
-      final jsonStr =
-          await rootBundle.loadString('assets/data/activities.json');
-      final dynamic decoded = json.decode(jsonStr);
-      List<dynamic> data;
-      if (decoded is List) {
-        data = decoded;
-      } else if (decoded is Map && decoded.containsKey('activities')) {
-        data = decoded['activities'] as List;
-      } else {
-        data = [];
+      final prefs = await SharedPreferences.getInstance();
+
+      final leftover = prefs.getInt(pendingKey);
+      if (leftover != null && leftover > 0) {
+        await addPoints(leftover);
+        await prefs.remove(pendingKey);
       }
-      _allActivities = data
-          .map((j) => Activity.fromJson(j as Map<String, dynamic>))
-          .toList();
+
+      final bonus = await ReferralService.instance.claimPendingBonus();
+      if (bonus > 0) {
+        await prefs.setInt(pendingKey, bonus);
+        await addPoints(bonus);
+        await prefs.remove(pendingKey);
+      }
     } catch (e) {
-      debugPrint('Error loading activities: $e — using fallback');
-      _allActivities = _fallbackActivities();
+      debugPrint('Referral bonus claim error: $e');
     }
   }
 
@@ -144,92 +131,6 @@ class AppProvider extends ChangeNotifier {
   // Chiave per il giorno specifico (usata anche per weeklyCompletions)
   String _dateKey(DateTime date) =>
       date.toIso8601String().split('T')[0];
-
-  void _buildTodayPlan() {
-    if (_allActivities.isEmpty) {
-      _todayPlan = _fallbackActivities();
-      return;
-    }
-    final essential =
-        _allActivities.where((a) => a.importance == 'Essential').take(3);
-    final recommended =
-        _allActivities.where((a) => a.importance == 'Recommended').take(4);
-    final optional =
-        _allActivities.where((a) => a.importance == 'Optional').take(2);
-    _todayPlan = [...essential, ...recommended, ...optional];
-  }
-
-  void _generateScheduleBlocks() {
-    final s = _plannerSettings;
-    _scheduleBlocks = [];
-    int timeMin = _parseTime(s.workStart);
-    int endMin = _parseTime(s.workEnd);
-    int lunchMin = s.lunchEnabled ? _parseTime(s.lunchStart) : -1;
-    int blockIdx = 1;
-
-    while (timeMin + s.focusSessionMinutes <= endMin) {
-      if (s.lunchEnabled &&
-          timeMin < lunchMin &&
-          timeMin + s.focusSessionMinutes >= lunchMin) {
-        _scheduleBlocks.add(ScheduleBlock(
-          id: 'lunch',
-          type: 'lunch',
-          title: '🍽️ Pausa pranzo',
-          startTime: _formatTime(lunchMin),
-          endTime: _formatTime(lunchMin + s.lunchDurationMinutes),
-          points: 0,
-        ));
-        timeMin = lunchMin + s.lunchDurationMinutes;
-        continue;
-      }
-      if (s.lunchEnabled &&
-          timeMin >= lunchMin &&
-          timeMin < lunchMin + s.lunchDurationMinutes) {
-        timeMin = lunchMin + s.lunchDurationMinutes;
-        continue;
-      }
-
-      final focusEnd = timeMin + s.focusSessionMinutes;
-      _scheduleBlocks.add(ScheduleBlock(
-        id: 'focus_$blockIdx',
-        type: 'focus',
-        title: '🧠 Focus Session $blockIdx',
-        startTime: _formatTime(timeMin),
-        endTime: _formatTime(focusEnd),
-        points: 60,
-      ));
-      timeMin = focusEnd;
-      blockIdx++;
-      if (timeMin >= endMin) break;
-
-      final isLong = blockIdx % 3 == 0;
-      final breakDur = isLong ? s.longBreakMinutes : s.shortBreakMinutes;
-      final breakEnd = timeMin + breakDur;
-      _scheduleBlocks.add(ScheduleBlock(
-        id: isLong ? 'long_break_$blockIdx' : 'short_break_$blockIdx',
-        type: isLong ? 'long_break' : 'short_break',
-        title: isLong ? '🧘 Wellness Break' : '⚡ Pausa Attiva',
-        startTime: _formatTime(timeMin),
-        endTime: _formatTime(breakEnd),
-        activityIds: isLong ? ['MOV003', 'STR001'] : ['STR001', 'VIS001'],
-        points: isLong ? 35 : 20,
-      ));
-      timeMin = breakEnd;
-    }
-  }
-
-  static int _parseTime(String t) {
-    final parts = t.split(':');
-    return int.parse(parts[0]) * 60 + int.parse(parts[1]);
-  }
-
-  static String _formatTime(int totalMin) {
-    final h = totalMin ~/ 60;
-    final m = totalMin % 60;
-    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
-  }
-
-  // ── Attività ───────────────────────────────────────────────────────────────
 
   // ── Acqua: punti progressivi per bicchiere ───────────────────────────────────
   // Distribuzione su N bicchieri con bonus al punto di mezzo e all'ultimo.
@@ -271,69 +172,16 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Mappa punti per gli ID delle abitudini (HabitLibrary).
-  /// Usata quando completeActivity() viene chiamata con un habitId invece di activityId.
-  static const Map<String, int> _habitPoints = {
-    'water': 0,          // Punti acqua gestiti per-bicchiere via awardWaterGlass()
-    'water_morning': 25,
-    'focus_25': 40,
-    'focus_50': 60,
-    'eyes_20_20_20': 15,
-    'neck_stretch': 20,
-    'posture': 20,
-    'breathing_box': 25,
-    'breathing_478': 25,
-    'walk_lunch': 30,
-    'desk_exercise': 20,
-    'stretching_active': 25,
-    'lunch_park': 30,
-    'meditation': 35,
-    'sleep_routine': 35,
-    'wake_consistent': 35,
-    'nap': 30,
-    'snack': 15,
-    'lunch_no_screen': 20,
-    'stairs': 15,
-    'focus_no_phone': 25,
-    'micro_walk': 20,
-    'digital_sunset': 30,
-  };
+  /// Registra il completamento di un'abitudine: punti (da [HabitDefinition],
+  /// fonte unica di verità — vedi habit_library.dart), streak, sessioni, badge.
+  /// Idempotente entro la stessa giornata.
+  Future<void> completeHabit(String habitId) async {
+    if (_completedToday.contains(habitId)) return;
+    _completedToday.add(habitId);
 
-  static const Map<String, int> _habitMinutes = {
-    'water': 1,
-    'water_morning': 1,
-    'focus_25': 25,
-    'focus_50': 50,
-    'eyes_20_20_20': 5,
-    'neck_stretch': 5,
-    'posture': 3,
-    'breathing_box': 5,
-    'breathing_478': 5,
-    'walk_lunch': 15,
-    'desk_exercise': 10,
-    'stretching_active': 15,
-    'lunch_park': 30,
-    'meditation': 15,
-    'sleep_routine': 20,
-    'wake_consistent': 5,
-    'nap': 20,
-    'snack': 5,
-    'lunch_no_screen': 30,
-    'stairs': 3,
-    'focus_no_phone': 25,
-    'micro_walk': 5,
-    'digital_sunset': 10,
-  };
-
-  Future<void> completeActivity(String activityId) async {
-    if (_completedToday.contains(activityId)) return;
-    _completedToday.add(activityId);
-
-    final activity =
-        _allActivities.where((a) => a.id == activityId).firstOrNull;
-    // Prima cerca nella mappa habit (se chiamato con habitId), poi nell'activity JSON, poi fallback
-    final basePts = _habitPoints[activityId] ?? activity?.points ?? 10;
-    final mins = _habitMinutes[activityId] ?? activity?.durationMinutes ?? 5;
+    final habit = HabitLibrary.findById(habitId);
+    final basePts = habit?.points ?? 20;
+    final mins = habit?.minutes ?? 5;
 
     // ── Variable ratio reward (Skinner, 1938) ──────────────────────────────
     // 1 completamento su 5 in modo casuale → punti tripli ("Welly Bonus").
@@ -344,10 +192,8 @@ class AppProvider extends ChangeNotifier {
     final pts = _lastCompletionWasBonus ? basePts * 3 : basePts;
 
     if (_user != null) {
-      // ── Aggiorna streak ────────────────────────────────────────────────────
       final newStreak = _calculateStreak();
 
-      // ── Aggiorna weeklyCompletions ─────────────────────────────────────────
       final todayStr = _dateKey(DateTime.now());
       final updatedWeekly = Map<String, int>.from(_user!.weeklyCompletions);
       updatedWeekly[todayStr] = (updatedWeekly[todayStr] ?? 0) + 1;
@@ -362,9 +208,8 @@ class AppProvider extends ChangeNotifier {
       );
       AnalyticsService.instance.logDayStreak(newStreak);
       if (_lastCompletionWasBonus) {
-        AnalyticsService.instance.logWellyBonus(activityId, pts);
+        AnalyticsService.instance.logWellyBonus(habitId, pts);
       }
-      await _checkAndAwardBadges();
       await _saveUser();
     }
 
@@ -373,17 +218,16 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── FIX 1: Calcolo streak reale ─────────────────────────────────────────────
-  // Logica: conta i giorni consecutivi a ritroso a partire da oggi
-  // in cui l'utente ha completato almeno 1 attività.
-  // Usa weeklyCompletions come fonte di verità (chiavi = date ISO).
+  // ── Calcolo streak reale ─────────────────────────────────────────────────
+  // Conta i giorni consecutivi a ritroso a partire da oggi in cui l'utente
+  // ha completato almeno 1 abitudine. Usa weeklyCompletions come fonte di
+  // verità (chiavi = date ISO).
   int _calculateStreak() {
     if (_user == null) return 0;
 
     // Includi anche il completamento di oggi (appena aggiunto)
     final todayStr = _dateKey(DateTime.now());
     final completions = Map<String, int>.from(_user!.weeklyCompletions);
-    // Aggiungi today se non c'è ancora (il completamento corrente)
     completions[todayStr] = (completions[todayStr] ?? 0) + 1;
 
     int streak = 0;
@@ -406,6 +250,16 @@ class AppProvider extends ChangeNotifier {
   Future<bool> redeemReward(RewardItem reward) async {
     if (_user == null) return false;
     if (_user!.points < reward.pointsCost) return false;
+    // stock == -1 → illimitato. Senza un backend non c'è vera scarsità
+    // cross-utente, ma niente impediva anche a UN SOLO utente di riscattare
+    // un premio "scorte: 20" un numero illimitato di volte sullo stesso
+    // dispositivo — questo almeno rispetta il numero dichiarato per chi lo
+    // riscatta.
+    if (reward.stock >= 0) {
+      final alreadyRedeemed =
+          _redeemedRewards.where((r) => r.rewardId == reward.id).length;
+      if (alreadyRedeemed >= reward.stock) return false;
+    }
 
     _user = _user!.copyWith(points: _user!.points - reward.pointsCost);
 
@@ -428,6 +282,25 @@ class AppProvider extends ChangeNotifier {
     return true;
   }
 
+  /// Scala [pts] punti dal saldo utente — usato da InAppProvider e futuri provider.
+  /// Restituisce true se i punti erano sufficienti e l'operazione è riuscita.
+  Future<bool> spendPoints(int pts) async {
+    if (_user == null || pts <= 0) return false;
+    if (_user!.points < pts) return false;
+    _user = _user!.copyWith(points: _user!.points - pts);
+    await _saveUser();
+    notifyListeners();
+    return true;
+  }
+
+  /// Aggiunge [pts] punti al saldo utente (rewarded ad, bonus, ecc.).
+  Future<void> addPoints(int pts) async {
+    if (_user == null || pts <= 0) return;
+    _user = _user!.copyWith(points: _user!.points + pts);
+    await _saveUser();
+    notifyListeners();
+  }
+
   Future<void> markRewardUsed(String code) async {
     final idx = _redeemedRewards.indexWhere((r) => r.code == code);
     if (idx == -1) return;
@@ -439,7 +312,7 @@ class AppProvider extends ChangeNotifier {
 
   String _generateCode(String rewardId) {
     final rand = Random();
-    final chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final suffix = List.generate(
         8, (_) => chars[rand.nextInt(chars.length)]).join();
     return '${rewardId.split('_')[0]}-$suffix';
@@ -451,68 +324,6 @@ class AppProvider extends ChangeNotifier {
     await prefs.setString('redeemed_rewards', json.encode(list));
   }
 
-  // ── Badge ──────────────────────────────────────────────────────────────────
-  Future<void> _checkAndAwardBadges() async {
-    if (_user == null) return;
-    _newlyEarnedBadges = [];
-
-    for (final badge in bw.allBadges) {
-      if (_user!.earnedBadgeIds.contains(badge.id)) continue;
-
-      bool earned = false;
-      switch (badge.metric) {
-        case 'streak':
-          earned = _user!.streak >= badge.requiredCount;
-          break;
-        case 'points':
-          earned = _user!.points >= badge.requiredCount;
-          break;
-        case 'sessions':
-          earned = _user!.totalSessions >= badge.requiredCount;
-          break;
-        case 'completions':
-          // Conta completamenti della categoria corrispondente
-          earned = _countCompletionsByCategory(badge.category) >=
-              badge.requiredCount;
-          break;
-        case 'plan_complete':
-          earned = completedCount >= totalCount && totalCount > 0;
-          break;
-      }
-
-      if (earned) {
-        final updated = List<String>.from(_user!.earnedBadgeIds)..add(badge.id);
-        _user = _user!.copyWith(earnedBadgeIds: updated);
-        _newlyEarnedBadges.add(badge.id);
-      }
-    }
-  }
-
-  // Conta completamenti totali per categoria badge
-  int _countCompletionsByCategory(String badgeCategory) {
-    if (_user == null) return 0;
-    // Usa totalSessions come proxy — in futuro si può affinare
-    // per categoria specifica con un contatore dedicato
-    switch (badgeCategory) {
-      case 'Stress':
-        // Conta sessioni breathing (attività con id STR*)
-        return _completedToday
-            .where((id) => id.startsWith('STR'))
-            .length + (_user!.totalSessions ~/ 5);
-      case 'Movimento':
-        return _completedToday
-            .where((id) => id.startsWith('MOV'))
-            .length + (_user!.totalSessions ~/ 5);
-      default:
-        return _user!.totalSessions;
-    }
-  }
-
-  void clearNewBadges() {
-    _newlyEarnedBadges = [];
-    notifyListeners();
-  }
-
   // ── Onboarding ─────────────────────────────────────────────────────────────
   Future<void> completeOnboarding(UserProfile profile) async {
     _user = profile;
@@ -520,23 +331,6 @@ class AppProvider extends ChangeNotifier {
     await _saveUser();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_onboarded', true);
-    notifyListeners();
-  }
-
-  // ── Planner ────────────────────────────────────────────────────────────────
-  Future<void> updatePlannerSettings(PlannerSettings s) async {
-    _plannerSettings = s;
-    _generateScheduleBlocks();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('planner_settings', json.encode(s.toJson()));
-    notifyListeners();
-  }
-
-  Future<void> toggleActivity(String id, bool enabled) async {
-    _enabledActivities[id] = enabled;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        'enabled_activities', json.encode(_enabledActivities));
     notifyListeners();
   }
 
@@ -554,7 +348,11 @@ class AppProvider extends ChangeNotifier {
     }
     final needsUpdate = (fbName.isNotEmpty && (_user!.name.isEmpty || _user!.name == 'Utente' || _user!.name == 'user' || _user!.name == 'ok')) || (fbEmail.isNotEmpty && _user!.email.isEmpty) || _user!.id != fbId;
     if (needsUpdate) {
-      _user = UserProfile(id: fbId, name: fbName.isNotEmpty ? fbName : _user!.name, email: fbEmail.isNotEmpty ? fbEmail : _user!.email, userType: _user!.userType, points: _user!.points, streak: _user!.streak, graceSkipsUsed: _user!.graceSkipsUsed, lastActivityDate: _user!.lastActivityDate, earnedBadgeIds: _user!.earnedBadgeIds, settings: _user!.settings, stressLevel: _user!.stressLevel, primaryGoal: _user!.primaryGoal, totalSessions: _user!.totalSessions, totalMinutes: _user!.totalMinutes, weeklyCompletions: _user!.weeklyCompletions);
+      _user = _user!.copyWith(
+        id: fbId,
+        name: fbName.isNotEmpty ? fbName : _user!.name,
+        email: fbEmail.isNotEmpty ? fbEmail : _user!.email,
+      );
       _saveUser();
     }
   }
@@ -562,23 +360,7 @@ class AppProvider extends ChangeNotifier {
   Future<void> updateDisplayName(String name) async {
     if (_user == null) return;
     await FirebaseAuth.instance.currentUser?.updateDisplayName(name);
-    _user = UserProfile(
-      id: _user!.id,
-      name: name,
-      email: _user!.email,
-      userType: _user!.userType,
-      points: _user!.points,
-      streak: _user!.streak,
-      graceSkipsUsed: _user!.graceSkipsUsed,
-      lastActivityDate: _user!.lastActivityDate,
-      earnedBadgeIds: _user!.earnedBadgeIds,
-      settings: _user!.settings,
-      stressLevel: _user!.stressLevel,
-      primaryGoal: _user!.primaryGoal,
-      totalSessions: _user!.totalSessions,
-      totalMinutes: _user!.totalMinutes,
-      weeklyCompletions: _user!.weeklyCompletions,
-    );
+    _user = _user!.copyWith(name: name);
     await _saveUser();
     notifyListeners();
   }
@@ -586,8 +368,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> resetOnLogout() async {
     _user = null;
     _completedToday.clear();
+    _redeemedRewards = [];
+    _isOnboarded = false;
     final p = await SharedPreferences.getInstance();
     await p.remove('user_profile');
+    await p.remove('redeemed_rewards');
     notifyListeners();
   }
 
@@ -608,75 +393,4 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_profile', json.encode(_user!.toJson()));
   }
-
-  Future<void> resetAll() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    _isOnboarded = false;
-    _user = null;
-    _completedToday = {};
-    _plannerSettings = const PlannerSettings();
-    _redeemedRewards = [];
-    notifyListeners();
-  }
-
-  // ── Fallback attività ──────────────────────────────────────────────────────
-  List<Activity> _fallbackActivities() => [
-        const Activity(
-          id: 'HYD001', category: 'Hydration & Nutrition',
-          name: 'Bevi un bicchiere d\'acqua', durationMinutes: 2,
-          frequency: '8x/day', notificationType: 'Soft',
-          importance: 'Essential', points: 5, pointsCategory: 'base',
-          contentType: 'reminder_text', difficulty: 1,
-          tags: ['hydration'], aiPersonalizationFactors: [], b2bRelevant: true,
-        ),
-        const Activity(
-          id: 'FOC001', category: 'Focus & Productivity',
-          name: 'Sessione Focus 25 min', durationMinutes: 25,
-          frequency: 'Daily', notificationType: 'Soft',
-          importance: 'Essential', points: 60, pointsCategory: 'productivity',
-          contentType: 'timer', difficulty: 2,
-          tags: ['focus'], aiPersonalizationFactors: [], b2bRelevant: true,
-        ),
-        const Activity(
-          id: 'STR001', category: 'Stress & Mindfulness',
-          name: 'Box Breathing 4-4-4-4', durationMinutes: 5,
-          frequency: 'Daily', notificationType: 'Soft',
-          importance: 'Essential', points: 30, pointsCategory: 'wellness',
-          contentType: 'guided_breathing', difficulty: 1,
-          tags: ['stress', 'breathing'], aiPersonalizationFactors: [], b2bRelevant: true,
-        ),
-        const Activity(
-          id: 'MOV001', category: 'Movement & Posture',
-          name: 'Pausa attiva — stretching', durationMinutes: 5,
-          frequency: 'Every 90 min', notificationType: 'Soft',
-          importance: 'Recommended', points: 25, pointsCategory: 'wellness',
-          contentType: 'guided_movement', difficulty: 1,
-          tags: ['movement'], aiPersonalizationFactors: [], b2bRelevant: true,
-        ),
-        const Activity(
-          id: 'VIS001', category: 'Eyes & Vision',
-          name: 'Regola 20-20-20', durationMinutes: 1,
-          frequency: 'Every 20 min', notificationType: 'Hard',
-          importance: 'Recommended', points: 15, pointsCategory: 'safety',
-          contentType: 'reminder_text', difficulty: 1,
-          tags: ['eyes'], aiPersonalizationFactors: [], b2bRelevant: true,
-        ),
-        const Activity(
-          id: 'SLP001', category: 'Sleep & Recovery',
-          name: 'Routine pre-sonno', durationMinutes: 10,
-          frequency: 'Daily', notificationType: 'Soft',
-          importance: 'Recommended', points: 40, pointsCategory: 'wellness',
-          contentType: 'guided_relaxation', difficulty: 1,
-          tags: ['sleep'], aiPersonalizationFactors: [], b2bRelevant: true,
-        ),
-      ];
 }
-
-
-
-
-
-
-
-

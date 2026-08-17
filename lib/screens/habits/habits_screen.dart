@@ -2,17 +2,34 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/progression_provider.dart';
 import '../../providers/schedule_provider.dart';
 import '../../models/habit_library.dart';
 import '../../widgets/bw_scaffold.dart';
+import '../../widgets/spotlight_overlay.dart';
 import '../../l10n/app_localizations.dart';
 import '../focus/focus_screen.dart';
+import '../stress/breathing_screen.dart';
+import 'guided_habit_screen.dart';
+import '../../data/habit_guides.dart';
 import 'habit_calendar.dart';
 import '../../providers/tutorial_provider.dart';
 import '../../services/analytics_service.dart';
+import '../../widgets/banner_ad_widget.dart';
+
+/// Etichetta del pulsante "avvia timer" per le abitudini con sessione guidata.
+String _timerLabel(String habitId, BwStrings s) {
+  switch (habitId) {
+    case 'focus_50': return '▶ 50 min';
+    case 'focus_25': return '▶ 25 min';
+    case 'breathing_box':
+    case 'breathing_478': return '▶ ${s.guideStart}';
+    default: return HabitGuides.hasGuide(habitId) ? '▶ ${s.guideStart}' : '▶ 25 min';
+  }
+}
 
 class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
@@ -26,12 +43,62 @@ class _HabitsScreenState extends State<HabitsScreen> {
   // sincronizzandosi con l'orologio reale del telefono.
   Timer? _clockTick;
 
+  // Configuratore a 5 fasi: facoltativo, non più un passaggio obbligato
+  // dell'onboarding. `null` = non ancora caricato da prefs.
+  bool? _hasPersonalizedPlan;
+
+  static const List<SpotlightStep> _habitsSpotlightSteps = [
+    SpotlightStep(textId: 'habits_welcome'),
+    SpotlightStep(textId: 'habits_now',  targetId: 'spot_now_card'),
+    SpotlightStep(textId: 'habits_list', targetId: 'spot_habits_card'),
+    SpotlightStep(textId: 'habits_ready'),
+  ];
+
   @override
   void initState() {
     super.initState();
     _clockTick = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _checkHabitsSpotlight();
+    });
+    _loadPersonalizedPlanState();
+  }
+
+  Future<void> _loadPersonalizedPlanState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final has = prefs.getString('questionnaire_answers') != null;
+    if (mounted) setState(() => _hasPersonalizedPlan = has);
+  }
+
+  Future<void> _openConfigurator(BuildContext context) async {
+    await Navigator.of(context).pushNamed('/onboarding');
+    await _loadPersonalizedPlanState();
+  }
+
+  Future<void> _checkHabitsSpotlight() async {
+    if (!mounted) return;
+    final ctrl = context.read<SpotlightController>();
+    final seen = await ctrl.hasSeenTutorial('habits_tour');
+    if (!mounted) return;
+    if (!seen) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) ctrl.startTutorial('habits_tour', _habitsSpotlightSteps);
+      // Vedi commento equivalente in home_screen.dart: bisogna passare dal
+      // TutorialProvider vero, non da un bool SharedPreferences che non
+      // legge nessuno.
+      if (mounted) {
+        final tutorial = context.read<TutorialProvider>();
+        await tutorial.markSeenExternally('habits_tab_first');
+        await tutorial.markSeenExternally('habit_card_explain');
+      }
+    } else {
+      if (mounted) {
+        context.read<TutorialProvider>().scheduleTrigger('habits_tab_first', context);
+      }
+    }
   }
 
   @override
@@ -132,8 +199,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
         final schedule = context.watch<ScheduleProvider>();
         final p = theme.paletteData;
 
-        // Tutorial: prima visita alla scheda Habits
-        context.read<TutorialProvider>().scheduleTrigger('habits_tab_first', context);
         final isAmb = theme.isAmbient;
         final s = context.sL;
         final habits = progression.activeHabits;
@@ -176,6 +241,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
             .toList();
 
         return BwScaffold(
+          bottomNavigationBar: const BannerAdWidget(),
           body: SafeArea(
             child: ListView(
               padding: EdgeInsets.fromLTRB(20, isAmb ? 72 : 24, 20, 40),
@@ -202,19 +268,26 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
                 // ── Card "Adesso" ─────────────────────────────────────────
                 if (habitForNow != null) ...[
-                  _NowCard(
-                    habit: habitForNow,
-                    daysCompleted: progression.daysCompletedFor(habitForNow.id),
-                    schedule: schedule,
-                    p: p,
-                    s: s,
-                    onComplete: habitForNow.id == 'water'
-                        ? null
-                        : () => _complete(context, habitForNow.id, progression, app),
-                    onStartTimer: habitForNow.id == 'focus_25' || habitForNow.id == 'focus_50'
-                        ? () => _openFocus(context, durationMinutes: habitForNow.id == 'focus_50' ? 50 : 25)
-                        : null,
-                    slotLabelFn: (slot) => _slotLabel(slot, s),
+                  SpotlightTarget(
+                    id: 'spot_now_card',
+                    child: _NowCard(
+                      habit: habitForNow,
+                      daysCompleted: progression.daysCompletedFor(habitForNow.id),
+                      schedule: schedule,
+                      p: p,
+                      s: s,
+                      onComplete: habitForNow.id == 'water'
+                          ? null
+                          : () => _complete(context, habitForNow.id, progression, app),
+                      onStartTimer: habitForNow.id == 'focus_25' || habitForNow.id == 'focus_50'
+                          ? () => _openFocus(context, durationMinutes: habitForNow.id == 'focus_50' ? 50 : 25)
+                          : habitForNow.id == 'breathing_box' || habitForNow.id == 'breathing_478'
+                              ? () => _openBreathing(context, habitId: habitForNow.id)
+                              : HabitGuides.hasGuide(habitForNow.id)
+                                  ? () => _openGuided(context, habitId: habitForNow.id)
+                                  : null,
+                      slotLabelFn: (slot) => _slotLabel(slot, s),
+                    ),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -237,13 +310,15 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     ),
                   )
                 else
-                  ...listaOggi.map((h) {
+                  ...listaOggi.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final h = entry.value;
                     final state = progression.stateOf(h.id);
                     final slot = schedule.getTimeSlot(h);
-                    return GestureDetector(
+                    final card = GestureDetector(
                       onLongPress: h.id == 'water'
                           ? null
-                          : () => _showSlowdownMenu(context, h, p, s, schedule),
+                          : () => _showSlowdownMenu(context, h, p, s),
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _HabitCard(
@@ -259,10 +334,17 @@ class _HabitsScreenState extends State<HabitsScreen> {
                               : () => _complete(context, h.id, progression, app),
                           onStartTimer: h.id == 'focus_25' || h.id == 'focus_50'
                               ? () => _openFocus(context, durationMinutes: h.id == 'focus_50' ? 50 : 25)
-                              : null,
+                              : h.id == 'breathing_box' || h.id == 'breathing_478'
+                                  ? () => _openBreathing(context, habitId: h.id)
+                                  : HabitGuides.hasGuide(h.id)
+                                      ? () => _openGuided(context, habitId: h.id)
+                                      : null,
                         ),
                       ),
                     );
+                    return idx == 0
+                        ? SpotlightTarget(id: 'spot_habits_card', child: card)
+                        : card;
                   }),
 
                 // ── Calendario giornaliero (visibile quando focus_25 sbloccato) ──
@@ -278,6 +360,23 @@ class _HabitsScreenState extends State<HabitsScreen> {
                         .scheduleTrigger('calendar_appears', context);
                     return const SizedBox.shrink();
                   }),
+                ],
+
+                // ── Configuratore facoltativo (dal primo sblocco reale) ─────
+                // Non più un passaggio obbligato dell'onboarding: appare qui,
+                // dopo il calendario, una volta che l'utente ha sbloccato
+                // almeno un'abitudine oltre quelle di partenza — a quel punto
+                // ha già visto come funziona l'app ed è pronto a raccontarle
+                // qualcosa di più su di sé per ricevere suggerimenti mirati.
+                if (_hasPersonalizedPlan != null &&
+                    habits.any((h) => !h.isStarter)) ...[
+                  const SizedBox(height: 20),
+                  _ConfiguratorCard(
+                    p: p,
+                    s: s,
+                    completed: _hasPersonalizedPlan!,
+                    onTap: () => _openConfigurator(context),
+                  ),
                 ],
 
                 // ── In arrivo (locked, max 2) ──────────────────────────────
@@ -308,7 +407,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
     // (scheduleTrigger usa postFrameCallback, sicuro anche con async successivi)
     context.read<TutorialProvider>().scheduleTrigger('first_completion', context);
     await progression.markCompleted(habitId);
-    await app.completeActivity(habitId);
+    await app.completeHabit(habitId);
 
     // ── Welly Bonus (variable ratio reward) ──────────────────────────────────
     if (app.lastCompletionWasBonus && context.mounted) {
@@ -346,6 +445,24 @@ class _HabitsScreenState extends State<HabitsScreen> {
     }
   }
 
+  void _openBreathing(BuildContext context, {required String habitId}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BreathingScreen(habitId: habitId),
+      ),
+    );
+  }
+
+  void _openGuided(BuildContext context, {required String habitId}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GuidedHabitScreen(habitId: habitId),
+      ),
+    );
+  }
+
   void _openFocus(BuildContext context, {int durationMinutes = 25}) {
     Navigator.push(
       context,
@@ -360,7 +477,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
     HabitDefinition habit,
     BwPaletteData p,
     BwStrings s,
-    ScheduleProvider schedule,
   ) {
     showModalBottomSheet(
       context: context,
@@ -371,7 +487,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
         s: s,
         onSlowdown: () async {
           AnalyticsService.instance.logSlowdownRequested(habit.id);
-          await schedule.setSlowdown(habit.id);
           await context.read<ProgressionProvider>().applySlowdown();
           if (context.mounted) Navigator.pop(context);
           if (context.mounted) {
@@ -556,7 +671,7 @@ class _NowCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      habit.id == 'focus_50' ? '▶ 50 min' : '▶ 25 min',
+                      _timerLabel(habit.id, s),
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
                     ),
                   ),
@@ -571,7 +686,7 @@ class _NowCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      s.habitsAllDone.split('.').first.trim().isEmpty ? 'Fatto' : 'Fatto',
+                      s.habitMarkDone,
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
                     ),
                   ),
@@ -757,7 +872,7 @@ class _HabitCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          habit.id == 'focus_50' ? '▶ 50 min' : '▶ 25 min',
+                          _timerLabel(habit.id, s),
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.btnText),
                         ),
                       ),
@@ -831,6 +946,16 @@ class _SlowdownMenuSheet extends StatelessWidget {
             s.habitName(habit.id),
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.text),
           ),
+          const SizedBox(height: 6),
+          // Il rallentamento non è per-abitudine: mette in pausa TUTTE le
+          // nuove proposte per 2 settimane. Prima questo non era spiegato
+          // da nessuna parte e il menu (aperto da una singola card) lasciava
+          // credere il contrario.
+          Text(
+            s.slowdownMenuSubtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: p.textSec, height: 1.4),
+          ),
           const SizedBox(height: 20),
           _SlowdownOption(
             emoji: '⏸',
@@ -841,7 +966,7 @@ class _SlowdownMenuSheet extends StatelessWidget {
           const SizedBox(height: 10),
           _SlowdownOption(
             emoji: '😮‍💨',
-            label: 'Questa abitudine mi pesa troppo',
+            label: s.slowdownReasonHeavy,
             p: p,
             onTap: onSlowdown,
           ),
@@ -849,7 +974,7 @@ class _SlowdownMenuSheet extends StatelessWidget {
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Text(
-              'Annulla',
+              s.cancel,
               style: TextStyle(fontSize: 14, color: p.textMut),
             ),
           ),
@@ -1036,6 +1161,73 @@ class _ArcPainter extends CustomPainter {
 }
 
 // ── Section Label ─────────────────────────────────────────────────────────────
+// ── Configurator Card ─────────────────────────────────────────────────────────
+/// Invito facoltativo a compilare il questionario di personalizzazione:
+/// appare dopo il calendario, solo dopo il primo sblocco reale.
+class _ConfiguratorCard extends StatelessWidget {
+  final BwPaletteData p;
+  final BwStrings s;
+  final bool completed;
+  final VoidCallback onTap;
+  const _ConfiguratorCard({
+    required this.p,
+    required this.s,
+    required this.completed,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: completed ? p.cardBorder : p.accent.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: (completed ? p.primary : p.accent).withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                completed ? Icons.tune_rounded : Icons.auto_awesome_rounded,
+                color: completed ? p.primary : p.accent,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    completed ? s.configuratorDoneTitle : s.configuratorTitle,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    completed ? s.configuratorDoneSubtitle : s.configuratorSubtitle,
+                    style: TextStyle(fontSize: 12, color: p.textSec),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: p.textMut, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SectionLabel extends StatelessWidget {
   final String label;
   final BwPaletteData p;

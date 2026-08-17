@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/app_provider.dart';
+import '../../services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -19,23 +17,29 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _navigate() async {
-    await Future.delayed(const Duration(milliseconds: 800));
+    // Aspetta che Firebase Auth ripristini la sessione persistita.
+    // currentUser può restare null per una frazione di secondo dopo l'avvio
+    // anche quando l'utente HA una sessione valida — controllarlo subito
+    // dopo un delay fisso (come prima) fa credere all'app che l'utente non
+    // sia loggato, chiedendo il login a ogni riapertura. authStateChanges()
+    // invece emette il valore vero solo quando Firebase ha davvero finito.
+    final user = await AuthService.instance.authStateChanges.first
+        .timeout(const Duration(seconds: 5), onTimeout: () => null);
+    // Breve pausa per non far lampeggiare lo splash troppo velocemente.
+    await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
 
-    final auth = context.read<AuthProvider>();
     final prefs = await SharedPreferences.getInstance();
 
-    if (!auth.isAuthenticated) {
+    if (user == null) {
       Navigator.pushReplacementNamed(context, '/login');
       return;
     }
 
-    final isOnboarded = prefs.getBool('is_onboarded') ?? false;
-    if (!isOnboarded) {
-      Navigator.pushReplacementNamed(context, '/login');
-      return;
-    }
-
+    // Il configuratore a 5 fasi (questionario) NON è più un passaggio
+    // obbligato: è facoltativo, raggiungibile dalla sezione Abitudini dopo
+    // il primo sblocco. L'unico prerequisito per Home è aver visto il
+    // carosello di benvenuto "Be Well".
     final wellyWelcomed = prefs.getBool('welly_welcomed') ?? false;
     if (!wellyWelcomed) {
       Navigator.pushReplacementNamed(context, '/welly-welcome');

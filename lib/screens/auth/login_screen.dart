@@ -39,8 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailCtrl.text.trim().isNotEmpty && _passwordCtrl.text.isNotEmpty;
 
   void _validateAndSubmit() {
-    final emailErr = BwValidators.email(_emailCtrl.text);
-    final passErr = BwValidators.loginPassword(_passwordCtrl.text);
+    final s = context.sL;
+    final emailErr = BwValidators.email(_emailCtrl.text, s);
+    final passErr = BwValidators.loginPassword(_passwordCtrl.text, s);
     setState(() {
       _emailError = emailErr;
       _passwordError = passErr;
@@ -162,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           if (auth.state == AuthState.error &&
                               auth.lastError != null)
                             _ErrorBanner(
-                              message: auth.lastError!.userMessage,
+                              message: auth.lastError!.localizedMessage(s),
                               attemptsRemaining: auth.attemptsRemaining,
                               onDismiss: auth.clearError,
                               p: p,
@@ -327,8 +328,8 @@ class _LoginScreenState extends State<LoginScreen> {
       case AuthNavigation.toHome:
         await context.read<AppProvider>().onLoginComplete();
         if (context.mounted) Navigator.of(context).pushReplacementNamed('/home');
-      case AuthNavigation.toOnboarding:
-        Navigator.of(context).pushReplacementNamed('/onboarding');
+      case AuthNavigation.toWelcome:
+        Navigator.of(context).pushReplacementNamed('/welly-welcome');
       default:
         break;
     }

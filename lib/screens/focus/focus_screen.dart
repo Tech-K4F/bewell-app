@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/app_provider.dart';
+import '../../providers/progression_provider.dart';
+import '../../models/habit_library.dart';
 import '../../widgets/bw_scaffold.dart';
 import '../../services/analytics_service.dart';
 
@@ -21,6 +24,7 @@ class FocusScreen extends StatefulWidget {
 class _FocusScreenState extends State<FocusScreen>
     with SingleTickerProviderStateMixin {
   int get _totalSeconds => widget.durationMinutes * 60;
+  String get _habitId => widget.durationMinutes >= 50 ? 'focus_50' : 'focus_25';
   late int _remaining;
   _TimerState _state = _TimerState.idle;
   Timer? _timer;
@@ -31,6 +35,10 @@ class _FocusScreenState extends State<FocusScreen>
   // Per sessioni da 50 min (Deep Work) non è rilevante.
   int _blockNumber = 1;
   bool get _isPomodoro => widget.durationMinutes == 25;
+
+  // Sessioni completate in questa visita (dato reale, non finto — l'app non
+  // tiene un contatore "sessioni di oggi" separato dal resto delle abitudini).
+  int _sessionsCompletedThisVisit = 0;
 
   // Testo informativo sotto il timer
   String _sessionInfoText(BuildContext context) {
@@ -79,6 +87,8 @@ class _FocusScreenState extends State<FocusScreen>
           _state = _TimerState.done;
           _timer?.cancel();
           AnalyticsService.instance.logFocusSessionCompleted(_totalSeconds ~/ 60);
+          _sessionsCompletedThisVisit++;
+          _markHabitCompleted();
           // Avanza il contatore blocco Pomodoro (1-4, poi torna a 1)
           if (_isPomodoro) {
             _blockNumber = _blockNumber < 4 ? _blockNumber + 1 : 1;
@@ -86,6 +96,30 @@ class _FocusScreenState extends State<FocusScreen>
         }
       });
     });
+  }
+
+  /// Registra il completamento dell'abitudine (punti/streak/progressione).
+  /// Idempotente entro la giornata — sicuro da chiamare a ogni blocco Pomodoro.
+  Future<void> _markHabitCompleted() async {
+    final progression = context.read<ProgressionProvider>();
+    final app = context.read<AppProvider>();
+    await progression.markCompleted(_habitId);
+    if (!mounted) return;
+    await app.completeHabit(_habitId);
+    if (!mounted) return;
+
+    // A differenza di respirazione/abitudini guidate/tap-to-complete, Focus
+    // non dava mai un riscontro dei punti guadagnati — il completamento era
+    // silenzioso nonostante sia l'abitudine che vale di più.
+    final basePts = HabitLibrary.findById(_habitId)?.points ?? 0;
+    final pts = app.lastCompletionWasBonus ? basePts * 3 : basePts;
+    if (pts <= 0) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(context.sL.breathingPointsEarned(pts)),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   void _pause() {
@@ -114,10 +148,13 @@ class _FocusScreenState extends State<FocusScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeProvider>(
-      builder: (context, theme, _) {
+    return Consumer2<ThemeProvider, AppProvider>(
+      builder: (context, theme, app, _) {
         final p = theme.paletteData;
         final isAmb = theme.isAmbient;
+        final streak = app.liveStreak;
+        final sessionsLabel = '$_sessionsCompletedThisVisit';
+        final minutesLabel = '${_sessionsCompletedThisVisit * widget.durationMinutes}';
 
         return BwScaffold(
           body: SafeArea(
@@ -290,7 +327,7 @@ class _FocusScreenState extends State<FocusScreen>
                 if (isAmb) ...[
                   Divider(color: p.cardBorder, height: 1),
                   const SizedBox(height: 20),
-                  Text('oggi',
+                  Text(context.sL.heatmapToday,
                       style: TextStyle(
                         fontSize: 11,
                         fontFamily: 'CormorantGaramond',
@@ -301,18 +338,18 @@ class _FocusScreenState extends State<FocusScreen>
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      _AmbStat(label: context.sL.focusSessions, value: '3', p: p),
-                      _AmbStat(label: context.sL.focusMinutes, value: '75', p: p),
-                      _AmbStat(label: context.sL.focusStreak, value: '7', p: p),
+                      _AmbStat(label: context.sL.focusSessions, value: sessionsLabel, p: p),
+                      _AmbStat(label: context.sL.focusMinutes, value: minutesLabel, p: p),
+                      _AmbStat(label: context.sL.focusStreak, value: '$streak', p: p),
                     ],
                   ),
                 ] else ...[
                   Row(children: [
-                    Expanded(child: _StatCard(label: context.sL.focusSessions, value: '3', p: p)),
+                    Expanded(child: _StatCard(label: context.sL.focusSessions, value: sessionsLabel, p: p)),
                     const SizedBox(width: 10),
-                    Expanded(child: _StatCard(label: context.sL.focusMinutes, value: '75', p: p)),
+                    Expanded(child: _StatCard(label: context.sL.focusMinutes, value: minutesLabel, p: p)),
                     const SizedBox(width: 10),
-                    Expanded(child: _StatCard(label: context.sL.focusStreak, value: '7 gg', p: p)),
+                    Expanded(child: _StatCard(label: context.sL.focusStreak, value: '$streak gg', p: p)),
                   ]),
                 ],
               ],

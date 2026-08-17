@@ -10,7 +10,7 @@ import '../models/habit_library.dart';
 
 // ── Tipo utente ───────────────────────────────────────────────────────────────
 
-enum UserType { student, worker }
+enum UserType { student, worker, both }
 
 // ── Fascia oraria ─────────────────────────────────────────────────────────────
 
@@ -66,10 +66,6 @@ class ScheduleProvider extends ChangeNotifier {
   UserType _userType = UserType.worker;
   WorkSchedule _schedule = const WorkSchedule();
 
-  /// Per ogni abitudine: timestamp (millisecondsSinceEpoch) dell'eventuale
-  /// rallentamento volontario. Se null → nessun rallentamento attivo.
-  final Map<String, int> _slowdownTimestamps = {};
-
   UserType get userType => _userType;
   WorkSchedule get schedule => _schedule;
 
@@ -79,7 +75,11 @@ class ScheduleProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
 
     final typeStr = prefs.getString('user_type') ?? 'worker';
-    _userType = typeStr == 'student' ? UserType.student : UserType.worker;
+    _userType = switch (typeStr) {
+      'student' => UserType.student,
+      'both' => UserType.both,
+      _ => UserType.worker,
+    };
 
     _schedule = WorkSchedule(
       startMorning:   _parseHour(prefs.getString('work_start_morning')   ?? '09:00'),
@@ -90,17 +90,6 @@ class ScheduleProvider extends ChangeNotifier {
       lunchDurationMin: prefs.getInt('lunch_duration_min') ?? 30,
     );
 
-    // Carica eventuali rallentamenti salvati
-    final allKeys = prefs.getKeys();
-    for (final key in allKeys) {
-      if (key.startsWith('habit_') && key.endsWith('_slowdown_ts')) {
-        final habitId = key
-            .replaceFirst('habit_', '')
-            .replaceAll('_slowdown_ts', '');
-        _slowdownTimestamps[habitId] = prefs.getInt(key) ?? 0;
-      }
-    }
-
     notifyListeners();
   }
 
@@ -109,7 +98,11 @@ class ScheduleProvider extends ChangeNotifier {
   Future<void> setUserType(UserType type) async {
     _userType = type;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_type', type == UserType.student ? 'student' : 'worker');
+    await prefs.setString('user_type', switch (type) {
+      UserType.student => 'student',
+      UserType.both => 'both',
+      UserType.worker => 'worker',
+    });
     notifyListeners();
   }
 
@@ -123,26 +116,6 @@ class ScheduleProvider extends ChangeNotifier {
     await prefs.setString('lunch_time',           '${s.lunchHour.toString().padLeft(2,'0')}:00');
     await prefs.setInt('lunch_duration_min', s.lunchDurationMin);
     notifyListeners();
-  }
-
-  /// Segna un rallentamento volontario per l'abitudine specificata.
-  /// Posticipa il prossimo sblocco di 14 giorni (gestito da ProgressionProvider).
-  Future<void> setSlowdown(String habitId) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    _slowdownTimestamps[habitId] = now;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('habit_${habitId}_slowdown_ts', now);
-    // Incrementa contatore
-    final count = (prefs.getInt('habit_${habitId}_slowdown_count') ?? 0) + 1;
-    await prefs.setInt('habit_${habitId}_slowdown_count', count);
-    notifyListeners();
-  }
-
-  /// True se almeno un'abitudine ha un rallentamento attivo negli ultimi 14 giorni.
-  bool get needsSlowdown {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    const fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
-    return _slowdownTimestamps.values.any((ts) => (now - ts) < fourteenDaysMs);
   }
 
   // ── Fascia oraria di un'abitudine ─────────────────────────────────────────
@@ -208,10 +181,13 @@ class ScheduleProvider extends ChangeNotifier {
       List<HabitDefinition> active, int hour) {
     if (active.isEmpty) return null;
 
-    if (_userType == UserType.worker) {
-      return _getHabitForNowWorker(active, hour);
-    } else {
+    // "Entrambe" usa la logica worker: si basa sugli orari di lavoro/studio
+    // espliciti raccolti in onboarding, più precisa delle fasce fisse
+    // della logica student per chi ha una giornata strutturata su entrambi.
+    if (_userType == UserType.student) {
       return _getHabitForNowStudent(active, hour);
+    } else {
+      return _getHabitForNowWorker(active, hour);
     }
   }
 

@@ -24,11 +24,16 @@ dependencies:
   cupertino_icons: ^1.0.6
   video_player: ^2.9.2
   firebase_analytics: ^11.6.0
+  cloud_firestore: ^5.4.4
+  google_mobile_ads: ^5.1.0
+  url_launcher: ^6.3.0
+  share_plus: ^10.1.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
@@ -48,4 +53,21 @@ flutter:
         - asset: assets/fonts/CormorantGaramond-Regular.ttf
           weight: 400
 
-
+# ── Launcher Icons ─────────────────────────────────────────────────────────────
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/companion/companion_base.png"
+  # Sfondo crema/panna — stesso colore dello sfondo base dell'app (palette Card)
+  # Usato per appiattire la trasparenza sull'icona legacy/iOS
+  background_color: "#F5F1EA"
+  # Icona adattiva Android (API 26+): foreground + sfondo separati
+  adaptive_icon_background: "#F5F1EA"
+  adaptive_icon_foreground: "assets/images/companion/companion_base.png"
+  # Rimuove il canale alpha per rispettare le linee guida App Store iOS
+  remove_alpha_ios: true
+  # Web e altri target (opzionale)
+  web:
+    generate: false
+  windows:
+    generate: false

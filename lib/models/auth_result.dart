@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import '../l10n/app_localizations.dart';
 
 class AuthResult {
   final bool success;
@@ -36,26 +37,19 @@ enum AuthError {
   accountDisabled,
 }
 
-// FIX: aggiunta extension con userMessage
 extension AuthErrorMessage on AuthError {
-  String get userMessage {
+  /// Messaggio localizzato per l'utente — richiede [BwStrings] perché
+  /// l'enum stesso non ha accesso al BuildContext/locale corrente.
+  String localizedMessage(BwStrings s) {
     switch (this) {
-      case AuthError.invalidCredentials:
-        return 'Email o password non corretti';
-      case AuthError.tooManyAttempts:
-        return 'Troppi tentativi. Account bloccato temporaneamente';
-      case AuthError.emailAlreadyExists:
-        return 'Esiste già un account con questa email';
-      case AuthError.offline:
-        return 'Nessuna connessione. Il login richiede internet';
-      case AuthError.timeout:
-        return 'Il server non risponde. Riprova tra poco';
-      case AuthError.serverError:
-        return 'Errore del server. Riprova tra poco';
-      case AuthError.cancelled:
-        return 'Accesso annullato';
-      case AuthError.accountDisabled:
-        return 'Account disabilitato. Contatta il supporto';
+      case AuthError.invalidCredentials: return s.errorInvalidCredentials;
+      case AuthError.tooManyAttempts:    return s.errorTooManyAttempts;
+      case AuthError.emailAlreadyExists: return s.errorEmailInUse;
+      case AuthError.offline:            return s.errorNetwork;
+      case AuthError.timeout:            return s.errorTimeout;
+      case AuthError.serverError:        return s.errorGeneral;
+      case AuthError.cancelled:          return s.errorCancelled;
+      case AuthError.accountDisabled:    return s.errorAccountDisabled;
     }
   }
 }

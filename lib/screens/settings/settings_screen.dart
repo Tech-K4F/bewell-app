@@ -3,18 +3,38 @@ import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/bw_scaffold.dart';
 import 'theme_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+
+  void _showComingSoon(BuildContext context, BwPaletteData p) {
+    final s = context.sL;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: p.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(s.comingSoonTitle, style: TextStyle(color: p.text, fontSize: 16)),
+        content: Text(s.comingSoonBody, style: TextStyle(color: p.textSec, fontSize: 13, height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(s.confirm, style: TextStyle(color: p.primary)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer2<SettingsProvider, ThemeProvider>(
       builder: (context, settings, theme, _) {
         final p = theme.paletteData;
-        return Scaffold(
-          backgroundColor: p.bg,
+        final s = context.sL;
+        return BwScaffold(
           appBar: AppBar(
             backgroundColor: p.bg,
             elevation: 0,
@@ -22,7 +42,7 @@ class SettingsScreen extends StatelessWidget {
               icon: Icon(Icons.arrow_back_ios, color: p.text, size: 18),
               onPressed: () => Navigator.pop(context),
             ),
-            title: Text('Impostazioni',
+            title: Text(s.settingsTitle,
                 style: TextStyle(color: p.text, fontSize: 17, fontWeight: FontWeight.w600)),
           ),
           body: ListView(
@@ -36,8 +56,8 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.palette_outlined,
                   iconBg: p.primaryLight,
                   iconColor: p.primary,
-                  label: 'Stile e tonalità',
-                  subtitle: '${theme.style == BwStyle.card ? "Card" : "Ambientale"} · ${theme.paletteData.name}',
+                  label: s.appearance,
+                  subtitle: '${theme.style == BwStyle.card ? s.themeCard : s.themeAmbient} · ${theme.paletteData.name}',
                   p: p,
                   onTap: () => Navigator.push(
                     context,
@@ -49,14 +69,14 @@ class SettingsScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               // ── ACCESSIBILITÀ ──────────────────────────────────────────────
-              _SectionHeader(label: 'Accessibilità', p: p),
+              _SectionHeader(label: s.accessibilitySection, p: p),
               _SettingsCard(p: p, children: [
                 _ToggleRow(
                   icon: Icons.contrast,
                   iconBg: const Color(0x1A2B5EA7),
                   iconColor: const Color(0xFF2B5EA7),
                   label: context.sL.highContrast,
-                  subtitle: 'Aumenta il contrasto dei testi',
+                  subtitle: s.contrastDesc,
                   value: settings.highContrast,
                   onChanged: (v) => settings.setHighContrast(v),
                   p: p,
@@ -66,7 +86,7 @@ class SettingsScreen extends StatelessWidget {
                   iconBg: const Color(0x1AC47E3A),
                   iconColor: const Color(0xFFC47E3A),
                   label: context.sL.largeText,
-                  subtitle: 'Aumenta la dimensione dei caratteri',
+                  subtitle: s.textSizeDesc,
                   value: settings.largeText,
                   onChanged: (v) => settings.setLargeText(v),
                   p: p,
@@ -77,33 +97,14 @@ class SettingsScreen extends StatelessWidget {
 
               // ── NOTIFICHE ──────────────────────────────────────────────────
               _SectionHeader(label: context.sL.notifications, p: p),
-              _SettingsCard(p: p, children: [
-                _ToggleRow(
-                  icon: Icons.notifications_outlined,
-                  iconBg: const Color(0x1A1D9E75),
-                  iconColor: const Color(0xFF1D9E75),
-                  label: 'Promemoria attività',
-                  subtitle: 'Notifiche per le attività pianificate',
-                  value: settings.notificationsEnabled,
-                  onChanged: (v) => settings.setNotificationsEnabled(v),
-                  p: p,
-                ),
-                _ToggleRow(
-                  icon: Icons.local_drink_outlined,
-                  iconBg: const Color(0x1A2B5EA7),
-                  iconColor: const Color(0xFF2B5EA7),
-                  label: context.sL.waterReminder,
-                  subtitle: context.sL.waterReminderDesc,
-                  value: settings.soundEnabled,
-                  onChanged: (v) => settings.setSound(v),
-                  p: p,
-                ),
-              ]),
+              _NotificationFrequencyCard(settings: settings, p: p, s: s),
+              const SizedBox(height: 12),
+              _SnoozeCard(settings: settings, p: p, s: s),
 
               const SizedBox(height: 20),
 
               // ── ACCOUNT ────────────────────────────────────────────────────
-              _SectionHeader(label: 'Account', p: p),
+              _SectionHeader(label: s.accountSection, p: p),
               _SettingsCard(p: p, children: [
                 _NavRow(
                   icon: Icons.privacy_tip_outlined,
@@ -111,7 +112,7 @@ class SettingsScreen extends StatelessWidget {
                   iconColor: const Color(0xFFB87333),
                   label: context.sL.privacy,
                   p: p,
-                  onTap: () {},
+                  onTap: () => _showComingSoon(context, p),
                 ),
                 _NavRow(
                   icon: Icons.help_outline,
@@ -119,7 +120,7 @@ class SettingsScreen extends StatelessWidget {
                   iconColor: const Color(0xFF7090AA),
                   label: context.sL.support,
                   p: p,
-                  onTap: () {},
+                  onTap: () => _showComingSoon(context, p),
                 ),
               ]),
             ],
@@ -296,8 +297,158 @@ class _ToggleRow extends StatelessWidget {
   }
 }
 
+/// Selettore della frequenza dei reminder (zero / poche / normale / tutte).
+/// Sostituisce il vecchio toggle on/off generico: l'utente sceglie quanto
+/// essere sollecitato, invece di un binario tutto-o-niente.
+class _NotificationFrequencyCard extends StatelessWidget {
+  final SettingsProvider settings;
+  final BwPaletteData p;
+  final BwStrings s;
+  const _NotificationFrequencyCard({required this.settings, required this.p, required this.s});
 
+  @override
+  Widget build(BuildContext context) {
+    final options = [
+      (NotificationFrequency.off,    s.notifFreqOff,    s.notifFreqOffDesc,    Icons.notifications_off_outlined),
+      (NotificationFrequency.low,    s.notifFreqLow,    s.notifFreqLowDesc,    Icons.notifications_none),
+      (NotificationFrequency.normal, s.notifFreqNormal, s.notifFreqNormalDesc, Icons.notifications_outlined),
+      (NotificationFrequency.high,   s.notifFreqHigh,   s.notifFreqHighDesc,   Icons.notifications_active_outlined),
+    ];
+    return _SettingsCard(
+      p: p,
+      children: options.map((opt) {
+        final (freq, label, desc, icon) = opt;
+        final selected = settings.frequency == freq;
+        return InkWell(
+          onTap: () => settings.setFrequency(freq),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: selected ? p.primary.withValues(alpha: .15) : p.bg2,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: selected ? p.primary : p.textMut, size: 17),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label,
+                          style: TextStyle(
+                              color: p.text,
+                              fontSize: 14,
+                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                      Text(desc, style: TextStyle(color: p.textSec, fontSize: 11, height: 1.3)),
+                    ],
+                  ),
+                ),
+                if (selected) Icon(Icons.check_circle_rounded, color: p.primary, size: 20),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
 
+/// Pausa temporanea dei reminder — indipendente dalla frequenza scelta,
+/// riprendono da soli allo scadere del tempo impostato con lo slider.
+class _SnoozeCard extends StatefulWidget {
+  final SettingsProvider settings;
+  final BwPaletteData p;
+  final BwStrings s;
+  const _SnoozeCard({required this.settings, required this.p, required this.s});
+
+  @override
+  State<_SnoozeCard> createState() => _SnoozeCardState();
+}
+
+class _SnoozeCardState extends State<_SnoozeCard> {
+  double _hours = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.p;
+    final s = widget.s;
+    final settings = widget.settings;
+
+    if (settings.isSnoozed) {
+      final until = settings.snoozeUntil!;
+      final label = '${until.hour.toString().padLeft(2, '0')}:${until.minute.toString().padLeft(2, '0')}';
+      return _SettingsCard(p: p, children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(color: p.bg2, borderRadius: BorderRadius.circular(8)),
+                child: Icon(Icons.snooze_rounded, color: p.textMut, size: 17),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(s.notifSnoozeActive(label),
+                    style: TextStyle(color: p.text, fontSize: 13.5, fontWeight: FontWeight.w500)),
+              ),
+              TextButton(
+                onPressed: () => settings.clearSnooze(),
+                child: Text(s.notifSnoozeCancel, style: TextStyle(color: p.primary, fontSize: 13)),
+              ),
+            ],
+          ),
+        ),
+      ]);
+    }
+
+    return _SettingsCard(p: p, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(color: p.bg2, borderRadius: BorderRadius.circular(8)),
+              child: Icon(Icons.snooze_rounded, color: p.textMut, size: 17),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(s.notifSnoozeLabel,
+                  style: TextStyle(color: p.text, fontSize: 14, fontWeight: FontWeight.w500)),
+            ),
+            Text(s.notifSnoozeHours(_hours.round()),
+                style: TextStyle(color: p.primary, fontSize: 13, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+      SliderTheme(
+        data: SliderTheme.of(context).copyWith(
+          activeTrackColor: p.primary,
+          inactiveTrackColor: p.primaryLight,
+          thumbColor: p.primary,
+          overlayColor: p.primary.withValues(alpha: .15),
+        ),
+        child: Slider(
+          value: _hours,
+          min: 1,
+          max: 24,
+          divisions: 23,
+          onChanged: (v) => setState(() => _hours = v),
+          onChangeEnd: (v) => settings.setSnoozeHours(v.round()),
+        ),
+      ),
+      const SizedBox(height: 4),
+    ]);
+  }
+}
 
 
 

@@ -1,18 +1,20 @@
-import 'package:flutter/material.dart';
-import '../../l10n/app_localizations.dart';
-import 'package:provider/provider.dart';
-import '../../providers/theme_provider.dart';
-import '../../widgets/bw_scaffold.dart';
-import 'package:provider/provider.dart';
-import '../../providers/theme_provider.dart';
-import '../../widgets/bw_scaffold.dart';
-import 'package:provider/provider.dart';
 import 'dart:async';
-import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../l10n/app_localizations.dart';
+import '../../providers/theme_provider.dart';
 import '../../providers/app_provider.dart';
+import '../../providers/progression_provider.dart';
+import '../../models/habit_library.dart';
+import '../../widgets/bw_scaffold.dart';
 
+/// Sessione di respirazione guidata, legata a un'abitudine reale
+/// (breathing_box o breathing_478) — il completamento aggiorna
+/// progressione, punti e streak come ogni altra abitudine.
 class BreathingScreen extends StatefulWidget {
-  const BreathingScreen({super.key});
+  final String habitId; // 'breathing_box' | 'breathing_478'
+  const BreathingScreen({super.key, required this.habitId});
+
   @override
   State<BreathingScreen> createState() => _BreathingScreenState();
 }
@@ -27,37 +29,33 @@ class _BreathingScreenState extends State<BreathingScreen>
   int _phaseIndex = 0; // 0=inhale 1=hold 2=exhale 3=hold2
   int _phaseSecond = 0;
   Timer? _ticker;
-
-  // Box: 4-4-4-4 | 478: 4-7-8 | Deep: 5-5-5
-  String _technique = 'box';
   int _totalCycles = 3;
 
-  static const Map<String, List<int>> _techniques = {
-    'box': [4, 4, 4, 4],
-    '478': [4, 7, 8, 0],
-    'deep': [5, 0, 5, 0],
-  };
-
-  static const Map<String, String> _names = {
-    'box': 'Box Breathing',
-    '478': 'Respirazione 4-7-8',
-    'deep': 'Respirazione Profonda',
-  };
-
-  static const _phaseLabels = [
-    'Inspira',
-    'Trattieni',
-    'Espira',
-    'Trattieni',
-  ];
-
-  List<int> get _durations => _techniques[_technique]!;
+  // Box: 4-4-4-4 | 4-7-8: 4-7-8-0 (nessuna seconda trattenuta)
+  List<int> get _durations =>
+      widget.habitId == 'breathing_478' ? const [4, 7, 8, 0] : const [4, 4, 4, 4];
 
   int get _currentPhaseDuration => _durations[_phaseIndex];
 
-  String get _phaseLabel {
+  String _phaseLabel(BwStrings s) {
     if (_currentPhaseDuration == 0) return '';
-    return _phaseLabels[_phaseIndex];
+    return switch (_phaseIndex) {
+      0 => s.breathingInhale,
+      2 => s.breathingExhale,
+      _ => s.breathingHold,
+    };
+  }
+
+  // Colore distinto per fase, cosi il box "respira" visivamente anche
+  // nel colore, non solo nella dimensione — non solo pulsazione, un vero
+  // cambio di stato leggibile a colpo d'occhio.
+  Color _phaseColor(BwPaletteData p) {
+    if (!_isRunning) return p.primary;
+    return switch (_phaseIndex) {
+      0 => p.primary,                            // inspira
+      2 => p.accent,                              // espira
+      _ => Color.lerp(p.primary, p.accent, 0.5)!, // trattieni
+    };
   }
 
   @override
@@ -67,7 +65,7 @@ class _BreathingScreenState extends State<BreathingScreen>
       vsync: this,
       duration: const Duration(seconds: 4),
     );
-    _scale = Tween<double>(begin: 0.6, end: 1.0).animate(
+    _scale = Tween<double>(begin: 0.45, end: 1.0).animate(
       CurvedAnimation(parent: _scaleCtrl, curve: Curves.easeInOut));
   }
 
@@ -95,20 +93,18 @@ class _BreathingScreenState extends State<BreathingScreen>
   }
 
   void _enterPhase() {
-    // Skip phases with 0 duration
     while (_currentPhaseDuration == 0 && _phaseIndex < 3) {
       _phaseIndex = (_phaseIndex + 1) % 4;
     }
 
-    _scaleCtrl.duration =
-        Duration(seconds: _currentPhaseDuration);
+    _scaleCtrl.duration = Duration(seconds: _currentPhaseDuration);
 
     if (_phaseIndex == 0) {
       _scaleCtrl.forward(from: 0);
     } else if (_phaseIndex == 2) {
       _scaleCtrl.reverse(from: 1);
     }
-    // Hold phases: keep scale where it is
+    // Fasi di trattenuta: la scala resta ferma dove si trova
 
     _phaseSecond = 0;
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -127,7 +123,6 @@ class _BreathingScreenState extends State<BreathingScreen>
   void _nextPhase() {
     int next = (_phaseIndex + 1) % 4;
 
-    // After exhale (phase 2) + hold2 (phase 3) → next cycle
     if (next == 0) {
       final newCycle = _cycleCount + 1;
       if (newCycle >= _totalCycles) {
@@ -144,42 +139,47 @@ class _BreathingScreenState extends State<BreathingScreen>
     _enterPhase();
   }
 
-  void _onComplete() {
+  Future<void> _onComplete() async {
     setState(() => _isRunning = false);
-    context.read<AppProvider>().completeActivity('STR001');
+    final progression = context.read<ProgressionProvider>();
+    final app = context.read<AppProvider>();
+    await progression.markCompleted(widget.habitId);
+    if (!mounted) return;
+    await app.completeHabit(widget.habitId);
+    if (!mounted) return;
+
+    final p = context.read<ThemeProvider>().paletteData;
+    final s = context.sL;
+    // Punti reali dell'abitudine (habit_library.dart è la fonte unica di
+    // verità) — un valore fisso 25/75 qui mostrava un numero sbagliato ogni
+    // volta che l'abitudine dietro questa schermata ne valeva un altro.
+    final basePts = HabitLibrary.findById(widget.habitId)?.points ?? 25;
+    final pts = app.lastCompletionWasBonus ? basePts * 3 : basePts;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        backgroundColor: context.read<ThemeProvider>().paletteData.bg,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: Text('🌿 Ottimo lavoro!',
-            style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 18)),
+        backgroundColor: p.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(s.breathingWellDone,
+            style: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 18)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '$_totalCycles cicli completati.',
-              style: TextStyle(
-                  color: Colors.white.withOpacity(.6), fontSize: 14),
+              s.breathingCyclesCompleted(_totalCycles),
+              style: TextStyle(color: p.textSec, fontSize: 14),
             ),
-            SizedBox(height: 14),
+            const SizedBox(height: 14),
             Container(
-              padding: EdgeInsets.symmetric(
-                  horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
-                color: context.read<ThemeProvider>().paletteData.bg,
+                color: p.primaryLight,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Text('+30 punti ⭐',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: context.read<ThemeProvider>().paletteData.bg)),
+              child: Text(s.breathingPointsEarned(pts),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: p.primaryText)),
             ),
           ],
         ),
@@ -188,17 +188,15 @@ class _BreathingScreenState extends State<BreathingScreen>
             onPressed: () => Navigator.of(context)
               ..pop()
               ..pop(),
-            style: ElevatedButton.styleFrom(
-                minimumSize: Size.fromHeight(44)),
-            child: Text(context.sL.confirm),
+            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+            child: Text(s.confirm),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _start();
             },
-            child: Text('Di nuovo',
-                style: TextStyle(color: context.read<ThemeProvider>().paletteData.textSec)),
+            child: Text(s.breathingAgain, style: TextStyle(color: p.textSec)),
           ),
         ],
       ),
@@ -207,131 +205,78 @@ class _BreathingScreenState extends State<BreathingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final p = context.watch<ThemeProvider>().paletteData;
+    final s = context.sL;
+    final title = s.habitName(widget.habitId);
+
     return BwScaffold(
       appBar: AppBar(
-        title: Text(context.sL.habitBreathingBoxName),
-        leading: const BackButton(),
+        backgroundColor: p.bg,
+        elevation: 0,
+        title: Text(title, style: TextStyle(color: p.text, fontSize: 17)),
+        leading: BackButton(color: p.text),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(24, 12, 24, 40),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
         child: Column(
           children: [
-            // Technique selector
             if (!_isRunning) ...[
+              // Info card: durata di ogni fase
               Container(
-                padding: EdgeInsets.all(5),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: context.read<ThemeProvider>().paletteData.bg,
+                  color: p.card,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: context.read<ThemeProvider>().paletteData.bg),
-                ),
-                child: Row(
-                  children: _techniques.keys.map((key) {
-                    final sel = _technique == key;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _technique = key),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding:
-                              EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: sel ? context.read<ThemeProvider>().paletteData.bg : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            _names[key]!.split(' ').first,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: sel
-                                    ? Colors.white
-                                    : Colors.white.withOpacity(.3)),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              SizedBox(height: 20),
-
-              // Info card
-              Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: context.read<ThemeProvider>().paletteData.bg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: context.read<ThemeProvider>().paletteData.bg.withOpacity(.3)),
+                  border: Border.all(color: p.cardBorder),
                 ),
                 child: Column(
                   children: [
-                    Text(_names[_technique]!,
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15)),
-                    SizedBox(height: 8),
+                    Text(title,
+                        style: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 15)),
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: List.generate(
-                        4,
-                        (i) => _durations[i] > 0
-                            ? Column(
-                                children: [
-                                  Text(_phaseLabels[i],
-                                      style: TextStyle(
-                                          color:
-                                              Colors.white.withOpacity(.5),
-                                          fontSize: 10)),
-                                  Text('${_durations[i]}s',
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 18)),
-                                ],
-                              )
-                            : SizedBox(),
-                      ),
+                      children: List.generate(4, (i) {
+                        if (_durations[i] <= 0) return const SizedBox();
+                        return Column(
+                          children: [
+                            Text(_phaseLabel3(s, i),
+                                style: TextStyle(color: p.textMut, fontSize: 10)),
+                            Text('${_durations[i]}s',
+                                style: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 18)),
+                          ],
+                        );
+                      }),
                     ),
                   ],
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-              // Cycles selector
+              // Selettore cicli
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Cicli:  ',
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(.5),
-                          fontSize: 14)),
+                  Text(s.breathingCycles, style: TextStyle(color: p.textMut, fontSize: 14)),
+                  const SizedBox(width: 6),
                   ...[3, 5, 7].map((n) {
                     final sel = n == _totalCycles;
                     return GestureDetector(
                       onTap: () => setState(() => _totalCycles = n),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        margin: EdgeInsets.symmetric(horizontal: 4),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: sel ? context.read<ThemeProvider>().paletteData.bg : Colors.transparent,
+                          color: sel ? p.primary : Colors.transparent,
                           shape: BoxShape.circle,
-                          border: Border.all(
-                              color: sel
-                                  ? context.read<ThemeProvider>().paletteData.bg
-                                  : Colors.white.withOpacity(.15)),
+                          border: Border.all(color: sel ? p.primary : p.cardBorder),
                         ),
                         child: Center(
                           child: Text('$n',
                               style: TextStyle(
-                                  color: sel
-                                      ? Colors.white
-                                      : Colors.white.withOpacity(.4),
+                                  color: sel ? p.btnText : p.textSec,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 15)),
                         ),
@@ -340,133 +285,124 @@ class _BreathingScreenState extends State<BreathingScreen>
                   }),
                 ],
               ),
-              SizedBox(height: 36),
+              const SizedBox(height: 36),
             ],
 
-            // Breathing circle
-            AnimatedBuilder(
-              animation: _scale,
-              builder: (_, __) {
-                final radius = 100 + (_scale.value * 50);
-                return Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Outer glow rings
-                      if (_isRunning)
-                        ...List.generate(3, (i) {
-                          final r = radius + (i + 1) * 20;
-                          return Container(
-                            width: r * 2,
-                            height: r * 2,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: context.read<ThemeProvider>().paletteData.bg.withOpacity(
-                                    0.15 * (1 - i * 0.3)),
-                                width: 1,
+            // Cerchio animato — area a dimensione fissa: il cerchio pulsa e
+            // cambia colore al suo interno senza mai spostare gli elementi
+            // sotto (in particolare il pulsante interrompi).
+            SizedBox(
+              width: 340,
+              height: 340,
+              child: AnimatedBuilder(
+                animation: _scale,
+                builder: (_, __) {
+                  final radius = 70 + (_scale.value * 80);
+                  final color = _phaseColor(p);
+                  return Center(
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (_isRunning)
+                          ...List.generate(3, (i) {
+                            final r = radius + (i + 1) * 20;
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 400),
+                              width: r * 2,
+                              height: r * 2,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: color.withValues(alpha: 0.18 * (1 - i * 0.3)),
+                                  width: 1,
+                                ),
                               ),
-                            ),
-                          );
-                        }),
-                      // Main circle
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: radius * 2,
-                        height: radius * 2,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              context.read<ThemeProvider>().paletteData.bg.withOpacity(.5),
-                              context.read<ThemeProvider>().paletteData.bg.withOpacity(.1),
-                            ],
-                          ),
-                          boxShadow: _isRunning
-                              ? [
-                                  BoxShadow(
-                                    color: context.read<ThemeProvider>().paletteData.bg.withOpacity(.4),
-                                    blurRadius: 40,
-                                    spreadRadius: 5,
-                                  )
-                                ]
-                              : null,
-                        ),
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_isRunning) ...[
-                                Text(
-                                  _phaseLabel,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w300,
-                                    letterSpacing: 2,
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  '${_currentPhaseDuration - _phaseSecond}',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 48,
-                                    fontWeight: FontWeight.w200,
-                                  ),
-                                ),
-                                Text(
-                                  'Ciclo ${_cycleCount + 1}/$_totalCycles',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(.4),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ] else ...[
-                                Text('🫁',
-                                    style: TextStyle(fontSize: 48)),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Tocca per\ncominciare',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      color: Colors.white.withOpacity(.5),
-                                      fontSize: 14),
-                                ),
+                            );
+                          }),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 400),
+                          width: radius * 2,
+                          height: radius * 2,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                color.withValues(alpha: .6),
+                                color.withValues(alpha: .12),
                               ],
-                            ],
+                            ),
+                            boxShadow: _isRunning
+                                ? [
+                                    BoxShadow(
+                                      color: color.withValues(alpha: .5),
+                                      blurRadius: 44,
+                                      spreadRadius: 6,
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_isRunning) ...[
+                                  Text(
+                                    _phaseLabel(s),
+                                    style: TextStyle(
+                                      color: p.text,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w300,
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${_currentPhaseDuration - _phaseSecond}',
+                                    style: TextStyle(color: p.text, fontSize: 48, fontWeight: FontWeight.w200),
+                                  ),
+                                  Text(
+                                    '${_cycleCount + 1}/$_totalCycles',
+                                    style: TextStyle(color: p.textMut, fontSize: 12),
+                                  ),
+                                ] else ...[
+                                  const Text('🫁', style: TextStyle(fontSize: 48)),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    s.breathingTapToStart,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: p.textSec, fontSize: 14),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
-            SizedBox(height: 48),
+            const SizedBox(height: 48),
 
-            // Start / Stop button
             if (!_isRunning)
               ElevatedButton(
                 onPressed: _start,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: context.read<ThemeProvider>().paletteData.bg,
-                  minimumSize: Size.fromHeight(54),
+                  backgroundColor: p.btn,
+                  minimumSize: const Size.fromHeight(54),
                 ),
-                child: Text('Inizia respirazione',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
+                child: Text(s.breathingStart,
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.btnText)),
               )
             else
               OutlinedButton.icon(
                 onPressed: _stop,
-                icon: Icon(Icons.stop_rounded,
-                    color: context.read<ThemeProvider>().paletteData.bg),
-                label: Text('Interrompi',
-                    style: TextStyle(color: context.read<ThemeProvider>().paletteData.bg)),
+                icon: Icon(Icons.stop_rounded, color: p.primary),
+                label: Text(s.breathingStop, style: TextStyle(color: p.primary)),
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: context.read<ThemeProvider>().paletteData.bg),
-                  minimumSize: Size.fromHeight(52),
+                  side: BorderSide(color: p.primary),
+                  minimumSize: const Size.fromHeight(52),
                 ),
               ),
           ],
@@ -474,9 +410,12 @@ class _BreathingScreenState extends State<BreathingScreen>
       ),
     );
   }
+
+  String _phaseLabel3(BwStrings s, int i) {
+    return switch (i) {
+      0 => s.breathingInhale,
+      2 => s.breathingExhale,
+      _ => s.breathingHold,
+    };
+  }
 }
-
-
-
-
-

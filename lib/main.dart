@@ -13,6 +13,9 @@ import 'l10n/app_localizations.dart';
 import 'providers/progression_provider.dart';
 import 'providers/schedule_provider.dart';
 import 'providers/tutorial_provider.dart';
+import 'providers/inapp_provider.dart';
+import 'widgets/spotlight_overlay.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -40,13 +43,17 @@ void main() async {
   ));
 
   await NotificationService.instance.init();
-  // I reminder giornalieri vengono pianificati da LocaleProvider.init()
-  // con le stringhe nella lingua dell'utente.
+  // I reminder periodici vengono pianificati da SettingsProvider.init() e
+  // LocaleProvider.init() (rescheduleBwReminders in app_localizations.dart),
+  // in base a lingua, frequenza scelta e pausa attiva.
+
+  // AdMob — inizializzazione prima di runApp
+  await MobileAds.instance.initialize();
 
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()..init()),
         ChangeNotifierProvider(create: (_) => AppProvider()..init()),
         ChangeNotifierProvider(create: (_) => OnboardingProvider()),
@@ -55,6 +62,8 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ProgressionProvider()..init()),
         ChangeNotifierProvider(create: (_) => ScheduleProvider()..init()),
         ChangeNotifierProvider(create: (_) => TutorialProvider()..init()),
+        ChangeNotifierProvider(create: (_) => InAppProvider()..init()),
+        ChangeNotifierProvider(create: (_) => SpotlightController()),
       ],
       child: const BewellApp(),
     ),

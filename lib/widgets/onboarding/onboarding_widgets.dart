@@ -1,13 +1,7 @@
 import 'package:flutter/material.dart';
-
-// ── Palette ────────────────────────────────────────────────────────────────
-const _teal = Color(0xFF1E9E87);
-const _tealLight = Color(0x1A1E9E87);
-const _panel = Color(0xFF0F1F33);
-const _panelBorder = Color(0xFF1A2E42);
-const _darkPanel = Color(0xFF0B1929);
-const _amber = Color(0xFFD99820);
-const _amberLight = Color(0x1FD99820);
+import 'package:provider/provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../l10n/app_localizations.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROGRESS BAR QUESTIONARIO (1/5 … 5/5)
@@ -27,14 +21,15 @@ class QuestionnaireProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     return Column(
       children: [
         Row(
           children: [
             Text(
-              '$current di $total',
+              context.sL.qOfTotal(current, total),
               style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
+                color: p.textMut,
                 fontSize: 11,
               ),
             ),
@@ -42,7 +37,7 @@ class QuestionnaireProgressBar extends StatelessWidget {
             if (timeRemaining != null)
               Text(
                 timeRemaining!,
-                style: const TextStyle(color: _teal, fontSize: 11),
+                style: TextStyle(color: p.primary, fontSize: 11),
               ),
           ],
         ),
@@ -51,8 +46,8 @@ class QuestionnaireProgressBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(3),
           child: LinearProgressIndicator(
             value: current / total,
-            backgroundColor: Colors.white.withOpacity(0.07),
-            valueColor: const AlwaysStoppedAnimation(_teal),
+            backgroundColor: p.cardBorder,
+            valueColor: AlwaysStoppedAnimation(p.primary),
             minHeight: 3,
           ),
         ),
@@ -73,14 +68,15 @@ class QuestionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: p.text,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -90,13 +86,13 @@ class QuestionLabel extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.06),
+                color: p.cardBorder,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                'opzionale',
+                context.sL.qOptional,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
+                  color: p.textMut,
                   fontSize: 9,
                 ),
               ),
@@ -130,31 +126,37 @@ class OptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? _tealLight : Colors.white.withOpacity(0.04),
+          color: selected ? p.primaryLight : p.card,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? _teal : _panelBorder,
+            color: selected ? p.primary : p.cardBorder,
             width: selected ? 1.5 : 1,
           ),
         ),
+        // mainAxisSize.min + Flexible sull'emoji: nelle griglie più strette
+        // (4 colonne, aspect ratio 1.0 — Q8, Q21) il budget verticale della
+        // cella è al millimetro e bastava un font leggermente più alto per
+        // sforare di una frazione di pixel (RenderFlex overflow).
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 22)),
-            const SizedBox(height: 5),
+            Text(emoji, style: const TextStyle(fontSize: 20)),
+            const SizedBox(height: 3),
             Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: selected ? _teal : Colors.white.withOpacity(0.7),
+                color: selected ? p.primary : p.textSec,
               ),
             ),
             if (sublabel != null)
@@ -163,7 +165,7 @@ class OptionCard extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 10,
-                  color: Colors.white.withOpacity(0.3),
+                  color: p.textMut,
                 ),
               ),
           ],
@@ -172,63 +174,6 @@ class OptionCard extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// GRID DI OPZIONI (2 colonne di default)
-// ═══════════════════════════════════════════════════════════════════════════
-
-class OptionGrid extends StatelessWidget {
-  final List<_OptionData> options;
-  final String? selected;
-  final List<String>? multiSelected;
-  final ValueChanged<String> onSelect;
-  final int crossAxisCount;
-
-  const OptionGrid({
-    super.key,
-    required this.options,
-    this.selected,
-    this.multiSelected,
-    required this.onSelect,
-    this.crossAxisCount = 2,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: crossAxisCount,
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
-      childAspectRatio: 1.1,
-      children: options.map((opt) {
-        final isSelected = multiSelected != null
-            ? multiSelected!.contains(opt.value)
-            : selected == opt.value;
-        return OptionCard(
-          emoji: opt.emoji,
-          label: opt.label,
-          sublabel: opt.sublabel,
-          selected: isSelected,
-          onTap: () => onSelect(opt.value),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _OptionData {
-  final String value;
-  final String emoji;
-  final String label;
-  final String? sublabel;
-  const _OptionData(this.value, this.emoji, this.label, [this.sublabel]);
-}
-
-// Helper per creare le opzioni
-List<_OptionData> options(List<List<String>> data) =>
-    data.map((d) => _OptionData(d[0], d[1], d[2], d.length > 3 ? d[3] : null)).toList();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SLIDER CON LABEL
@@ -256,6 +201,7 @@ class LabeledSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -265,7 +211,7 @@ class LabeledSlider extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: p.textSec,
                 fontSize: 13,
               ),
             ),
@@ -273,14 +219,14 @@ class LabeledSlider extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
-                color: _tealLight,
+                color: p.primaryLight,
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: _teal.withOpacity(0.3)),
+                border: Border.all(color: p.primary.withValues(alpha: 0.3)),
               ),
               child: Text(
                 valueLabel(value),
-                style: const TextStyle(
-                    color: _teal, fontSize: 12, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                    color: p.primary, fontSize: 12, fontWeight: FontWeight.w700),
               ),
             ),
           ],
@@ -291,21 +237,19 @@ class LabeledSlider extends StatelessWidget {
           max: max,
           divisions: divisions,
           onChanged: onChanged,
-          activeColor: _teal,
-          inactiveColor: Colors.white.withOpacity(0.1),
+          activeColor: p.primary,
+          inactiveColor: p.cardBorder,
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               valueLabel(min),
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.25), fontSize: 10),
+              style: TextStyle(color: p.textMut, fontSize: 10),
             ),
             Text(
               valueLabel(max),
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.25), fontSize: 10),
+              style: TextStyle(color: p.textMut, fontSize: 10),
             ),
           ],
         ),
@@ -336,15 +280,16 @@ class ResourceToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     return GestureDetector(
       onTap: () => onChanged(!value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: value ? _tealLight : Colors.white.withOpacity(0.03),
+          color: value ? p.primaryLight : p.card,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: value ? _teal.withOpacity(0.5) : _panelBorder,
+            color: value ? p.primary.withValues(alpha: 0.5) : p.cardBorder,
           ),
         ),
         child: Row(
@@ -357,15 +302,14 @@ class ResourceToggle extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
-                        color: Colors.white,
+                    style: TextStyle(
+                        color: p.text,
                         fontSize: 13,
                         fontWeight: FontWeight.w600),
                   ),
                   Text(
                     sublabel,
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.35), fontSize: 11),
+                    style: TextStyle(color: p.textMut, fontSize: 11),
                   ),
                 ],
               ),
@@ -373,11 +317,11 @@ class ResourceToggle extends StatelessWidget {
             Switch(
               value: value,
               onChanged: onChanged,
-              activeColor: _teal,
+              activeColor: p.primary,
               trackColor: WidgetStateProperty.resolveWith((states) =>
                   states.contains(WidgetState.selected)
-                      ? _teal.withOpacity(0.4)
-                      : Colors.white.withOpacity(0.1)),
+                      ? p.primary.withValues(alpha: 0.4)
+                      : p.cardBorder),
             ),
           ],
         ),
@@ -402,12 +346,14 @@ class QuestionnaireNavRow extends StatelessWidget {
     required this.onNext,
     this.onBack,
     this.onSkipAll,
-    this.nextLabel = 'Avanti →',
+    required this.nextLabel,
     this.nextEnabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
+    final s = context.sL;
     return Column(
       children: [
         SizedBox(
@@ -416,17 +362,17 @@ class QuestionnaireNavRow extends StatelessWidget {
           child: ElevatedButton(
             onPressed: nextEnabled ? onNext : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _teal,
-              disabledBackgroundColor: _teal.withOpacity(0.3),
+              backgroundColor: p.btn,
+              disabledBackgroundColor: p.btn.withValues(alpha: 0.3),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(
               nextLabel,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white),
+                  color: p.btnText),
             ),
           ),
         ),
@@ -438,9 +384,8 @@ class QuestionnaireNavRow extends StatelessWidget {
               TextButton(
                 onPressed: onBack,
                 child: Text(
-                  '← Indietro',
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.35), fontSize: 13),
+                  s.qBack,
+                  style: TextStyle(color: p.textMut, fontSize: 13),
                 ),
               )
             else
@@ -448,9 +393,9 @@ class QuestionnaireNavRow extends StatelessWidget {
             if (onSkipAll != null)
               TextButton(
                 onPressed: onSkipAll,
-                child: const Text(
-                  'Salta tutto',
-                  style: TextStyle(color: _teal, fontSize: 13),
+                child: Text(
+                  s.qSkipAll,
+                  style: TextStyle(color: p.primary, fontSize: 13),
                 ),
               ),
           ],
@@ -480,19 +425,18 @@ class CompactTimePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.read<ThemeProvider>().paletteData;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: TextStyle(
-                color: Colors.white.withOpacity(0.6), fontSize: 12)),
+        Text(label, style: TextStyle(color: p.textSec, fontSize: 12)),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: p.card,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _panelBorder),
+            border: Border.all(color: p.cardBorder),
           ),
           child: DropdownButton<String>(
             value: value,
@@ -500,10 +444,10 @@ class CompactTimePicker extends StatelessWidget {
             items: options
                 .map((o) => DropdownMenuItem(value: o, child: Text(o)))
                 .toList(),
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-            dropdownColor: const Color(0xFF0F1F33),
+            style: TextStyle(color: p.text, fontSize: 14),
+            dropdownColor: p.card,
             underline: const SizedBox(),
-            icon: const Icon(Icons.expand_more, color: Color(0xFF1E9E87)),
+            icon: Icon(Icons.expand_more, color: p.primary),
             isExpanded: true,
           ),
         ),

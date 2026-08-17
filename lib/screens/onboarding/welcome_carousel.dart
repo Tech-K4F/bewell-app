@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/onboarding_provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../widgets/bw_scaffold.dart';
+import '../../l10n/app_localizations.dart';
 
 const _teal = Color(0xFF1E9E87);
 const _blue = Color(0xFF3A7BD5);
 const _amber = Color(0xFFD99820);
-const _amberLight = Color(0x1FD99820);
 
 /// S-07 · Welcome Carousel
 /// 3 slide swipeable, skip sempre visibile.
@@ -20,26 +22,23 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
   final _controller = PageController();
   int _currentPage = 0;
 
-  static const _slides = [
+  List<_Slide> _slides(BwStrings s) => [
     _Slide(
       emoji: '🌿',
-      title: 'Il tuo piano\ndi benessere personale',
-      subtitle:
-          'Be Well costruisce un piano su misura per te, basato sulle tue abitudini e obiettivi.',
+      title: s.welcomeSlide1Title,
+      subtitle: s.welcomeSlide1Sub,
       accentColor: _teal,
     ),
     _Slide(
       emoji: '🔔',
-      title: 'Reminder che\nconosco il tuo calendario',
-      subtitle:
-          'I promemoria si adattano ai tuoi meeting e orari, così non ti interrompono mai nel momento sbagliato.',
+      title: s.welcomeSlide2Title,
+      subtitle: s.welcomeSlide2Sub,
       accentColor: _blue,
     ),
     _Slide(
       emoji: '🎁',
-      title: 'Trasforma le abitudini\nin premi reali',
-      subtitle:
-          'Guadagna punti completando attività e riscattali per sconti, voucher e molto altro.',
+      title: s.welcomeSlide3Title,
+      subtitle: s.welcomeSlide3Sub,
       accentColor: _amber,
     ),
   ];
@@ -54,8 +53,8 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
     context.read<OnboardingProvider>().skipAll();
   }
 
-  void _nextOrStart() {
-    if (_currentPage < _slides.length - 1) {
+  void _nextOrStart(int slideCount) {
+    if (_currentPage < slideCount - 1) {
       _controller.nextPage(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,
@@ -67,8 +66,11 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B1929),
+    final p = context.watch<ThemeProvider>().paletteData;
+    final s = context.sL;
+    final slides = _slides(s);
+
+    return BwScaffold(
       body: SafeArea(
         child: Column(
           children: [
@@ -77,9 +79,9 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
               alignment: Alignment.topRight,
               child: TextButton(
                 onPressed: _skip,
-                child: const Text(
-                  'Salta',
-                  style: TextStyle(color: _teal, fontSize: 14),
+                child: Text(
+                  s.welcomeSkip,
+                  style: const TextStyle(color: _teal, fontSize: 14),
                 ),
               ),
             ),
@@ -88,10 +90,10 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
             Expanded(
               child: PageView.builder(
                 controller: _controller,
-                itemCount: _slides.length,
+                itemCount: slides.length,
                 onPageChanged: (i) => setState(() => _currentPage = i),
                 itemBuilder: (context, i) =>
-                    _SlideWidget(slide: _slides[i], isActive: i == _currentPage),
+                    _SlideWidget(slide: slides[i], isActive: i == _currentPage, p: p),
               ),
             ),
 
@@ -101,7 +103,7 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
-                  _slides.length,
+                  slides.length,
                   (i) => AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -109,8 +111,8 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                     height: 6,
                     decoration: BoxDecoration(
                       color: i == _currentPage
-                          ? _slides[_currentPage].accentColor
-                          : Colors.white.withOpacity(0.15),
+                          ? slides[_currentPage].accentColor
+                          : p.cardBorder,
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
@@ -127,17 +129,17 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: _nextOrStart,
+                      onPressed: () => _nextOrStart(slides.length),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _slides[_currentPage].accentColor,
+                        backgroundColor: slides[_currentPage].accentColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: Text(
-                        _currentPage < _slides.length - 1
-                            ? 'Avanti →'
-                            : 'Inizia la configurazione →',
+                        _currentPage < slides.length - 1
+                            ? s.welcomeNext
+                            : s.welcomeStart,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -146,14 +148,14 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                       ),
                     ),
                   ),
-                  if (_currentPage == _slides.length - 1) ...[
+                  if (_currentPage == slides.length - 1) ...[
                     const SizedBox(height: 10),
                     TextButton(
                       onPressed: _skip,
                       child: Text(
-                        'Configura dopo',
+                        s.welcomeConfigureLater,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.35),
+                          color: p.textMut,
                           fontSize: 13,
                         ),
                       ),
@@ -172,8 +174,9 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
 class _SlideWidget extends StatelessWidget {
   final _Slide slide;
   final bool isActive;
+  final BwPaletteData p;
 
-  const _SlideWidget({required this.slide, required this.isActive});
+  const _SlideWidget({required this.slide, required this.isActive, required this.p});
 
   @override
   Widget build(BuildContext context) {
@@ -190,15 +193,15 @@ class _SlideWidget extends StatelessWidget {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: slide.accentColor.withOpacity(0.12),
+                color: slide.accentColor.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: slide.accentColor.withOpacity(0.25),
+                  color: slide.accentColor.withValues(alpha: 0.25),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: slide.accentColor.withOpacity(0.2),
+                    color: slide.accentColor.withValues(alpha: 0.2),
                     blurRadius: 32,
                     spreadRadius: 4,
                   ),
@@ -221,8 +224,8 @@ class _SlideWidget extends StatelessWidget {
                 Text(
                   slide.title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: p.text,
                     fontSize: 26,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.5,
@@ -234,7 +237,7 @@ class _SlideWidget extends StatelessWidget {
                   slide.subtitle,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                    color: p.textSec,
                     fontSize: 15,
                     height: 1.55,
                   ),

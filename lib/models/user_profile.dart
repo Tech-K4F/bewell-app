@@ -5,7 +5,6 @@ class UserProfile {
   final String userType; // worker | student | both
   final int points;
   final int streak;
-  final int graceSkipsUsed;
   final DateTime? lastActivityDate;
   final List<String> earnedBadgeIds;
   final Map<String, dynamic> settings;
@@ -22,7 +21,6 @@ class UserProfile {
     required this.userType,
     this.points = 0,
     this.streak = 0,
-    this.graceSkipsUsed = 0,
     this.lastActivityDate,
     this.earnedBadgeIds = const [],
     this.settings = const {},
@@ -85,29 +83,33 @@ class UserProfile {
   }
 
   UserProfile copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? userType,
     int? points,
     int? streak,
-    int? graceSkipsUsed,
     DateTime? lastActivityDate,
     List<String>? earnedBadgeIds,
     Map<String, dynamic>? settings,
+    int? stressLevel,
+    String? primaryGoal,
     int? totalSessions,
     int? totalMinutes,
     Map<String, int>? weeklyCompletions,
   }) {
     return UserProfile(
-      id: id,
-      name: name,
-      email: email,
-      userType: userType,
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      userType: userType ?? this.userType,
       points: points ?? this.points,
       streak: streak ?? this.streak,
-      graceSkipsUsed: graceSkipsUsed ?? this.graceSkipsUsed,
       lastActivityDate: lastActivityDate ?? this.lastActivityDate,
       earnedBadgeIds: earnedBadgeIds ?? this.earnedBadgeIds,
       settings: settings ?? this.settings,
-      stressLevel: stressLevel,
-      primaryGoal: primaryGoal,
+      stressLevel: stressLevel ?? this.stressLevel,
+      primaryGoal: primaryGoal ?? this.primaryGoal,
       totalSessions: totalSessions ?? this.totalSessions,
       totalMinutes: totalMinutes ?? this.totalMinutes,
       weeklyCompletions: weeklyCompletions ?? this.weeklyCompletions,
@@ -121,7 +123,6 @@ class UserProfile {
         'userType': userType,
         'points': points,
         'streak': streak,
-        'graceSkipsUsed': graceSkipsUsed,
         'lastActivityDate': lastActivityDate?.toIso8601String(),
         'earnedBadgeIds': earnedBadgeIds,
         'settings': settings,
@@ -139,7 +140,6 @@ class UserProfile {
         userType: j['userType'] ?? 'worker',
         points: j['points'] ?? 0,
         streak: j['streak'] ?? 0,
-        graceSkipsUsed: j['graceSkipsUsed'] ?? 0,
         lastActivityDate: j['lastActivityDate'] != null
             ? DateTime.tryParse(j['lastActivityDate'])
             : null,

@@ -54,6 +54,10 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
     await prefs.setString('welly_name', _wellyName);
     await prefs.setString('user_type', _userType);
     await prefs.setBool('welly_welcomed', true);
+    // Il configuratore a 5 fasi non è più un prerequisito: "onboarded"
+    // ora coincide col completare questo carosello, non col questionario
+    // facoltativo (raggiungibile in un secondo momento da Abitudini).
+    await prefs.setBool('is_onboarded', true);
     AnalyticsService.instance.logOnboardingCompleted(_userType);
     if (mounted) {
       Navigator.pushReplacementNamed(context, '/home');
@@ -295,7 +299,7 @@ class _Page2 extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // ── Scelta student / worker ─────────────────────────────────────
+          // ── Scelta student / worker / entrambi ───────────────────────────
           Row(
             children: [
               Expanded(
@@ -307,7 +311,7 @@ class _Page2 extends StatelessWidget {
                   onTap: () => onUserTypeChanged('student'),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: _UserTypeCard(
                   emoji: '💼',
@@ -315,6 +319,16 @@ class _Page2 extends StatelessWidget {
                   selected: userType == 'worker',
                   p: p,
                   onTap: () => onUserTypeChanged('worker'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _UserTypeCard(
+                  emoji: '🎒',
+                  label: s.q1Both,
+                  selected: userType == 'both',
+                  p: p,
+                  onTap: () => onUserTypeChanged('both'),
                 ),
               ),
             ],
@@ -356,7 +370,7 @@ class _UserTypeCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 20),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
         decoration: BoxDecoration(
           color: selected ? p.primaryLight : p.card,
           borderRadius: BorderRadius.circular(16),
@@ -368,12 +382,15 @@ class _UserTypeCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 32)),
-            const SizedBox(height: 8),
+            Text(emoji, style: const TextStyle(fontSize: 26)),
+            const SizedBox(height: 6),
             Text(
               label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
                 color: selected ? p.primary : p.text,
               ),

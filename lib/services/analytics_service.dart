@@ -101,6 +101,24 @@ class AnalyticsService {
         'points_spent': pointsSpent,
       });
 
+  /// Utente ha ottenuto un codice sconto.
+  void logDiscountObtained(String discountId) =>
+      _log('discount_obtained', {'discount_id': discountId});
+
+  /// Utente ha guardato un rewarded ad.
+  void logAdWatched(int pointsEarned) =>
+      _log('ad_watched', {'points_earned': pointsEarned});
+
+  /// Utente ha sbloccato un item in-app con i punti.
+  void logInAppPurchase(String itemId, int pointsSpent) =>
+      _log('inapp_purchase', {
+        'item_id': itemId,
+        'points_spent': pointsSpent,
+      });
+
+  /// Utente ha toccato il banner Premium.
+  void logPremiumTapped() => _log('premium_tapped');
+
   // ── Retention ────────────────────────────────────────────────────────────────
 
   /// Streak corrente dopo un completamento.

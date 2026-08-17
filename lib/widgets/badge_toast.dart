@@ -2,21 +2,26 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
-import '../models/badge_model.dart' as bw;
 import '../providers/theme_provider.dart';
 
 /// Banner non invasivo che scende dall'alto per notificare achievement/sblocchi.
 /// Usa i colori del tema corrente.
 class BwBanner {
-  static void showBadge(BuildContext context, String badgeId) {
-    final badge = bw.allBadges.where((b) => b.id == badgeId).firstOrNull;
-    if (badge == null) return;
+  /// [emoji]/[title]/[subtitle] vengono dalla stessa fonte che disegna la
+  /// griglia badge in Growth (ProgressionProvider.allBadges) — un solo
+  /// sistema di badge, non due che possono raccontare cose diverse.
+  static void showBadge(
+    BuildContext context, {
+    required String emoji,
+    required String title,
+    required String subtitle,
+  }) {
     _show(
       context,
-      emoji: badge.emoji,
+      emoji: emoji,
       label: context.sL.achievementUnlocked,
-      title: badge.name,
-      subtitle: badge.description,
+      title: title,
+      subtitle: subtitle,
       isHabitUnlock: false,
     );
   }
@@ -267,10 +272,4 @@ class _BwBannerWidgetState extends State<_BwBannerWidget>
       ),
     );
   }
-}
-
-// Alias retrocompatibile — usa BwBanner.showBadge()
-class BadgeToast {
-  static void show(BuildContext context, String badgeId) =>
-      BwBanner.showBadge(context, badgeId);
 }

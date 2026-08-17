@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/app_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../models/auth_result.dart';
 import '../../utils/validators.dart';
 import '../../widgets/auth/auth_widgets.dart';
+import '../../widgets/bw_scaffold.dart';
+import '../../l10n/app_localizations.dart';
 
 /// S-03 · Registration Screen
 /// Solo per nuovi utenti. Email + password o SSO one-tap.
@@ -46,9 +49,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _tosAccepted;
 
   void _validateAndSubmit() {
-    final nameErr = BwValidators.name(_nameCtrl.text);
-    final emailErr = BwValidators.email(_emailCtrl.text);
-    final passErr = BwValidators.registerPassword(_passwordCtrl.text);
+    final s = context.sL;
+    final nameErr = BwValidators.name(_nameCtrl.text, s);
+    final emailErr = BwValidators.email(_emailCtrl.text, s);
+    final passErr = BwValidators.registerPassword(_passwordCtrl.text, s);
 
     setState(() {
       _nameError = nameErr;
@@ -67,8 +71,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, auth, _) {
+    return Consumer2<AuthProvider, ThemeProvider>(
+      builder: (context, auth, theme, _) {
+        final p = theme.paletteData;
+        final s = context.sL;
+
         // Navigazione verso verifica email
         if (auth.state == AuthState.emailVerificationPending) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -88,8 +95,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         final isLoading = auth.state == AuthState.loading;
 
-        return Scaffold(
-          backgroundColor: const Color(0xFF0B1929),
+        return BwScaffold(
           body: SafeArea(
             child: Column(
               children: [
@@ -100,21 +106,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Back button
+                        // Torna al login — Register è sempre raggiunta con
+                        // pushReplacementNamed, quindi non c'è nulla sotto
+                        // nello stack: pop() non farebbe nulla.
                         GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
+                          onTap: () => Navigator.of(context)
+                              .pushReplacementNamed('/login'),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 Icons.arrow_back_ios,
-                                color: Colors.white.withOpacity(0.4),
+                                color: p.textMut,
                                 size: 16,
                               ),
                               Text(
-                                'Accedi',
+                                s.signIn,
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: p.textMut,
                                   fontSize: 14,
                                 ),
                               ),
@@ -123,10 +132,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        const Text(
-                          'Crea account',
+                        Text(
+                          s.createAccount,
                           style: TextStyle(
-                            color: Colors.white,
+                            color: p.text,
                             fontSize: 28,
                             fontWeight: FontWeight.w700,
                             letterSpacing: -0.5,
@@ -134,9 +143,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Inizia il tuo percorso di benessere',
+                          s.registerSubtitle,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
+                            color: p.textSec,
                             fontSize: 15,
                           ),
                         ),
@@ -154,7 +163,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         // Errore globale
                         if (auth.state == AuthState.error && auth.lastError != null)
-                          _buildErrorBanner(auth.lastError!.userMessage, auth),
+                          _buildErrorBanner(auth.lastError!.localizedMessage(s), auth, p),
 
                         // Nome
                         BwNameField(
@@ -193,12 +202,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         _TosCheckbox(
                           accepted: _tosAccepted,
                           onChanged: (v) => setState(() => _tosAccepted = v),
+                          p: p,
+                          s: s,
                         ),
                         const SizedBox(height: 24),
 
                         // Bottone registrazione
                         BwAuthButton(
-                          label: 'Crea account',
+                          label: s.createAccount,
                           isLoading: isLoading,
                           onPressed: (_canSubmit && !isLoading && auth.isOnline)
                               ? _validateAndSubmit
@@ -214,15 +225,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             child: RichText(
                               text: TextSpan(
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: p.textMut,
                                   fontSize: 14,
                                 ),
-                                children: const [
-                                  TextSpan(text: 'Hai già un account? '),
+                                children: [
+                                  TextSpan(text: s.alreadyHaveAccount),
                                   TextSpan(
-                                    text: 'Accedi',
+                                    text: s.signIn,
                                     style: TextStyle(
-                                      color: Color(0xFF1E9E87),
+                                      color: p.primary,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -243,29 +254,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildErrorBanner(String message, AuthProvider auth) {
+  Widget _buildErrorBanner(String message, AuthProvider auth, BwPaletteData p) {
+    const error = Color(0xFFE05640);
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFE05640).withOpacity(0.12),
+        color: error.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE05640).withOpacity(0.3)),
+        border: Border.all(color: error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFE05640), size: 16),
+          const Icon(Icons.error_outline, color: error, size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Color(0xFFE05640), fontSize: 13),
+              style: const TextStyle(color: error, fontSize: 13),
             ),
           ),
           GestureDetector(
             onTap: auth.clearError,
             child: Icon(Icons.close,
-                size: 16, color: const Color(0xFFE05640).withOpacity(0.6)),
+                size: 16, color: error.withValues(alpha: 0.6)),
           ),
         ],
       ),
@@ -276,8 +288,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final nav = auth.pendingNavigation;
     auth.consumeNavigation();
     switch (nav) {
-      case AuthNavigation.toOnboarding:
-        Navigator.of(context).pushReplacementNamed('/onboarding');
+      case AuthNavigation.toWelcome:
+        Navigator.of(context).pushReplacementNamed('/welly-welcome');
       case AuthNavigation.toHome:
         await context.read<AppProvider>().onLoginComplete();
         if (context.mounted) Navigator.of(context).pushReplacementNamed('/home');
@@ -290,8 +302,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 class _TosCheckbox extends StatelessWidget {
   final bool accepted;
   final ValueChanged<bool> onChanged;
+  final BwPaletteData p;
+  final BwStrings s;
 
-  const _TosCheckbox({required this.accepted, required this.onChanged});
+  const _TosCheckbox({
+    required this.accepted,
+    required this.onChanged,
+    required this.p,
+    required this.s,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -306,8 +325,8 @@ class _TosCheckbox extends StatelessWidget {
             child: Checkbox(
               value: accepted,
               onChanged: (v) => onChanged(v ?? false),
-              activeColor: const Color(0xFF1E9E87),
-              side: BorderSide(color: Colors.white.withOpacity(0.25)),
+              activeColor: p.primary,
+              side: BorderSide(color: p.textMut),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(4),
               ),
@@ -318,28 +337,28 @@ class _TosCheckbox extends StatelessWidget {
             child: RichText(
               text: TextSpan(
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: p.textSec,
                   fontSize: 13,
                   height: 1.5,
                 ),
-                children: const [
-                  TextSpan(text: 'Accetto i '),
+                children: [
+                  TextSpan(text: s.tosAccept),
                   TextSpan(
-                    text: 'Termini di Servizio',
+                    text: s.tosTerms,
                     style: TextStyle(
-                      color: Color(0xFF1E9E87),
+                      color: p.primary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  TextSpan(text: ' e la '),
+                  TextSpan(text: s.tosAnd),
                   TextSpan(
-                    text: 'Privacy Policy',
+                    text: s.tosPrivacy,
                     style: TextStyle(
-                      color: Color(0xFF1E9E87),
+                      color: p.primary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  TextSpan(text: ' di Be Well'),
+                  TextSpan(text: s.tosSuffix),
                 ],
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/bw_scaffold.dart';
 
 class ThemeScreen extends StatelessWidget {
   const ThemeScreen({super.key});
@@ -11,8 +12,8 @@ class ThemeScreen extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, theme, _) {
         final p = theme.paletteData;
-        return Scaffold(
-          backgroundColor: p.bg,
+        final s = context.sL;
+        return BwScaffold(
           appBar: AppBar(
             backgroundColor: p.bg,
             elevation: 0,
@@ -21,7 +22,7 @@ class ThemeScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(
-              'Aspetto',
+              s.appearance,
               style: TextStyle(
                 color: p.text,
                 fontSize: 17,
@@ -34,14 +35,14 @@ class ThemeScreen extends StatelessWidget {
             children: [
 
               // ── Sezione stile ─────────────────────────────────────────────
-              _SectionLabel(label: context.sL.themeTitle, color: p.textSec),
+              _SectionLabel(label: s.themeTitle, color: p.textSec),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: _StyleCard(
-                      label: context.sL.themeCard,
-                      description: 'Contenuti in schede,\ntipografia chiara',
+                      label: s.themeCard,
+                      description: s.styleCardDesc,
                       selected: theme.style == BwStyle.card,
                       palette: theme.palette,
                       style: BwStyle.card,
@@ -52,8 +53,8 @@ class ThemeScreen extends StatelessWidget {
                   const SizedBox(width: 14),
                   Expanded(
                     child: _StyleCard(
-                      label: context.sL.themeAmbient,
-                      description: 'Paesaggio atmosferico,\nfont editoriale',
+                      label: s.themeAmbient,
+                      description: s.styleAmbientDesc,
                       selected: theme.style == BwStyle.ambient,
                       palette: theme.palette,
                       style: BwStyle.ambient,
@@ -67,7 +68,7 @@ class ThemeScreen extends StatelessWidget {
               const SizedBox(height: 32),
 
               // ── Sezione palette ───────────────────────────────────────────
-              _SectionLabel(label: 'Tonalità', color: p.textSec),
+              _SectionLabel(label: s.toneSection, color: p.textSec),
               const SizedBox(height: 12),
               ...BwPalette.values.map((pal) {
                 final pd = kPalettes[pal]!;

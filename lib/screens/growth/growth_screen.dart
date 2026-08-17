@@ -1,18 +1,58 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart' hide Badge;
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/progression_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/tutorial_provider.dart';
-import '../../models/habit_library.dart';
 import '../../widgets/companion/companion_widget.dart';
 import '../../widgets/bw_scaffold.dart';
-import '../../widgets/habits/habit_intro_sheet.dart';
+import '../../widgets/spotlight_overlay.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/banner_ad_widget.dart';
 import '../marketplace/marketplace_screen.dart';
 
-class GrowthScreen extends StatelessWidget {
+class GrowthScreen extends StatefulWidget {
   const GrowthScreen({super.key});
+
+  @override
+  State<GrowthScreen> createState() => _GrowthScreenState();
+}
+
+class _GrowthScreenState extends State<GrowthScreen> {
+  static const List<SpotlightStep> _growthSteps = [
+    SpotlightStep(textId: 'growth_welcome'),
+    SpotlightStep(textId: 'growth_phase',   targetId: 'spot_companion_hero'),
+    SpotlightStep(textId: 'growth_heatmap', targetId: 'spot_heatmap'),
+    SpotlightStep(textId: 'growth_badges',  targetId: 'spot_badges'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _checkGrowthSpotlight();
+    });
+  }
+
+  Future<void> _checkGrowthSpotlight() async {
+    if (!mounted) return;
+    final ctrl = context.read<SpotlightController>();
+    final seen = await ctrl.hasSeenTutorial('growth_tour');
+    if (!mounted) return;
+    if (!seen) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) ctrl.startTutorial('growth_tour', _growthSteps);
+      if (mounted) {
+        await context.read<TutorialProvider>().markSeenExternally('growth_first_visit');
+      }
+    } else {
+      if (mounted) {
+        context.read<TutorialProvider>()
+            .scheduleTrigger('growth_first_visit', context);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,10 +62,8 @@ class GrowthScreen extends StatelessWidget {
         final isAmb = theme.isAmbient;
         final s = context.sL;
 
-        // Tutorial: prima visita alla scheda Growth
-        context.read<TutorialProvider>().scheduleTrigger('growth_first_visit', context);
-
         return BwScaffold(
+          bottomNavigationBar: const BannerAdWidget(),
           body: SafeArea(
             child: ListView(
             padding: EdgeInsets.fromLTRB(20, isAmb ? 72 : 24, 20, 40),
@@ -50,7 +88,10 @@ class GrowthScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               // ── Companion + fase + messaggio narrativo ──────────────────
-              _CompanionHero(p: p, isAmb: isAmb, progression: progression),
+              SpotlightTarget(
+                id: 'spot_companion_hero',
+                child: _CompanionHero(p: p, isAmb: isAmb, progression: progression),
+              ),
 
               const SizedBox(height: 24),
 
@@ -109,7 +150,10 @@ class GrowthScreen extends StatelessWidget {
               const SizedBox(height: 28),
 
               // ── Heatmap consistenza ──────────────────────────────────────
-              _HeatmapSection(p: p, progression: progression),
+              SpotlightTarget(
+                id: 'spot_heatmap',
+                child: _HeatmapSection(p: p, progression: progression),
+              ),
 
               const SizedBox(height: 28),
 
@@ -126,7 +170,10 @@ class GrowthScreen extends StatelessWidget {
               // ── Badge ───────────────────────────────────────────────────
               _SectionLabel(label: context.sL.badges, p: p),
               const SizedBox(height: 12),
-              _BadgeGrid(p: p, progression: progression),
+              SpotlightTarget(
+                id: 'spot_badges',
+                child: _BadgeGrid(p: p, progression: progression),
+              ),
             ],
           ),
           ),
@@ -161,7 +208,7 @@ class _CompanionHero extends StatelessWidget {
       children: [
         const SizedBox(height: 16),
         // Companion grande
-        CompanionWidget(size: 160, showPhase: true),
+        const CompanionWidget(size: 160, showPhase: true),
         const SizedBox(height: 16),
         // Fase
         Container(
@@ -285,317 +332,6 @@ class _PhaseTimeline extends StatelessWidget {
   }
 }
 
-// ── Coach Card ────────────────────────────────────────────────────────────────
-class _CoachCard extends StatelessWidget {
-  final String message;
-  final BwPaletteData p;
-  final bool isAmb;
-  const _CoachCard({required this.message, required this.p, required this.isAmb});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: p.primaryLight,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: p.primary.withValues(alpha: 0.2), width: 0.5),
-      ),
-      child: Row(
-        children: [
-          // Mini companion
-          CompanionWidget(size: 40, mood: WellyMood.calm),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                fontSize: isAmb ? 15 : 13,
-                fontWeight: isAmb ? FontWeight.w300 : FontWeight.w400,
-                color: p.text,
-                height: 1.5,
-                fontStyle: isAmb ? FontStyle.italic : FontStyle.normal,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Habit Row ─────────────────────────────────────────────────────────────────
-class _HabitRow extends StatelessWidget {
-  final HabitDefinition habit;
-  final HabitState state;
-  final BwPaletteData p;
-  final bool isAmb;
-
-  const _HabitRow({
-    required this.habit,
-    required this.state,
-    required this.p,
-    required this.isAmb,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isCompletedToday = state.lastCompletedAt != null &&
-        _isToday(state.lastCompletedAt!);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: isCompletedToday ? p.primaryLight : p.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isCompletedToday ? p.primary : p.cardBorder,
-          width: isCompletedToday ? 1 : 0.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          // Immagine habit
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.asset(
-              habit.imageAsset,
-              width: 44,
-              height: 44,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(
-                  color: p.primaryLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.spa_outlined, color: p.primary, size: 20),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.sL.habitName(habit.id),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
-                    color: p.text,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    Text(
-                      state.statusEmoji,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${state.daysCompleted} ${context.sL.days}',
-                      style: TextStyle(fontSize: 11, color: p.textSec),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Status indicator (read-only)
-          Icon(
-            isCompletedToday
-                ? Icons.check_circle_rounded
-                : Icons.radio_button_unchecked,
-            color: isCompletedToday ? p.primary : p.textMut,
-            size: 22,
-          ),
-        ],
-      ),
-    );
-  }
-
-  bool _isToday(DateTime date) {
-    final now = DateTime.now();
-    return date.year == now.year &&
-        date.month == now.month &&
-        date.day == now.day;
-  }
-}
-
-// ── Next Unlock ───────────────────────────────────────────────────────────────
-class _NextUnlock extends StatelessWidget {
-  final BwPaletteData p;
-  final bool isAmb;
-  final ProgressionProvider progression;
-
-  const _NextUnlock({
-    required this.p,
-    required this.isAmb,
-    required this.progression,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final pendingPair = progression.pendingChoicePair;
-    final s = context.sL;
-
-    if (pendingPair != null) {
-      final allPending = progression.pendingChoicePairs;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionLabel(label: s.nextUnlock, p: p),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () => HabitIntroSheet.show(
-              context,
-              habitA: pendingPair.$1,
-              habitB: pendingPair.$2,
-              allPairs: allPending,
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: p.primaryLight,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: p.primary.withValues(alpha: 0.35),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(
-                      color: p.primary.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.auto_awesome_outlined,
-                        color: p.primary, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          s.habitChoiceOpen,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: p.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${pendingPair.$1.name}  ·  ${pendingPair.$2.name}',
-                          style: TextStyle(fontSize: 11, color: p.textSec),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.chevron_right_rounded, color: p.primary, size: 20),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    final next = progression.nextHabitToUnlock;
-    if (next == null) return const SizedBox();
-
-    final daysLeft = progression.daysUntilUnlock(next.id);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel(label: context.sL.nextUnlock, p: p),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: p.card,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: p.cardBorder, width: 0.5),
-          ),
-          child: Row(
-            children: [
-              // Immagine sfocata/bloccata
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: ColorFiltered(
-                      colorFilter: const ColorFilter.mode(
-                        Colors.grey,
-                        BlendMode.saturation,
-                      ),
-                      child: Image.asset(
-                        next.imageAsset,
-                        width: 52,
-                        height: 52,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 52, height: 52,
-                          decoration: BoxDecoration(
-                            color: p.bg2,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: p.bg.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(Icons.lock_outline,
-                          color: p.textMut, size: 18),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      s.habitName(next.id),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: p.textSec,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      daysLeft > 0
-                          ? '${s.unlocksIn} $daysLeft ${s.days}'
-                          : s.almostReady,
-                      style: TextStyle(fontSize: 11, color: p.textMut),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 // ── Badge Grid ────────────────────────────────────────────────────────────────
 class _BadgeGrid extends StatelessWidget {
   final BwPaletteData p;
@@ -604,16 +340,7 @@ class _BadgeGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badges = progression.earnedBadges(context.sL);
-    if (badges.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(
-          context.sL.noBadgesYet,
-          style: TextStyle(fontSize: 13, color: p.textMut),
-        ),
-      );
-    }
+    final badges = progression.allBadges(context.sL);
 
     return GridView.builder(
       shrinkWrap: true,
@@ -631,23 +358,36 @@ class _BadgeGrid extends StatelessWidget {
 }
 
 class _BadgeTile extends StatelessWidget {
-  final BwBadge badge;
+  final BadgeInfo badge;
   final BwPaletteData p;
   const _BadgeTile({required this.badge, required this.p});
 
   @override
   Widget build(BuildContext context) {
+    final s = context.sL;
+    // Livello massimo di questa famiglia già raggiunto → tile piena e a colori.
+    // Altrimenti è il prossimo obiettivo: emoji smorzata + progresso reale,
+    // così l'utente vede sempre cosa manca per sbloccarlo.
+    final isMaxed = badge.progress >= badge.target;
+    final complete = badge.earned && isMaxed;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: p.card,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: p.cardBorder, width: 0.5),
+        border: Border.all(
+          color: complete ? p.primary.withValues(alpha: 0.4) : p.cardBorder,
+          width: complete ? 1 : 0.5,
+        ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(badge.emoji, style: const TextStyle(fontSize: 28)),
+          Opacity(
+            opacity: complete ? 1.0 : 0.4,
+            child: Text(badge.emoji, style: const TextStyle(fontSize: 28)),
+          ),
           const SizedBox(height: 6),
           Text(
             badge.name,
@@ -655,17 +395,26 @@ class _BadgeTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: p.text,
+              color: complete ? p.text : p.textSec,
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            badge.description,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 9, color: p.textSec),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 2),
+          if (complete)
+            Text(
+              badge.description,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 9, color: p.textSec),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            )
+          else
+            Text(
+              '${s.growthNextGoal}: ${badge.progress}/${badge.target}',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 9, color: p.textMut, fontWeight: FontWeight.w600),
+            ),
         ],
       ),
     );
@@ -793,9 +542,9 @@ class _HeatmapSectionState extends State<_HeatmapSection> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('5 ${s.days} ${s.days == 'giorni' ? 'fa' : 'ago'}',
+                  Text(s.heatmapDaysAgo(5),
                       style: TextStyle(fontSize: 9, color: p.textMut)),
-                  Text(s.days == 'giorni' ? 'oggi' : 'today',
+                  Text(s.heatmapToday,
                       style: TextStyle(fontSize: 9, color: p.textMut)),
                 ],
               ),
@@ -947,10 +696,8 @@ class _WellyJourneySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.sL;
     final currentPhase = progression.currentPhase;
-    final install = progression.installDate;
 
     const phaseEmojis  = ['🌱', '🌿', '🌾', '🌳', '✨'];
-    const phaseThresh  = [0, 7, 21, 42, 90];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -987,12 +734,8 @@ class _WellyJourneySection extends StatelessWidget {
               final isCurrent = phase == currentPhase;
               final isReached = phase <= currentPhase;
               final isFuture = phase > currentPhase;
-              final phaseDate = install != null && isReached
-                  ? install.add(Duration(days: phaseThresh[i]))
-                  : null;
-              final daysUntil = isFuture && install != null
-                  ? (phaseThresh[i] - progression.totalDaysCompleted).clamp(0, 999)
-                  : 0;
+              final phaseDate = isReached ? progression.phaseReachedDate(phase) : null;
+              final habitsLeft = isFuture ? progression.habitsUntilPhase(phase) : 0;
 
               final phaseLabels = [
                 s.phase1, s.phase2, s.phase3, s.phase4, s.phase5
@@ -1064,13 +807,13 @@ class _WellyJourneySection extends StatelessWidget {
                           if (phaseDate != null)
                             Text(
                               phase == 1
-                                  ? '${s.days == 'giorni' ? 'iniziato' : 'started'} ${phaseDate.day}/${phaseDate.month}'
-                                  : '${s.days == 'giorni' ? 'raggiunto' : 'reached'} ${phaseDate.day}/${phaseDate.month}',
+                                  ? s.phaseStarted('${phaseDate.day}/${phaseDate.month}')
+                                  : s.phaseReached('${phaseDate.day}/${phaseDate.month}'),
                               style: TextStyle(fontSize: 10, color: p.textSec),
                             )
                           else if (isFuture)
                             Text(
-                              '${s.unlocksIn} ${daysUntil}g',
+                              s.growthHabitsToRoot(habitsLeft),
                               style: TextStyle(fontSize: 10, color: p.textMut.withValues(alpha: 0.4)),
                             ),
                         ],

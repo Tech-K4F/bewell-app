@@ -29,8 +29,8 @@ abstract class TutorialScripts {
         mood: TutorialMood.celebrating,
         // Il testo reale viene da sL.tutorialText(id) in ogni lingua.
         // Questo è il fallback italiano usato se la localizzazione non copre l'id.
-        text: '✅ Ottima scelta! Trovi la nuova abitudine nella scheda Habits. '
-            'Completala ogni giorno per consolidarla.',
+        text: 'Molto bene! Oggi goditi il traguardo — inizieremo a lavorare '
+            'sulla nuova abitudine da domani.',
         actions: [TutorialAction.ok],
       );
     }
@@ -130,13 +130,13 @@ const _dialogs = <WellyDialog>[
     actions: [TutorialAction.ok],
   ),
 
-  // ── Focus 25 sbloccato ────────────────────────────────────────────────────
+  // ── Presentazione Focus 25 (disponibile fin da subito) ───────────────────
   WellyDialog(
     id: 'focus_unlocked',
     mood: TutorialMood.excited,
-    text: 'Hai sbloccato il Focus da 25 minuti! Il cervello umano ha un ciclo '
-        'naturale di concentrazione di circa 20-30 minuti. Hai guadagnato '
-        'questa abilità costruendo l\'abitudine dell\'acqua.',
+    text: 'Hai a disposizione il Focus da 25 minuti fin da subito! Il '
+        'cervello umano ha un ciclo naturale di concentrazione di circa '
+        '20-30 minuti — usalo per un blocco di lavoro senza distrazioni.',
     scienceFact: 'Kleitman (1963): cicli ultradiani di 90 min con picchi di '
         'attenzione da 20-30 min. Tecniche Pomodoro sfruttano questo ritmo.',
     actions: [TutorialAction.ok, TutorialAction.more],
