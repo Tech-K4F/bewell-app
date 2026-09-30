@@ -269,6 +269,27 @@ class SmartReminders {
     );
   }
 
+  /// Timer Focus persistente (conto alla rovescia fino a [endsAt]).
+  static Future<void> showFocusRunning(DateTime endsAt) async {
+    final s = await currentBwStrings();
+    await NotificationService.instance.showFocusTimer(
+      title: s.notifFocusRunningTitle,
+      body: s.notifFocusRunningBody,
+      endsAt: endsAt,
+    );
+  }
+
+  static Future<void> showFocusPaused() async {
+    final s = await currentBwStrings();
+    await NotificationService.instance.showFocusTimer(
+      title: s.notifFocusPausedTitle,
+      body: s.notifFocusPausedBody,
+    );
+  }
+
+  static Future<void> cancelFocusTimer() =>
+      NotificationService.instance.cancel(NotificationIds.focusTimer);
+
   static Future<void> cancelFocusEnd() =>
       NotificationService.instance.cancel(NotificationIds.focusEnd);
 

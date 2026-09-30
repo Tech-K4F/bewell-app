@@ -85,6 +85,7 @@ class _FocusScreenState extends State<FocusScreen>
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     SmartReminders.cancelFocusEnd();
+    SmartReminders.cancelFocusTimer();
     _pulseCtrl.dispose();
     super.dispose();
   }
@@ -96,6 +97,7 @@ class _FocusScreenState extends State<FocusScreen>
     _endsAt = DateTime.now().add(Duration(seconds: _remaining));
     setState(() => _state = _TimerState.running);
     _scheduleEndNotification();
+    SmartReminders.showFocusRunning(_endsAt!);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
@@ -118,6 +120,7 @@ class _FocusScreenState extends State<FocusScreen>
       _remaining = 0;
       _state = _TimerState.done;
       _timer?.cancel();
+      SmartReminders.cancelFocusTimer();
       AnalyticsService.instance.logFocusSessionCompleted(_totalSeconds ~/ 60);
       _sessionsCompletedThisVisit++;
       _markHabitCompleted();
@@ -188,6 +191,7 @@ class _FocusScreenState extends State<FocusScreen>
     if (_state != _TimerState.running) return;
     _timer?.cancel();
     SmartReminders.cancelFocusEnd();
+    SmartReminders.showFocusPaused();
     setState(() => _state = _TimerState.paused);
   }
 
@@ -196,6 +200,7 @@ class _FocusScreenState extends State<FocusScreen>
   void _stop() {
     _timer?.cancel();
     SmartReminders.cancelFocusEnd();
+    SmartReminders.cancelFocusTimer();
     setState(() {
       _state = _TimerState.idle;
       _remaining = _totalSeconds;
@@ -445,7 +450,8 @@ class _FocusScreenState extends State<FocusScreen>
                     Expanded(
                         child: _StatCard(
                             label: context.sL.focusStreak,
-                            value: '$streak ${streak == 1 ? context.sL.dayOne : context.sL.days}',
+                            value:
+                                '$streak ${streak == 1 ? context.sL.dayOne : context.sL.days}',
                             p: p)),
                   ]),
                 ],

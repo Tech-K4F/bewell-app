@@ -9,6 +9,7 @@ class _Channel {
   static const String habits = 'bewell_habits';
   static const String unlocks = 'bewell_unlocks';
   static const String water = 'bewell_water';
+  static const String focusTimer = 'bewell_focus_timer';
 }
 
 /// ID notifiche (univoci)
@@ -16,6 +17,8 @@ class NotificationIds {
   static const int habitChoice = 99998;
   // Fine sessione Focus (una sola alla volta).
   static const int focusEnd = 99997;
+  // Notifica persistente con il timer Focus in corso.
+  static const int focusTimer = 99996;
   static int forHabit(String id) => id.hashCode.abs() % 90000 + 10000;
   // Reminder periodici — fascia riservata 100-119 (max 12: oggi e domani).
   static const int reminderBase = 100;
@@ -124,6 +127,46 @@ class NotificationService {
     }
   }
 
+  // ── Timer Focus persistente ──────────────────────────────────────────────────
+  // Notifica non cancellabile a scorrimento, silenziosa. Con [endsAt] il
+  // sistema mostra da solo il conto alla rovescia (funziona anche con lo
+  // schermo spento e l'app in background); senza, è lo stato "in pausa".
+  Future<void> showFocusTimer({
+    required String title,
+    required String body,
+    DateTime? endsAt,
+  }) async {
+    if (!_initialized) return;
+    try {
+      final details = AndroidNotificationDetails(
+        _Channel.focusTimer,
+        _channelName(_Channel.focusTimer),
+        channelDescription: _channelDesc(_Channel.focusTimer),
+        importance: Importance.low,
+        priority: Priority.low,
+        ongoing: true,
+        autoCancel: false,
+        onlyAlertOnce: true,
+        playSound: false,
+        enableVibration: false,
+        showWhen: endsAt != null,
+        when: endsAt?.millisecondsSinceEpoch,
+        usesChronometer: endsAt != null,
+        chronometerCountDown: endsAt != null,
+        // Se l'app viene chiusa con il timer attivo, il sistema toglie la
+        // notifica da solo alla scadenza.
+        timeoutAfter: endsAt == null
+            ? null
+            : endsAt.difference(DateTime.now()).inMilliseconds + 1000,
+        category: AndroidNotificationCategory.progress,
+      );
+      await _plugin.show(NotificationIds.focusTimer, title, body,
+          NotificationDetails(android: details));
+    } catch (e) {
+      debugPrint('NotificationService focus timer error: $e');
+    }
+  }
+
   // ── Notifica sblocco abitudine (solo background) ──────────────────────────────
 
   Future<void> showHabitUnlocked({
@@ -220,6 +263,8 @@ class NotificationService {
         return 'Nuove abitudini';
       case _Channel.water:
         return 'Promemoria acqua';
+      case _Channel.focusTimer:
+        return 'Timer Focus';
       default:
         return 'Be Well';
     }
@@ -231,6 +276,8 @@ class NotificationService {
         return 'Avvisi quando si sblocca una nuova abitudine';
       case _Channel.water:
         return 'Promemoria per bere acqua durante la giornata';
+      case _Channel.focusTimer:
+        return 'Mostra il timer della sessione Focus in corso';
       default:
         return 'Promemoria abitudini Be Well';
     }

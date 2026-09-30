@@ -882,6 +882,10 @@ abstract class BwStrings {
   String get focusMinRemaining;
   String get focusBlockOf4;
   String get focusThenBreak;
+  String get notifFocusRunningTitle;
+  String get notifFocusRunningBody;
+  String get notifFocusPausedTitle;
+  String get notifFocusPausedBody;
   String get dayOne;
   String get wellyMsgMorning;
   String get wellyMsgAfternoon;
@@ -1112,6 +1116,10 @@ class _En extends BwStrings {
   String get focusMinRemaining => 'min left';
   String get focusBlockOf4 => 'of 4';
   String get focusThenBreak => 'then a 5-minute break';
+  String get notifFocusRunningTitle => '🎯 Focus in progress';
+  String get notifFocusRunningBody => 'One thing at a time. Tap to get back to the timer.';
+  String get notifFocusPausedTitle => '⏸ Focus paused';
+  String get notifFocusPausedBody => 'Take your time — pick it up whenever you\x27re ready.';
   String get dayOne => 'day';
   String get wellyMsgMorning => 'Good morning! A glass of water and your day starts on the right foot.';
   String get wellyMsgAfternoon => 'Still with me? A sip of water and a short pause will do you good.';
@@ -2225,6 +2233,10 @@ class _It extends BwStrings {
   String get focusMinRemaining => 'min rimasti';
   String get focusBlockOf4 => 'di 4';
   String get focusThenBreak => 'poi una pausa di 5 minuti';
+  String get notifFocusRunningTitle => '🎯 Focus in corso';
+  String get notifFocusRunningBody => 'Una cosa alla volta. Tocca per tornare al timer.';
+  String get notifFocusPausedTitle => '⏸ Focus in pausa';
+  String get notifFocusPausedBody => 'Con calma: riprendi quando vuoi.';
   String get dayOne => 'giorno';
   String get wellyMsgMorning => 'Buongiorno! Un bicchiere d\x27acqua e la giornata parte col piede giusto.';
   String get wellyMsgAfternoon => 'Ci sei ancora? Un sorso d\x27acqua e una piccola pausa ti faranno bene.';
@@ -3347,6 +3359,10 @@ class _Fr extends BwStrings {
   String get focusMinRemaining => 'min restantes';
   String get focusBlockOf4 => 'sur 4';
   String get focusThenBreak => 'puis une pause de 5 minutes';
+  String get notifFocusRunningTitle => '🎯 Focus en cours';
+  String get notifFocusRunningBody => 'Une chose à la fois. Touche pour revenir au minuteur.';
+  String get notifFocusPausedTitle => '⏸ Focus en pause';
+  String get notifFocusPausedBody => 'Prends ton temps : reprends quand tu veux.';
   String get dayOne => 'jour';
   String get wellyMsgMorning => 'Bonjour ! Un verre d\x27eau et la journée démarre du bon pied.';
   String get wellyMsgAfternoon => 'Toujours là ? Une gorgée d\x27eau et une petite pause te feront du bien.';
@@ -4485,6 +4501,10 @@ class _De extends BwStrings {
   String get focusMinRemaining => 'Min verbleibend';
   String get focusBlockOf4 => 'von 4';
   String get focusThenBreak => 'danach 5 Minuten Pause';
+  String get notifFocusRunningTitle => '🎯 Fokus läuft';
+  String get notifFocusRunningBody => 'Eins nach dem anderen. Tippe, um zum Timer zurückzukehren.';
+  String get notifFocusPausedTitle => '⏸ Fokus pausiert';
+  String get notifFocusPausedBody => 'Lass dir Zeit – mach weiter, wenn du bereit bist.';
   String get dayOne => 'Tag';
   String get wellyMsgMorning => 'Guten Morgen! Ein Glas Wasser und der Tag startet gut.';
   String get wellyMsgAfternoon => 'Noch da? Ein Schluck Wasser und eine kleine Pause tun dir gut.';
@@ -5622,6 +5642,10 @@ class _Es extends BwStrings {
   String get focusMinRemaining => 'min restantes';
   String get focusBlockOf4 => 'de 4';
   String get focusThenBreak => 'luego una pausa de 5 minutos';
+  String get notifFocusRunningTitle => '🎯 Foco en curso';
+  String get notifFocusRunningBody => 'Una cosa a la vez. Toca para volver al temporizador.';
+  String get notifFocusPausedTitle => '⏸ Foco en pausa';
+  String get notifFocusPausedBody => 'Con calma: retómalo cuando quieras.';
   String get dayOne => 'día';
   String get wellyMsgMorning => '¡Buenos días! Un vaso de agua y el día empieza con buen pie.';
   String get wellyMsgAfternoon => '¿Sigues ahí? Un sorbo de agua y una pequeña pausa te sentarán bien.';
