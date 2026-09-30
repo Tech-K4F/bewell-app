@@ -77,7 +77,8 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
           color: p.bg,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        padding: EdgeInsets.fromLTRB(
+            20, 12, 20, 32 + MediaQuery.of(context).viewPadding.bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

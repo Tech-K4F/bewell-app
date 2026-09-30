@@ -166,7 +166,10 @@ class ProfileScreen extends StatelessWidget {
                   icon: Icons.notifications_outlined,
                   label: context.sL.notifications,
                   p: p,
-                  onTap: () {},
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const SettingsScreen())),
                 ),
                 _LocaleTile(p: p),
               ]),
@@ -666,6 +669,7 @@ class _LocaleTile extends StatelessWidget {
         final sorted = [...BwLocale.values]
           ..sort((a, b) => a.label.compareTo(b.label));
         return ListTile(
+          onTap: () => _showPicker(context, localeProvider, sorted, p),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           leading: Container(
@@ -678,20 +682,17 @@ class _LocaleTile extends StatelessWidget {
           title: Text('Lingua / Language',
               style: TextStyle(
                   color: p.text, fontSize: 14, fontWeight: FontWeight.w500)),
-          trailing: GestureDetector(
-            onTap: () => _showPicker(context, localeProvider, sorted, p),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(localeProvider.locale.flag,
-                    style: const TextStyle(fontSize: 18)),
-                const SizedBox(width: 4),
-                Text(localeProvider.locale.label,
-                    style: TextStyle(fontSize: 13, color: p.textSec)),
-                const SizedBox(width: 4),
-                Icon(Icons.expand_more, color: p.textMut, size: 16),
-              ],
-            ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(localeProvider.locale.flag,
+                  style: const TextStyle(fontSize: 18)),
+              const SizedBox(width: 4),
+              Text(localeProvider.locale.label,
+                  style: TextStyle(fontSize: 13, color: p.textSec)),
+              const SizedBox(width: 4),
+              Icon(Icons.expand_more, color: p.textMut, size: 16),
+            ],
           ),
         );
       },
@@ -705,7 +706,8 @@ class _LocaleTile extends StatelessWidget {
       backgroundColor: p.card,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Column(
+      builder: (_) => SafeArea(
+          child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 12),
@@ -737,7 +739,7 @@ class _LocaleTile extends StatelessWidget {
           }),
           const SizedBox(height: 16),
         ],
-      ),
+      )),
     );
   }
 }
