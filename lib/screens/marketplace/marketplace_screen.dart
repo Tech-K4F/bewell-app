@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart' hide RewardItem;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../services/referral_service.dart';
+import '../../services/remote_flags_service.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../providers/theme_provider.dart';
@@ -27,11 +29,11 @@ const _purple = Color(0xFF7C3AED);
 
 // ── Colori categoria reward (costanti light) ──────────────────────────────────
 const _catColors = {
-  'Food & Drink':    Color(0xFFE0F2F1),
+  'Food & Drink': Color(0xFFE0F2F1),
   'Sport & Fitness': Color(0xFFFFF8E1),
-  'Benessere':       Color(0xFFF3E5F5),
-  'Cultura':         Color(0xFFE3F2FD),
-  'Shopping':        Color(0xFFF5F5F5),
+  'Benessere': Color(0xFFF3E5F5),
+  'Cultura': Color(0xFFE3F2FD),
+  'Shopping': Color(0xFFF5F5F5),
 };
 Color _catColor(String category) =>
     _catColors[category] ?? const Color(0xFFF5F5F5);
@@ -52,10 +54,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
   late TabController _tab;
 
   static const List<SpotlightStep> _marketplaceSteps = [
-    SpotlightStep(textId: 'marketplace_welcome'),
     SpotlightStep(textId: 'marketplace_points', targetId: 'spot_points_strip'),
-    SpotlightStep(textId: 'marketplace_tabs',   targetId: 'spot_market_tabs'),
-    SpotlightStep(textId: 'marketplace_card',   targetId: 'spot_reward_card'),
+    SpotlightStep(textId: 'marketplace_tabs', targetId: 'spot_market_tabs'),
   ];
 
   @override
@@ -80,11 +80,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
       // via TutorialProvider vero (un bool SharedPreferences a parte non
       // veniva mai letto, il dialogo ricompariva comunque).
       if (mounted) {
-        await context.read<TutorialProvider>().markSeenExternally('rewards_first_visit');
+        await context
+            .read<TutorialProvider>()
+            .markSeenExternally('rewards_first_visit');
       }
     } else {
       if (mounted) {
-        context.read<TutorialProvider>()
+        context
+            .read<TutorialProvider>()
             .scheduleTrigger('rewards_first_visit', context);
       }
     }
@@ -255,8 +258,7 @@ class _MarketplaceTabBar extends StatelessWidget {
         indicatorSize: TabBarIndicatorSize.tab,
         labelColor: p.text,
         unselectedLabelColor: p.textSec,
-        labelStyle:
-            const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         unselectedLabelStyle:
             const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
         dividerColor: Colors.transparent,
@@ -300,9 +302,17 @@ class _RewardsTabState extends State<_RewardsTab> {
     });
     try {
       final items = await RewardRepository.instance.getCatalog();
-      if (mounted) setState(() { _catalog = items; _loading = false; });
+      if (mounted)
+        setState(() {
+          _catalog = items;
+          _loading = false;
+        });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
     }
   }
 
@@ -312,7 +322,7 @@ class _RewardsTabState extends State<_RewardsTab> {
     final s = context.sL;
 
     if (_loading) {
-      return Center(child: CircularProgressIndicator(color: p.primary));
+      return _CatalogSkeleton(p: p);
     }
 
     if (_error != null) {
@@ -328,7 +338,8 @@ class _RewardsTabState extends State<_RewardsTab> {
             GestureDetector(
               onTap: _loadCatalog,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
                   color: p.btn,
                   borderRadius: BorderRadius.circular(10),
@@ -379,10 +390,15 @@ class _RewardsTabState extends State<_RewardsTab> {
 
             const SizedBox(height: 8),
 
-            // RewardedAdCard in fondo
-            _RewardedAdCard(p: p, s: s),
-
-            const SizedBox(height: 8),
+            // RewardedAdCard in fondo — l'ID annuncio release è ancora un
+            // segnaposto (REPLACE_WITH_PROD_ID): in debug usa comunque
+            // l'ID di test reale di Google, in release resta nascosta
+            // finché il remote flag non conferma che l'ID vero è a posto.
+            if (!kReleaseMode ||
+                RemoteFlagsService.instance.rewardedAdEnabled) ...[
+              _RewardedAdCard(p: p, s: s),
+              const SizedBox(height: 8),
+            ],
 
             // Invita un amico — link referral
             _ReferralCard(p: p),
@@ -406,6 +422,101 @@ class _RewardsTabState extends State<_RewardsTab> {
         value: ap,
         child: _RedeemSheet(reward: reward),
       ),
+    );
+  }
+}
+
+// ── Skeleton di caricamento catalogo — placeholder animati al posto dello
+// spinner centrato: la schermata sembra già viva mentre i dati arrivano,
+// invece di un vuoto con una rotella in mezzo.
+
+class _ShimmerBox extends StatefulWidget {
+  final double width;
+  final double height;
+  final double radius;
+  final BwPaletteData p;
+  const _ShimmerBox(
+      {required this.width,
+      required this.height,
+      required this.p,
+      this.radius = 6});
+
+  @override
+  State<_ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween(begin: 0.35, end: 0.85)
+          .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut)),
+      child: Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: widget.p.textMut.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(widget.radius),
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogSkeleton extends StatelessWidget {
+  final BwPaletteData p;
+  const _CatalogSkeleton({required this.p});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 40),
+      children: List.generate(6, (_) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: p.cardBorder, width: 0.5),
+          ),
+          child: Row(
+            children: [
+              _ShimmerBox(width: 38, height: 38, radius: 10, p: p),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _ShimmerBox(width: 140, height: 13, p: p),
+                    const SizedBox(height: 8),
+                    _ShimmerBox(width: 80, height: 11, p: p),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _ShimmerBox(width: 48, height: 24, radius: 8, p: p),
+            ],
+          ),
+        );
+      }),
     );
   }
 }
@@ -439,9 +550,8 @@ class _RewardCard extends StatelessWidget {
           color: p.card,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _canAfford
-                ? p.primary.withValues(alpha: 0.25)
-                : p.cardBorder,
+            color:
+                _canAfford ? p.primary.withValues(alpha: 0.25) : p.cardBorder,
             width: 0.5,
           ),
         ),
@@ -529,11 +639,11 @@ class _TypeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = switch (type) {
-      'voucher'    => '🎟 voucher',
-      'discount'   => '🏷 sconto',
+      'voucher' => '🎟 voucher',
+      'discount' => '🏷 sconto',
       'experience' => '✨ esperienza',
-      'digital'    => '💻 digitale',
-      _            => type,
+      'digital' => '💻 digitale',
+      _ => type,
     };
     return Text(
       label,
@@ -567,10 +677,10 @@ class _RedeemSheetState extends State<_RedeemSheet>
     super.initState();
     _animCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 500));
-    _flyY = Tween<double>(begin: 0, end: -30).animate(
-        CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
-    _flyOpacity = Tween<double>(begin: 1, end: 0).animate(
-        CurvedAnimation(parent: _animCtrl, curve: Curves.easeIn));
+    _flyY = Tween<double>(begin: 0, end: -30)
+        .animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
+    _flyOpacity = Tween<double>(begin: 1, end: 0)
+        .animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeIn));
   }
 
   @override
@@ -589,7 +699,11 @@ class _RedeemSheetState extends State<_RedeemSheet>
       final code = ap.redeemedRewards
           .firstWhere((r) => r.rewardId == widget.reward.id)
           .code;
-      setState(() { _phase = _RedeemPhase.success; _code = code; });
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _phase = _RedeemPhase.success;
+        _code = code;
+      });
     } else {
       setState(() => _phase = _RedeemPhase.confirm);
       _animCtrl.reset();
@@ -617,9 +731,9 @@ class _RedeemSheetState extends State<_RedeemSheet>
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: switch (_phase) {
-            _RedeemPhase.confirm   => _buildConfirm(context, ap, p, s),
+            _RedeemPhase.confirm => _buildConfirm(context, ap, p, s),
             _RedeemPhase.animating => _buildAnimating(p),
-            _RedeemPhase.success   => _buildSuccess(context, p, s),
+            _RedeemPhase.success => _buildSuccess(context, p, s),
           },
         ),
       );
@@ -634,10 +748,11 @@ class _RedeemSheetState extends State<_RedeemSheet>
       children: [
         // Handle
         Container(
-          width: 36, height: 4,
+          width: 36,
+          height: 4,
           margin: const EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
-            color: p.cardBorder, borderRadius: BorderRadius.circular(2)),
+              color: p.cardBorder, borderRadius: BorderRadius.circular(2)),
         ),
 
         Text(
@@ -658,7 +773,8 @@ class _RedeemSheetState extends State<_RedeemSheet>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: _catColor(widget.reward.category),
                 borderRadius: BorderRadius.circular(12),
@@ -758,18 +874,18 @@ class _RedeemSheetState extends State<_RedeemSheet>
     );
   }
 
-  Widget _buildSuccess(
-      BuildContext context, BwPaletteData p, BwStrings s) {
+  Widget _buildSuccess(BuildContext context, BwPaletteData p, BwStrings s) {
     final code = _code ?? '—';
     return Column(
       key: const ValueKey('success'),
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 36, height: 4,
+          width: 36,
+          height: 4,
           margin: const EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
-            color: p.cardBorder, borderRadius: BorderRadius.circular(2)),
+              color: p.cardBorder, borderRadius: BorderRadius.circular(2)),
         ),
 
         // Welly text
@@ -875,15 +991,31 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
   RewardedAd? _rewardedAd;
   bool _adLoading = false;
 
-  // TODO: sostituire con ID produzione prima del rilascio
-  static const _adUnitId = kDebugMode
-      ? 'ca-app-pub-3940256099942544/5224354917'  // Test Android
-      : 'ca-app-pub-REPLACE_WITH_PROD_ID/REPLACE'; // Produzione
+  // ID di produzione reali per entrambe le piattaforme (creati in AdMob).
+  static final _adUnitId = kDebugMode
+      ? (Platform.isIOS
+          ? 'ca-app-pub-3940256099942544/1712485313' // Test iOS
+          : 'ca-app-pub-3940256099942544/5224354917') // Test Android
+      : (Platform.isIOS
+          ? 'ca-app-pub-5624251597550316/4830703542' // Produzione iOS
+          : 'ca-app-pub-5624251597550316/3655177074'); // Produzione Android
+
+  // Punti per ad e tetto giornaliero: senza un limite, guardare pubblicità
+  // diventa un modo per accumulare punti scollegato dalle abitudini — un
+  // utente potrebbe ignorare le attività e "grindare" solo ad, mentre ogni
+  // ad rende all'app molto meno di quanto quei punti valgano nel
+  // marketplace (voucher reali). 3 ad/giorno = max 30 pt/die da questa
+  // fonte, comparabile a UNA abitudine media, non a un'entrata illimitata.
+  static const int _pointsPerAd = 10;
+  static const int _maxAdsPerDay = 3;
+  int _adsWatchedToday = 0;
+  bool _capLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _loadAd();
+    _loadAdsWatchedToday();
   }
 
   @override
@@ -891,6 +1023,37 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
     _rewardedAd?.dispose();
     super.dispose();
   }
+
+  static String _todayKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _loadAdsWatchedToday() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = _todayKey(DateTime.now());
+    final savedDate = prefs.getString('rewarded_ads_date') ?? '';
+    final count =
+        savedDate == today ? (prefs.getInt('rewarded_ads_count') ?? 0) : 0;
+    if (savedDate != today) {
+      await prefs.setString('rewarded_ads_date', today);
+      await prefs.setInt('rewarded_ads_count', 0);
+    }
+    if (mounted) {
+      setState(() {
+        _adsWatchedToday = count;
+        _capLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _registerAdWatched() async {
+    final prefs = await SharedPreferences.getInstance();
+    final newCount = _adsWatchedToday + 1;
+    await prefs.setString('rewarded_ads_date', _todayKey(DateTime.now()));
+    await prefs.setInt('rewarded_ads_count', newCount);
+    if (mounted) setState(() => _adsWatchedToday = newCount);
+  }
+
+  bool get _capReached => _adsWatchedToday >= _maxAdsPerDay;
 
   void _loadAd() {
     if (_adLoading) return;
@@ -901,19 +1064,30 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
           if (mounted) {
-            setState(() { _rewardedAd = ad; _adLoading = false; });
+            setState(() {
+              _rewardedAd = ad;
+              _adLoading = false;
+            });
           } else {
             ad.dispose();
           }
         },
         onAdFailedToLoad: (_) {
-          if (mounted) setState(() { _rewardedAd = null; _adLoading = false; });
+          if (mounted)
+            setState(() {
+              _rewardedAd = null;
+              _adLoading = false;
+            });
         },
       ),
     );
   }
 
   Future<void> _watchAd(BuildContext context) async {
+    if (_capReached) {
+      _showCapReachedToast(context);
+      return;
+    }
     if (_rewardedAd == null) {
       _showUnavailableToast(context);
       _loadAd(); // riprova in background
@@ -928,7 +1102,10 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
-        if (mounted) { setState(() => _rewardedAd = null); _loadAd(); }
+        if (mounted) {
+          setState(() => _rewardedAd = null);
+          _loadAd();
+        }
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
         ad.dispose();
@@ -942,14 +1119,15 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
 
     await _rewardedAd!.show(
       onUserEarnedReward: (_, __) async {
-        await ap.addPoints(10);
-        AnalyticsService.instance.logAdWatched(10);
+        await ap.addPoints(_pointsPerAd);
+        await _registerAdWatched();
+        AnalyticsService.instance.logAdWatched(_pointsPerAd);
         if (mounted) {
           messenger.showSnackBar(SnackBar(
-            content: Text('+10 pt ${s.pointsAvailable}! 🎉'),
+            content: Text('+$_pointsPerAd pt ${s.pointsAvailable}! 🎉'),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             duration: const Duration(seconds: 3),
           ));
         }
@@ -961,6 +1139,17 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(
         widget.s.marketAdUnavailable,
+        style: const TextStyle(fontSize: 13),
+      ),
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
+  void _showCapReachedToast(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(
+        widget.s.marketAdCapReached,
         style: const TextStyle(fontSize: 13),
       ),
       behavior: SnackBarBehavior.floating,
@@ -981,7 +1170,9 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
         border: Border.all(color: p.cardBorder, width: 0.5),
       ),
       child: GestureDetector(
-        onTap: () => _showHelpDialog(context),
+        onTap: () => _capReached
+            ? _showCapReachedToast(context)
+            : _showHelpDialog(context),
         behavior: HitTestBehavior.opaque,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -990,7 +1181,8 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
               children: [
                 // Icona play in cerchio
                 Container(
-                  width: 36, height: 36,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: p.primaryLight,
                     shape: BoxShape.circle,
@@ -1011,7 +1203,12 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
                             color: p.text),
                       ),
                       Text(
-                        s.marketAdSubtitle,
+                        _capReached
+                            ? s.marketAdCapReached
+                            : _capLoaded
+                                ? s.marketAdRemaining(
+                                    _maxAdsPerDay - _adsWatchedToday)
+                                : s.marketAdSubtitle,
                         style: TextStyle(fontSize: 11, color: p.textSec),
                       ),
                     ],
@@ -1020,7 +1217,8 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
                 // Indicatore caricamento ad
                 if (_adLoading)
                   SizedBox(
-                    width: 14, height: 14,
+                    width: 14,
+                    height: 14,
                     child: CircularProgressIndicator(
                         strokeWidth: 1.5, color: p.textMut),
                   ),
@@ -1035,7 +1233,9 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: _rewardedAd != null ? p.primary : p.textMut),
+                      color: !_capReached && _rewardedAd != null
+                          ? p.primary
+                          : p.textMut),
                 ),
                 GestureDetector(
                   onTap: () => _showWhyDialog(context),
@@ -1068,14 +1268,19 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
         title: Row(
           children: [
             Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(color: p.primaryLight, shape: BoxShape.circle),
+              width: 36,
+              height: 36,
+              decoration:
+                  BoxDecoration(color: p.primaryLight, shape: BoxShape.circle),
               child: Icon(Icons.play_arrow_rounded, color: p.primary, size: 20),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(s.marketAdTitle,
-                  style: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 15)),
+                  style: TextStyle(
+                      color: p.text,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15)),
             ),
           ],
         ),
@@ -1086,7 +1291,8 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
-            child: Text(s.cancel, style: TextStyle(color: p.textMut, fontSize: 13)),
+            child: Text(s.cancel,
+                style: TextStyle(color: p.textMut, fontSize: 13)),
           ),
           GestureDetector(
             onTap: () {
@@ -1095,10 +1301,14 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(color: p.btn, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                  color: p.btn, borderRadius: BorderRadius.circular(10)),
               child: Text(
                 s.marketWatchNow,
-                style: TextStyle(color: p.btnText, fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    color: p.btnText,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -1114,8 +1324,7 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: p.card,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           s.whyAdsTitle,
           style: TextStyle(
@@ -1129,8 +1338,7 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                 color: p.btn,
                 borderRadius: BorderRadius.circular(10),
@@ -1184,7 +1392,11 @@ class _ReferralCardState extends State<_ReferralCard> {
 
   Future<void> _loadCode() async {
     final code = await ReferralService.instance.getOrCreateMyCode();
-    if (mounted) setState(() { _myCode = code; _loading = false; });
+    if (mounted)
+      setState(() {
+        _myCode = code;
+        _loading = false;
+      });
   }
 
   void _share(BwStrings s) {
@@ -1217,11 +1429,16 @@ class _ReferralCardState extends State<_ReferralCard> {
 
   String _errorLabel(String code, BwStrings s) {
     switch (code) {
-      case 'invalid_code':      return s.referralErrorInvalid;
-      case 'own_code':          return s.referralErrorOwn;
-      case 'already_redeemed':  return s.referralErrorAlready;
-      case 'not_signed_in':     return s.referralErrorNotSignedIn;
-      default:                  return s.referralErrorGeneric;
+      case 'invalid_code':
+        return s.referralErrorInvalid;
+      case 'own_code':
+        return s.referralErrorOwn;
+      case 'already_redeemed':
+        return s.referralErrorAlready;
+      case 'not_signed_in':
+        return s.referralErrorNotSignedIn;
+      default:
+        return s.referralErrorGeneric;
     }
   }
 
@@ -1242,9 +1459,12 @@ class _ReferralCardState extends State<_ReferralCard> {
           Row(
             children: [
               Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(color: p.primaryLight, shape: BoxShape.circle),
-                child: Icon(Icons.person_add_alt_1_rounded, color: p.primary, size: 18),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                    color: p.primaryLight, shape: BoxShape.circle),
+                child: Icon(Icons.person_add_alt_1_rounded,
+                    color: p.primary, size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1252,7 +1472,10 @@ class _ReferralCardState extends State<_ReferralCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(s.referralTitle,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.text)),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: p.text)),
                     Text(s.referralSubtitle,
                         style: TextStyle(fontSize: 11, color: p.textSec)),
                   ],
@@ -1264,8 +1487,10 @@ class _ReferralCardState extends State<_ReferralCard> {
           if (_loading)
             Center(
               child: SizedBox(
-                width: 16, height: 16,
-                child: CircularProgressIndicator(strokeWidth: 1.5, color: p.textMut),
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 1.5, color: p.textMut),
               ),
             )
           else if (_myCode == null)
@@ -1285,7 +1510,10 @@ class _ReferralCardState extends State<_ReferralCard> {
                   child: Text(
                     s.referralRetry,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: p.textSec, fontSize: 12, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        color: p.textSec,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -1302,7 +1530,10 @@ class _ReferralCardState extends State<_ReferralCard> {
                 child: Center(
                   child: Text(
                     s.referralShareButton(_myCode ?? ''),
-                    style: TextStyle(color: p.btnText, fontSize: 12, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        color: p.btnText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -1319,7 +1550,8 @@ class _ReferralCardState extends State<_ReferralCard> {
                     isDense: true,
                     hintText: s.referralHint,
                     hintStyle: TextStyle(fontSize: 12, color: p.textMut),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 10),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(color: p.cardBorder),
@@ -1335,18 +1567,24 @@ class _ReferralCardState extends State<_ReferralCard> {
               GestureDetector(
                 onTap: () => _redeem(context, s),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: p.primaryLight,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: _redeeming
                       ? SizedBox(
-                          width: 14, height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 1.5, color: p.primary),
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 1.5, color: p.primary),
                         )
                       : Text(s.referralApply,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.primary)),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: p.primary)),
                 ),
               ),
             ],
@@ -1444,7 +1682,8 @@ class _DiscountCard extends StatelessWidget {
           children: [
             // Emoji in cerchio colorato
             Container(
-              width: 38, height: 38,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 color: discount.bgColor,
                 borderRadius: BorderRadius.circular(10),
@@ -1501,8 +1740,7 @@ class _DiscountCard extends StatelessWidget {
 
             // Pulsante "Ottieni"
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.amber[700],
                 borderRadius: BorderRadius.circular(8),
@@ -1545,7 +1783,8 @@ class _DiscountSheet extends StatelessWidget {
         children: [
           // Handle
           Container(
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
                 color: p.cardBorder, borderRadius: BorderRadius.circular(2)),
@@ -1555,7 +1794,8 @@ class _DiscountSheet extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 48, height: 48,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: discount.bgColor,
                   borderRadius: BorderRadius.circular(14),
@@ -1607,8 +1847,7 @@ class _DiscountSheet extends StatelessWidget {
           // Codice in box grande
           Container(
             width: double.infinity,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: p.bg2,
               borderRadius: BorderRadius.circular(14),
@@ -1705,8 +1944,7 @@ class _DiscountSheet extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(context.sL.codeCopied),
       behavior: SnackBarBehavior.floating,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       duration: const Duration(seconds: 2),
     ));
   }
@@ -1738,9 +1976,15 @@ class _InAppTab extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(10, 12, 10, 40),
           children: [
-            // ── Banner Premium ────────────────────────────────────────────
-            _PremiumBanner(p: p, s: s),
-            const SizedBox(height: 20),
+            // ── Banner Premium — nascosto finché non c'è un IAP reale
+            // dietro (RevenueCat/StoreKit), governato da remote flag così
+            // si può riaccendere il giorno in cui è pronto senza rilasciare
+            // una nuova build. Prima mostrava un prezzo e un CTA "prova
+            // gratis" che non facevano letteralmente nulla al tap.
+            if (RemoteFlagsService.instance.premiumEnabled) ...[
+              _PremiumBanner(p: p, s: s),
+              const SizedBox(height: 20),
+            ],
 
             // ── Welly ─────────────────────────────────────────────────────
             _InAppSectionLabel(label: s.inAppWelly, p: p),
@@ -1838,9 +2082,7 @@ class _PremiumBanner extends StatelessWidget {
               Text(
                 s.premiumPrice('3.99€'),
                 style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _purple),
+                    fontSize: 11, fontWeight: FontWeight.w600, color: _purple),
               ),
             ],
           ),
@@ -1869,9 +2111,7 @@ class _PremiumBanner extends StatelessWidget {
                 s.premiumTrial,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                    fontSize: 10,
-                    color: _purple,
-                    fontWeight: FontWeight.w500),
+                    fontSize: 10, color: _purple, fontWeight: FontWeight.w500),
               ),
             ),
           ),
@@ -1899,9 +2139,7 @@ class _PremiumFeature extends StatelessWidget {
         children: [
           const Text('·',
               style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: _purple)),
+                  fontSize: 14, fontWeight: FontWeight.w700, color: _purple)),
           const SizedBox(width: 6),
           Expanded(
             child: Text(text,
@@ -1997,8 +2235,8 @@ class _InAppGrid extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _UnlockSheet(
-          item: item, ap: ap, inApp: inApp, p: p, s: s),
+      builder: (_) =>
+          _UnlockSheet(item: item, ap: ap, inApp: inApp, p: p, s: s),
     );
   }
 }
@@ -2032,9 +2270,7 @@ class _InAppGridCard extends StatelessWidget {
             color: unlocked ? p.primaryLight : p.card,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: unlocked
-                  ? p.primary.withValues(alpha: 0.3)
-                  : p.cardBorder,
+              color: unlocked ? p.primary.withValues(alpha: 0.3) : p.cardBorder,
               width: 0.5,
             ),
           ),
@@ -2046,9 +2282,7 @@ class _InAppGridCard extends StatelessWidget {
               Text(
                 item.name,
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: p.text),
+                    fontSize: 12, fontWeight: FontWeight.w600, color: p.text),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -2139,9 +2373,7 @@ class _InAppListCard extends StatelessWidget {
     return Opacity(
       opacity: (!unlocked && !canAfford) ? 0.55 : 1.0,
       child: GestureDetector(
-        onTap: unlocked
-            ? null
-            : () => _showUnlockSheet(context),
+        onTap: unlocked ? null : () => _showUnlockSheet(context),
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(11),
@@ -2149,9 +2381,7 @@ class _InAppListCard extends StatelessWidget {
             color: unlocked ? p.primaryLight : p.card,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: unlocked
-                  ? p.primary.withValues(alpha: 0.3)
-                  : p.cardBorder,
+              color: unlocked ? p.primary.withValues(alpha: 0.3) : p.cardBorder,
               width: 0.5,
             ),
           ),
@@ -2159,14 +2389,14 @@ class _InAppListCard extends StatelessWidget {
             children: [
               // Emoji in cerchio
               Container(
-                width: 38, height: 38,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF3E5F5), // purple-light
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
-                  child:
-                      Text(item.emoji, style: const TextStyle(fontSize: 20)),
+                  child: Text(item.emoji, style: const TextStyle(fontSize: 20)),
                 ),
               ),
               const SizedBox(width: 11),
@@ -2272,11 +2502,14 @@ class _UnlockSheetState extends State<_UnlockSheet> {
   Future<void> _unlock() async {
     if (_loading) return;
     setState(() => _loading = true);
-    final ok = await widget.inApp.unlockItem(
-        widget.item.id, widget.item.pointsCost, widget.ap);
+    final ok = await widget.inApp
+        .unlockItem(widget.item.id, widget.item.pointsCost, widget.ap);
     if (!mounted) return;
     if (ok) {
-      setState(() { _phase = _UnlockPhase.success; _loading = false; });
+      setState(() {
+        _phase = _UnlockPhase.success;
+        _loading = false;
+      });
     } else {
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -2317,7 +2550,8 @@ class _UnlockSheetState extends State<_UnlockSheet> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 36, height: 4,
+          width: 36,
+          height: 4,
           margin: const EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
               color: p.cardBorder, borderRadius: BorderRadius.circular(2)),
@@ -2356,9 +2590,7 @@ class _UnlockSheetState extends State<_UnlockSheet> {
               Text(
                 '${widget.item.pointsCost} pt ⭐',
                 style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: _purple),
+                    fontSize: 14, fontWeight: FontWeight.w700, color: _purple),
               ),
             ],
           ),
@@ -2408,7 +2640,8 @@ class _UnlockSheetState extends State<_UnlockSheet> {
                   child: Center(
                     child: _loading
                         ? const SizedBox(
-                            width: 18, height: 18,
+                            width: 18,
+                            height: 18,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white))
                         : Text(
@@ -2416,9 +2649,7 @@ class _UnlockSheetState extends State<_UnlockSheet> {
                             style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: canAfford
-                                    ? Colors.white
-                                    : p.textMut),
+                                color: canAfford ? Colors.white : p.textMut),
                           ),
                   ),
                 ),
@@ -2436,7 +2667,8 @@ class _UnlockSheetState extends State<_UnlockSheet> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 36, height: 4,
+          width: 36,
+          height: 4,
           margin: const EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
               color: p.cardBorder, borderRadius: BorderRadius.circular(2)),
@@ -2487,5 +2719,3 @@ class _UnlockSheetState extends State<_UnlockSheet> {
     );
   }
 }
-
-

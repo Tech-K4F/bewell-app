@@ -23,25 +23,26 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
   int _currentPage = 0;
 
   List<_Slide> _slides(BwStrings s) => [
-    _Slide(
-      emoji: '🌿',
-      title: s.welcomeSlide1Title,
-      subtitle: s.welcomeSlide1Sub,
-      accentColor: _teal,
-    ),
-    _Slide(
-      emoji: '🔔',
-      title: s.welcomeSlide2Title,
-      subtitle: s.welcomeSlide2Sub,
-      accentColor: _blue,
-    ),
-    _Slide(
-      emoji: '🎁',
-      title: s.welcomeSlide3Title,
-      subtitle: s.welcomeSlide3Sub,
-      accentColor: _amber,
-    ),
-  ];
+        _Slide(
+          emoji: '🌿',
+          title: s.welcomeSlide1Title,
+          subtitle: s.welcomeSlide1Sub,
+          accentColor: _teal,
+          footer: s.welcomeSlide1Footer,
+        ),
+        _Slide(
+          emoji: '🔔',
+          title: s.welcomeSlide2Title,
+          subtitle: s.welcomeSlide2Sub,
+          accentColor: _blue,
+        ),
+        _Slide(
+          emoji: '🎁',
+          title: s.welcomeSlide3Title,
+          subtitle: s.welcomeSlide3Sub,
+          accentColor: _amber,
+        ),
+      ];
 
   @override
   void dispose() {
@@ -92,8 +93,8 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
                 controller: _controller,
                 itemCount: slides.length,
                 onPageChanged: (i) => setState(() => _currentPage = i),
-                itemBuilder: (context, i) =>
-                    _SlideWidget(slide: slides[i], isActive: i == _currentPage, p: p),
+                itemBuilder: (context, i) => _SlideWidget(
+                    slide: slides[i], isActive: i == _currentPage, p: p),
               ),
             ),
 
@@ -176,7 +177,8 @@ class _SlideWidget extends StatelessWidget {
   final bool isActive;
   final BwPaletteData p;
 
-  const _SlideWidget({required this.slide, required this.isActive, required this.p});
+  const _SlideWidget(
+      {required this.slide, required this.isActive, required this.p});
 
   @override
   Widget build(BuildContext context) {
@@ -242,6 +244,18 @@ class _SlideWidget extends StatelessWidget {
                     height: 1.55,
                   ),
                 ),
+                if (slide.footer != null) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    slide.footer!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: p.textMut,
+                      fontSize: 12.5,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -256,11 +270,13 @@ class _Slide {
   final String title;
   final String subtitle;
   final Color accentColor;
+  final String? footer;
 
   const _Slide({
     required this.emoji,
     required this.title,
     required this.subtitle,
     required this.accentColor,
+    this.footer,
   });
 }

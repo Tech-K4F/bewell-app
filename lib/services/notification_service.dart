@@ -1,22 +1,25 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
 /// Identificatori canale notifiche
 class _Channel {
-  static const String habits  = 'bewell_habits';
+  static const String habits = 'bewell_habits';
   static const String unlocks = 'bewell_unlocks';
-  static const String water   = 'bewell_water';
+  static const String water = 'bewell_water';
 }
 
 /// ID notifiche (univoci)
-class _NId {
-  static const int habitChoice    = 99998;
-  static int forHabit(String id)  => id.hashCode.abs() % 90000 + 10000;
-  // Reminder periodici — fascia riservata 100-119 (max ~7 al giorno).
-  static const int reminderBase   = 100;
-  static const int reminderSlots  = 20;
+class NotificationIds {
+  static const int habitChoice = 99998;
+  // Fine sessione Focus (una sola alla volta).
+  static const int focusEnd = 99997;
+  static int forHabit(String id) => id.hashCode.abs() % 90000 + 10000;
+  // Reminder periodici — fascia riservata 100-119 (max 12: oggi e domani).
+  static const int reminderBase = 100;
+  static const int reminderSlots = 20;
   // ID del VECCHIO sistema di reminder (un solo promemoria acqua + un solo
   // check-in serale, id fissi 1/2) da prima che diventasse multi-slot con
   // frequenza configurabile. flutter_local_notifications schedula allarmi
@@ -24,8 +27,8 @@ class _NId {
   // già l'app installata continuava a ricevere QUESTI oltre ai nuovi
   // (stessa ora, testo nella lingua in cui erano stati schedulati l'ultima
   // volta — da cui il doppio avviso, a volte in due lingue diverse).
-  static const int legacyWater    = 1;
-  static const int legacyEvening  = 2;
+  static const int legacyWater = 1;
+  static const int legacyEvening = 2;
 }
 
 /// Servizio notifiche locale.
@@ -68,12 +71,31 @@ class NotificationService {
 
   Future<void> requestPermission() async {
     try {
-      final androidPlugin = _plugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
       await androidPlugin?.requestNotificationsPermission();
     } catch (e) {
       debugPrint('NotificationService requestPermission error: $e');
+    }
+  }
+
+  /// Su Android 12+ gli allarmi precisi (fine timer Focus) richiedono un
+  /// permesso che l'utente concede dalle impostazioni di sistema. Lo chiede
+  /// UNA SOLA VOLTA, quando ha senso (apertura del Focus); se rifiuta la fine
+  /// sessione arriva comunque, con qualche minuto di margine.
+  Future<void> ensureExactAlarms() async {
+    if (!_initialized) return;
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (android == null) return;
+      if (await android.canScheduleExactNotifications() ?? true) return;
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('exact_alarm_asked') ?? false) return;
+      await prefs.setBool('exact_alarm_asked', true);
+      await android.requestExactAlarmsPermission();
+    } catch (e) {
+      debugPrint('NotificationService ensureExactAlarms error: $e');
     }
   }
 
@@ -95,8 +117,8 @@ class NotificationService {
         priority: Priority.high,
         styleInformation: BigTextStyleInformation(body),
       );
-      await _plugin.show(id, title, body,
-          NotificationDetails(android: androidDetails));
+      await _plugin.show(
+          id, title, body, NotificationDetails(android: androidDetails));
     } catch (e) {
       debugPrint('NotificationService show error: $e');
     }
@@ -110,99 +132,72 @@ class NotificationService {
     required String message,
   }) async {
     await showNotification(
-      id: _NId.forHabit(habitId),
+      id: NotificationIds.forHabit(habitId),
       title: '🌱 $habitName',
       body: message,
       channel: _Channel.unlocks,
     );
   }
 
-  // ── Reminder giornalieri scheduelati (localizzati) ───────────────────────────
-  // Chiamata su cambio lingua, cambio frequenza/pausa nelle impostazioni, o
-  // primo avvio. Le notifiche schedulate vengono mostrate dall'OS sempre,
-  // indipendentemente dal foreground dell'app.
-  //
-  // [hours] è la lista di ore (0-23) a cui inviare un reminder — vuota se
-  // l'utente ha disattivato le notifiche o è in pausa. Il primo orario usa
-  // sempre il messaggio "acqua" (naturalmente mattutino), l'ultimo il
-  // messaggio "check-in serale", quelli intermedi il messaggio generico
-  // sulle abitudini — così non è più sempre lo stesso testo ripetuto.
-  Future<void> scheduleReminders({
-    required List<int> hours,
-    required String waterTitle,
-    required String waterBody,
-    required String habitTitle,
-    required String habitBody,
-    required String eveningTitle,
-    required String eveningBody,
+  // ── Promemoria programmati (one-shot) ────────────────────────────────────────
+  // Il piano (quanti, quando, con che testo) lo decide SmartReminders: qui c'è
+  // solo la programmazione a livello OS di un singolo avviso a una data ora.
+  // [exact] chiede un allarme preciso (fine timer Focus), con ripiego su
+  // quello inesatto se il permesso non è concesso.
+  Future<void> scheduleAt({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime at,
+    bool exact = false,
+    String channel = _Channel.habits,
   }) async {
     if (!_initialized) return;
-    try {
-      await cancelReminders();
-      if (hours.isEmpty) return;
-
-      for (var i = 0; i < hours.length && i < _NId.reminderSlots; i++) {
-        final isFirst = i == 0;
-        final isLast = i == hours.length - 1;
-        final title = isFirst ? waterTitle : (isLast ? eveningTitle : habitTitle);
-        final body = isFirst ? waterBody : (isLast ? eveningBody : habitBody);
-        await _scheduleDaily(
-          id: _NId.reminderBase + i,
-          title: title,
-          body: body,
-          hour: hours[i],
-          minute: 0,
-          channel: isFirst ? _Channel.water : _Channel.habits,
+    final when = tz.TZDateTime.from(at, tz.local);
+    if (!when.isAfter(tz.TZDateTime.now(tz.local))) return;
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        channel,
+        _channelName(channel),
+        channelDescription: _channelDesc(channel),
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+        styleInformation: BigTextStyleInformation(body),
+      ),
+    );
+    Future<void> schedule(AndroidScheduleMode mode) => _plugin.zonedSchedule(
+          id,
+          title,
+          body,
+          when,
+          details,
+          androidScheduleMode: mode,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
         );
+    try {
+      try {
+        await schedule(exact
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle);
+      } catch (_) {
+        if (!exact) rethrow;
+        await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
       }
     } catch (e) {
-      debugPrint('NotificationService scheduleReminders error: $e');
+      debugPrint('NotificationService scheduleAt error: $e');
     }
   }
 
   Future<void> cancelReminders() async {
     if (!_initialized) return;
-    for (var i = 0; i < _NId.reminderSlots; i++) {
-      await _plugin.cancel(_NId.reminderBase + i);
+    for (var i = 0; i < NotificationIds.reminderSlots; i++) {
+      await _plugin.cancel(NotificationIds.reminderBase + i);
     }
     // Migrazione: elimina eventuali allarmi del vecchio sistema (id 1/2)
     // ancora registrati presso l'OS da un'installazione precedente.
-    await _plugin.cancel(_NId.legacyWater);
-    await _plugin.cancel(_NId.legacyEvening);
-  }
-
-  Future<void> _scheduleDaily({
-    required int id,
-    required String title,
-    required String body,
-    required int hour,
-    required int minute,
-    required String channel,
-  }) async {
-    final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime(
-        tz.local, now.year, now.month, now.day, hour, minute);
-    if (scheduled.isBefore(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
-    }
-    final androidDetails = AndroidNotificationDetails(
-      channel,
-      _channelName(channel),
-      channelDescription: _channelDesc(channel),
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
-    );
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduled,
-      NotificationDetails(android: androidDetails),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+    await _plugin.cancel(NotificationIds.legacyWater);
+    await _plugin.cancel(NotificationIds.legacyEvening);
   }
 
   // ── Cancellazione ────────────────────────────────────────────────────────────
@@ -221,17 +216,23 @@ class NotificationService {
 
   String _channelName(String id) {
     switch (id) {
-      case _Channel.unlocks: return 'Nuove abitudini';
-      case _Channel.water:   return 'Promemoria acqua';
-      default:               return 'Be Well';
+      case _Channel.unlocks:
+        return 'Nuove abitudini';
+      case _Channel.water:
+        return 'Promemoria acqua';
+      default:
+        return 'Be Well';
     }
   }
 
   String _channelDesc(String id) {
     switch (id) {
-      case _Channel.unlocks: return 'Avvisi quando si sblocca una nuova abitudine';
-      case _Channel.water:   return 'Promemoria per bere acqua durante la giornata';
-      default:               return 'Promemoria abitudini Be Well';
+      case _Channel.unlocks:
+        return 'Avvisi quando si sblocca una nuova abitudine';
+      case _Channel.water:
+        return 'Promemoria per bere acqua durante la giornata';
+      default:
+        return 'Promemoria abitudini Be Well';
     }
   }
 }

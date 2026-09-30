@@ -81,7 +81,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
                         // ── Logo + titolo ─────────────────────────
                         Row(
                           children: [
@@ -90,7 +89,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: 40,
                               height: 40,
                               errorBuilder: (_, __, ___) => Container(
-                                width: 40, height: 40,
+                                width: 40,
+                                height: 40,
                                 decoration: BoxDecoration(
                                   color: p.primaryLight,
                                   borderRadius: BorderRadius.circular(12),
@@ -107,9 +107,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: TextStyle(
                                 color: p.text,
                                 fontSize: 22,
-                                fontWeight: isAmb
-                                    ? FontWeight.w300
-                                    : FontWeight.w700,
+                                fontWeight:
+                                    isAmb ? FontWeight.w300 : FontWeight.w700,
                               ),
                             ),
                           ],
@@ -122,9 +121,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: TextStyle(
                             color: p.text,
                             fontSize: isAmb ? 32 : 28,
-                            fontWeight: isAmb
-                                ? FontWeight.w300
-                                : FontWeight.w700,
+                            fontWeight:
+                                isAmb ? FontWeight.w300 : FontWeight.w700,
                             height: 1.1,
                           ),
                         ),
@@ -134,9 +132,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: TextStyle(
                             color: p.textSec,
                             fontSize: 15,
-                            fontStyle: isAmb
-                                ? FontStyle.italic
-                                : FontStyle.normal,
+                            fontStyle:
+                                isAmb ? FontStyle.italic : FontStyle.normal,
                           ),
                         ),
 
@@ -144,8 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         if (isLocked)
                           AccountLockedWidget(
-                            initialSecondsRemaining:
-                                auth.lockSecondsRemaining,
+                            initialSecondsRemaining: auth.lockSecondsRemaining,
                             onUnlock: () => auth.clearError(),
                           )
                         else ...[
@@ -228,15 +224,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: double.infinity,
                               height: 52,
                               decoration: BoxDecoration(
-                                color: (_canSubmit && !isLoading)
-                                    ? p.btn
-                                    : p.bg2,
+                                color:
+                                    (_canSubmit && !isLoading) ? p.btn : p.bg2,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Center(
                                 child: isLoading
                                     ? SizedBox(
-                                        width: 20, height: 20,
+                                        width: 20,
+                                        height: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
                                           color: p.btnText,
@@ -321,15 +317,24 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _handleNavigation(BuildContext context, AuthProvider auth) async {
+  Future<void> _handleNavigation(
+      BuildContext context, AuthProvider auth) async {
     final nav = auth.pendingNavigation;
     auth.consumeNavigation();
     switch (nav) {
       case AuthNavigation.toHome:
         await context.read<AppProvider>().onLoginComplete();
-        if (context.mounted) Navigator.of(context).pushReplacementNamed('/home');
+        if (context.mounted)
+          Navigator.of(context).pushReplacementNamed('/home');
       case AuthNavigation.toWelcome:
-        Navigator.of(context).pushReplacementNamed('/welly-welcome');
+        // Anche qui, non solo su toHome: senza questo un utente nuovo
+        // restava con AppProvider.user nullo per tutto l'onboarding e
+        // la schermata Profilo, appena aperta, risultava bianca (early
+        // return su user == null, nessun fallback).
+        await context.read<AppProvider>().onLoginComplete();
+        if (context.mounted) {
+          Navigator.of(context).pushReplacementNamed('/welly-welcome');
+        }
       default:
         break;
     }
@@ -395,11 +400,10 @@ class _ThemedFieldState extends State<_ThemedField> {
             style: TextStyle(color: p.text, fontSize: 15),
             decoration: InputDecoration(
               labelText: widget.label,
-              labelStyle:
-                  TextStyle(color: p.textSec, fontSize: 14),
+              labelStyle: TextStyle(color: p.textSec, fontSize: 14),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 16),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               suffixIcon: widget.obscureText
                   ? IconButton(
                       icon: Icon(
@@ -409,8 +413,7 @@ class _ThemedFieldState extends State<_ThemedField> {
                         color: p.textMut,
                         size: 18,
                       ),
-                      onPressed: () =>
-                          setState(() => _obscure = !_obscure),
+                      onPressed: () => setState(() => _obscure = !_obscure),
                     )
                   : null,
             ),
@@ -421,8 +424,7 @@ class _ThemedFieldState extends State<_ThemedField> {
             padding: const EdgeInsets.only(top: 4, left: 4),
             child: Text(
               widget.errorText!,
-              style: const TextStyle(
-                  color: Colors.redAccent, fontSize: 11),
+              style: const TextStyle(color: Colors.redAccent, fontSize: 11),
             ),
           ),
       ],
@@ -442,8 +444,7 @@ class _OrDivider extends StatelessWidget {
         Expanded(child: Divider(color: p.cardBorder, height: 1)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(label,
-              style: TextStyle(color: p.textMut, fontSize: 12)),
+          child: Text(label, style: TextStyle(color: p.textMut, fontSize: 12)),
         ),
         Expanded(child: Divider(color: p.cardBorder, height: 1)),
       ],
@@ -474,13 +475,11 @@ class _ErrorBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.redAccent.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: Colors.redAccent.withValues(alpha: 0.3)),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline,
-              color: Colors.redAccent, size: 18),
+          const Icon(Icons.error_outline, color: Colors.redAccent, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -491,8 +490,7 @@ class _ErrorBanner extends StatelessWidget {
                         color: Colors.redAccent,
                         fontSize: 13,
                         fontWeight: FontWeight.w500)),
-                if (attemptsRemaining > 0 &&
-                    attemptsRemaining < 5)
+                if (attemptsRemaining > 0 && attemptsRemaining < 5)
                   Text(
                     '$attemptsRemaining $attemptsLabel',
                     style: TextStyle(
@@ -505,8 +503,7 @@ class _ErrorBanner extends StatelessWidget {
           IconButton(
             onPressed: onDismiss,
             icon: Icon(Icons.close,
-                size: 16,
-                color: Colors.redAccent.withValues(alpha: 0.6)),
+                size: 16, color: Colors.redAccent.withValues(alpha: 0.6)),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
@@ -515,10 +512,3 @@ class _ErrorBanner extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-

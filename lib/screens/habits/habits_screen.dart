@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/app_provider.dart';
@@ -19,15 +20,20 @@ import 'habit_calendar.dart';
 import '../../providers/tutorial_provider.dart';
 import '../../services/analytics_service.dart';
 import '../../widgets/banner_ad_widget.dart';
+import '../../widgets/habit_progress_calendar.dart';
 
 /// Etichetta del pulsante "avvia timer" per le abitudini con sessione guidata.
 String _timerLabel(String habitId, BwStrings s) {
   switch (habitId) {
-    case 'focus_50': return '▶ 50 min';
-    case 'focus_25': return '▶ 25 min';
+    case 'focus_50':
+      return '▶ 50 min';
+    case 'focus_25':
+      return '▶ 25 min';
     case 'breathing_box':
-    case 'breathing_478': return '▶ ${s.guideStart}';
-    default: return HabitGuides.hasGuide(habitId) ? '▶ ${s.guideStart}' : '▶ 25 min';
+    case 'breathing_478':
+      return '▶ ${s.guideStart}';
+    default:
+      return HabitGuides.hasGuide(habitId) ? '▶ ${s.guideStart}' : '▶ 25 min';
   }
 }
 
@@ -48,10 +54,13 @@ class _HabitsScreenState extends State<HabitsScreen> {
   bool? _hasPersonalizedPlan;
 
   static const List<SpotlightStep> _habitsSpotlightSteps = [
-    SpotlightStep(textId: 'habits_welcome'),
-    SpotlightStep(textId: 'habits_now',  targetId: 'spot_now_card'),
-    SpotlightStep(textId: 'habits_list', targetId: 'spot_habits_card'),
-    SpotlightStep(textId: 'habits_ready'),
+    SpotlightStep(textId: 'habits_now', targetId: 'spot_now_card'),
+    SpotlightStep(
+      textId: 'habits_now_arc',
+      targetId: 'spot_now_arc',
+      shape: SpotlightShape.circle,
+    ),
+    SpotlightStep(textId: 'habits_progression'),
   ];
 
   @override
@@ -96,7 +105,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
       }
     } else {
       if (mounted) {
-        context.read<TutorialProvider>().scheduleTrigger('habits_tab_first', context);
+        context
+            .read<TutorialProvider>()
+            .scheduleTrigger('habits_tab_first', context);
       }
     }
   }
@@ -127,11 +138,16 @@ class _HabitsScreenState extends State<HabitsScreen> {
   // ── Ordine numerico dei time slot ─────────────────────────────────────────
   static int _slotOrder(TimeSlot slot) {
     switch (slot) {
-      case TimeSlot.morning:   return 0;
-      case TimeSlot.midday:    return 1;
-      case TimeSlot.lunch:     return 2;
-      case TimeSlot.afternoon: return 3;
-      case TimeSlot.evening:   return 4;
+      case TimeSlot.morning:
+        return 0;
+      case TimeSlot.midday:
+        return 1;
+      case TimeSlot.lunch:
+        return 2;
+      case TimeSlot.afternoon:
+        return 3;
+      case TimeSlot.evening:
+        return 4;
     }
   }
 
@@ -152,10 +168,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
     bool isDoneToday(HabitDefinition h) {
       final last = progression.stateOf(h.id)?.lastCompletedAt;
       if (last == null) return false;
-      return last.year == now.year && last.month == now.month && last.day == now.day;
+      return last.year == now.year &&
+          last.month == now.month &&
+          last.day == now.day;
     }
 
-    final done    = habits.where(isDoneToday).toList();
+    final done = habits.where(isDoneToday).toList();
     final notDone = habits.where((h) => !isDoneToday(h)).toList();
 
     notDone.sort((a, b) {
@@ -184,11 +202,16 @@ class _HabitsScreenState extends State<HabitsScreen> {
   // ── Etichetta fascia oraria (emoji + testo) ───────────────────────────────
   static (String, String) _slotLabel(TimeSlot slot, BwStrings s) {
     switch (slot) {
-      case TimeSlot.morning:   return ('🌅', s.timeMorning);
-      case TimeSlot.midday:    return ('☀️', s.timeMidday);
-      case TimeSlot.lunch:     return ('🍃', s.timeLunch);
-      case TimeSlot.afternoon: return ('🌤', s.timeAfternoon);
-      case TimeSlot.evening:   return ('🌙', s.timeEvening);
+      case TimeSlot.morning:
+        return ('🌅', s.timeMorning);
+      case TimeSlot.midday:
+        return ('☀️', s.timeMidday);
+      case TimeSlot.lunch:
+        return ('🍃', s.timeLunch);
+      case TimeSlot.afternoon:
+        return ('🌤', s.timeAfternoon);
+      case TimeSlot.evening:
+        return ('🌙', s.timeEvening);
     }
   }
 
@@ -246,7 +269,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
             child: ListView(
               padding: EdgeInsets.fromLTRB(20, isAmb ? 72 : 24, 20, 40),
               children: [
-
                 // ── Titolo dinamico ───────────────────────────────────────
                 Text(
                   _habitsTitle(s, hour),
@@ -272,21 +294,67 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     id: 'spot_now_card',
                     child: _NowCard(
                       habit: habitForNow,
-                      daysCompleted: progression.daysCompletedFor(habitForNow.id),
+                      daysCompleted:
+                          progression.daysCompletedFor(habitForNow.id),
+                      todayCount: habitForNow.id == 'water'
+                          ? progression.todayWaterCount
+                          : null,
+                      todayTarget: habitForNow.id == 'water'
+                          ? progression.todayWaterTarget
+                          : null,
                       schedule: schedule,
                       p: p,
                       s: s,
                       onComplete: habitForNow.id == 'water'
                           ? null
-                          : () => _complete(context, habitForNow.id, progression, app),
-                      onStartTimer: habitForNow.id == 'focus_25' || habitForNow.id == 'focus_50'
-                          ? () => _openFocus(context, durationMinutes: habitForNow.id == 'focus_50' ? 50 : 25)
-                          : habitForNow.id == 'breathing_box' || habitForNow.id == 'breathing_478'
-                              ? () => _openBreathing(context, habitId: habitForNow.id)
+                          : () => _complete(
+                              context, habitForNow.id, progression, app),
+                      onStartTimer: habitForNow.id == 'focus_25' ||
+                              habitForNow.id == 'focus_50'
+                          ? () => _openFocus(context,
+                              durationMinutes:
+                                  habitForNow.id == 'focus_50' ? 50 : 25)
+                          : habitForNow.id == 'breathing_box' ||
+                                  habitForNow.id == 'breathing_478'
+                              ? () => _openBreathing(context,
+                                  habitId: habitForNow.id)
                               : HabitGuides.hasGuide(habitForNow.id)
-                                  ? () => _openGuided(context, habitId: habitForNow.id)
+                                  ? () => _openGuided(context,
+                                      habitId: habitForNow.id)
                                   : null,
                       slotLabelFn: (slot) => _slotLabel(slot, s),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ] else if (habits.isNotEmpty && notDoneNow.isEmpty) ...[
+                  // Tutto fatto per oggi: senza questo la card "Adesso"
+                  // spariva e basta, lasciando la schermata a metà — nessuna
+                  // conferma che non c'è altro da fare fino a domani.
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: p.primaryLight,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                          color: p.primary.withValues(alpha: 0.3), width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle_rounded,
+                            color: p.primary, size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            s.habitsAllDone,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: p.primaryText,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -301,12 +369,30 @@ class _HabitsScreenState extends State<HabitsScreen> {
                 // ── Lista abitudini (esclusa quella in Card Adesso) ────────
                 if (habits.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.only(top: 40),
-                    child: Center(
-                      child: Text(
-                        s.waterZero,
-                        style: TextStyle(fontSize: 14, color: p.textSec),
-                      ),
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Column(
+                      children: [
+                        Text('🌱', style: TextStyle(fontSize: 40)),
+                        const SizedBox(height: 14),
+                        Text(
+                          s.habitsEmptyTitle,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: p.text),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Text(
+                            s.habitsEmptySubtitle,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 13.5, color: p.textSec, height: 1.4),
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 else
@@ -329,15 +415,25 @@ class _HabitsScreenState extends State<HabitsScreen> {
                           s: s,
                           timeSlot: slot,
                           slotLabel: _slotLabel(slot, s),
+                          todayCount: h.id == 'water'
+                              ? progression.todayWaterCount
+                              : null,
+                          todayTarget: h.id == 'water'
+                              ? progression.todayWaterTarget
+                              : null,
                           onComplete: h.id == 'water'
                               ? null
-                              : () => _complete(context, h.id, progression, app),
+                              : () =>
+                                  _complete(context, h.id, progression, app),
                           onStartTimer: h.id == 'focus_25' || h.id == 'focus_50'
-                              ? () => _openFocus(context, durationMinutes: h.id == 'focus_50' ? 50 : 25)
-                              : h.id == 'breathing_box' || h.id == 'breathing_478'
+                              ? () => _openFocus(context,
+                                  durationMinutes: h.id == 'focus_50' ? 50 : 25)
+                              : h.id == 'breathing_box' ||
+                                      h.id == 'breathing_478'
                                   ? () => _openBreathing(context, habitId: h.id)
                                   : HabitGuides.hasGuide(h.id)
-                                      ? () => _openGuided(context, habitId: h.id)
+                                      ? () =>
+                                          _openGuided(context, habitId: h.id)
                                       : null,
                         ),
                       ),
@@ -356,7 +452,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   const HabitCalendar(),
                   // Tutorial: calendario apparso per la prima volta
                   Builder(builder: (_) {
-                    context.read<TutorialProvider>()
+                    context
+                        .read<TutorialProvider>()
                         .scheduleTrigger('calendar_appears', context);
                     return const SizedBox.shrink();
                   }),
@@ -385,9 +482,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   _SectionLabel(label: s.habitsComingSoon, p: p),
                   const SizedBox(height: 12),
                   ...comingUpHabits.map((h) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _LockedHabitTile(habit: h, p: p, s: s),
-                  )),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _LockedHabitTile(habit: h, p: p, s: s),
+                      )),
                 ],
               ],
             ),
@@ -405,7 +502,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
   ) async {
     // Tutorial: prima abitudine completata — schedulato prima degli await
     // (scheduleTrigger usa postFrameCallback, sicuro anche con async successivi)
-    context.read<TutorialProvider>().scheduleTrigger('first_completion', context);
+    context
+        .read<TutorialProvider>()
+        .scheduleTrigger('first_completion', context);
+    HapticFeedback.mediumImpact();
     await progression.markCompleted(habitId);
     await app.completeHabit(habitId);
 
@@ -425,7 +525,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   children: [
                     Text(
                       loc.wellyBonusTitle,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 14),
                     ),
                     Text(
                       loc.wellyBonusBody,
@@ -438,7 +539,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
           ),
           backgroundColor: const Color(0xFF2D7D46),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           duration: const Duration(seconds: 3),
         ),
       );
@@ -497,7 +599,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
     );
   }
 
-  void _showSlowdownResponse(BuildContext context, BwPaletteData p, BwStrings s) {
+  void _showSlowdownResponse(
+      BuildContext context, BwPaletteData p, BwStrings s) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -511,7 +614,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 36, height: 4,
+              width: 36,
+              height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
                 color: p.textMut,
@@ -542,7 +646,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
                 child: Center(
                   child: Text(
                     'Ok',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.btnText),
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: p.btnText),
                   ),
                 ),
               ),
@@ -554,10 +661,66 @@ class _HabitsScreenState extends State<HabitsScreen> {
   }
 }
 
+// Apre la vista "calendario" (HabitProgressCalendar) come bottom sheet per
+// UNA abitudine — condivisa tra la card "Adesso" e ogni card della lista,
+// così toccare il cerchio dei giorni apre sempre la stessa identica scheda
+// ovunque, non versioni diverse a seconda di dove ci si trova.
+void _openHabitCalendarSheet(
+  BuildContext context, {
+  required HabitDefinition habit,
+  required int daysCompleted,
+  required BwPaletteData p,
+  int? todayCount,
+  int? todayTarget,
+}) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (_) => DraggableScrollableSheet(
+      initialChildSize: 0.62,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: p.textMut.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            HabitProgressCalendar(
+              habit: habit,
+              daysCompleted: daysCompleted,
+              todayCount: todayCount,
+              todayTarget: todayTarget,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 // ── Card "Adesso" ─────────────────────────────────────────────────────────────
 class _NowCard extends StatelessWidget {
   final HabitDefinition habit;
   final int daysCompleted;
+  final int? todayCount;
+  final int? todayTarget;
   final ScheduleProvider schedule;
   final BwPaletteData p;
   final BwStrings s;
@@ -572,6 +735,8 @@ class _NowCard extends StatelessWidget {
     required this.p,
     required this.s,
     required this.slotLabelFn,
+    this.todayCount,
+    this.todayTarget,
     this.onComplete,
     this.onStartTimer,
   });
@@ -581,7 +746,8 @@ class _NowCard extends StatelessWidget {
   Color _arcColor(BwPaletteData p) {
     if (_isWater) return p.accent;
     if (habit.id.startsWith('focus')) return p.primary;
-    if (habit.id.contains('breath') || habit.id == 'meditation') return p.primary;
+    if (habit.id.contains('breath') || habit.id == 'meditation')
+      return p.primary;
     return p.primary;
   }
 
@@ -625,11 +791,28 @@ class _NowCard extends StatelessWidget {
           // Contenuto
           Row(
             children: [
-              // Arco 48px (giorni di QUESTA abitudine)
-              _HabitArc(
-                daysCompleted: daysCompleted,
-                color: arcColor,
-                size: 48,
+              // Arco 48px (giorni di QUESTA abitudine) — toccabile per
+              // rivedere l'obiettivo: prima l'unico modo di vederlo era il
+              // tour del tutorial al primo avvio, mai più raggiungibile
+              // dopo la prima volta.
+              SpotlightTarget(
+                id: 'spot_now_arc',
+                child: GestureDetector(
+                  onTap: () => _openHabitCalendarSheet(
+                    context,
+                    habit: habit,
+                    daysCompleted: daysCompleted,
+                    todayCount: todayCount,
+                    todayTarget: todayTarget,
+                    p: p,
+                  ),
+                  child: _HabitArc(
+                    daysCompleted: daysCompleted,
+                    color: arcColor,
+                    size: 54,
+                    label: daysCompleted == 1 ? s.dayOne : s.days,
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
 
@@ -653,6 +836,49 @@ class _NowCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 5),
+                    // Obiettivo esplicito, sempre con un numero — la card
+                    // "Adesso" è il posto più visto di tutta l'app: se il
+                    // traguardo non è chiaro qui, non lo è da nessuna parte.
+                    Text(
+                      habitGoalLabel(
+                        s,
+                        daysCompleted,
+                        todayCount: todayCount,
+                        todayTarget: todayTarget,
+                      ),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: arcColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // Ricompensa di oggi: prima il punteggio si vedeva solo
+                    // DOPO aver completato (nel toast bonus), mai prima —
+                    // l'utente doveva fidarsi che "ne valesse la pena" senza
+                    // saperlo. L'acqua ha già i suoi punti per bicchiere
+                    // visibili nella sezione dedicata, qui non serve
+                    // ripeterli.
+                    if (!_isWater && habit.points > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('⭐', style: TextStyle(fontSize: 10)),
+                          const SizedBox(width: 3),
+                          Text(
+                            '+${habit.points} ${s.points}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: p.textMut,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -665,14 +891,18 @@ class _NowCard extends StatelessWidget {
                 GestureDetector(
                   onTap: onStartTimer,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: p.primary,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       _timerLabel(habit.id, s),
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white),
                     ),
                   ),
                 )
@@ -680,14 +910,18 @@ class _NowCard extends StatelessWidget {
                 GestureDetector(
                   onTap: onComplete,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: p.primary,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       s.habitMarkDone,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white),
                     ),
                   ),
                 ),
@@ -699,7 +933,6 @@ class _NowCard extends StatelessWidget {
   }
 }
 
-
 // ── Habit Card ────────────────────────────────────────────────────────────────
 class _HabitCard extends StatelessWidget {
   final HabitDefinition habit;
@@ -708,7 +941,9 @@ class _HabitCard extends StatelessWidget {
   final bool isAmb;
   final BwStrings s;
   final TimeSlot timeSlot;
-  final (String, String) slotLabel;   // (emoji, testo)
+  final (String, String) slotLabel; // (emoji, testo)
+  final int? todayCount;
+  final int? todayTarget;
   final VoidCallback? onComplete;
   final VoidCallback? onStartTimer;
 
@@ -720,6 +955,8 @@ class _HabitCard extends StatelessWidget {
     required this.s,
     required this.timeSlot,
     required this.slotLabel,
+    this.todayCount,
+    this.todayTarget,
     this.onComplete,
     this.onStartTimer,
   });
@@ -730,7 +967,9 @@ class _HabitCard extends StatelessWidget {
     final last = state?.lastCompletedAt;
     if (last == null) return false;
     final now = DateTime.now();
-    return last.year == now.year && last.month == now.month && last.day == now.day;
+    return last.year == now.year &&
+        last.month == now.month &&
+        last.day == now.day;
   }
 
   @override
@@ -758,25 +997,45 @@ class _HabitCard extends StatelessWidget {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
                   child: ColorFiltered(
                     colorFilter: done
                         ? const ColorFilter.matrix([
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0,      0,      0,      1, 0,
+                            0.2126,
+                            0.7152,
+                            0.0722,
+                            0,
+                            0,
+                            0.2126,
+                            0.7152,
+                            0.0722,
+                            0,
+                            0,
+                            0.2126,
+                            0.7152,
+                            0.0722,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            1,
+                            0,
                           ])
-                        : const ColorFilter.mode(Colors.transparent, BlendMode.saturation),
+                        : const ColorFilter.mode(
+                            Colors.transparent, BlendMode.saturation),
                     child: Image.asset(
                       habit.imageAsset,
-                      height: 140,
+                      height: 200,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      alignment: habit.imageAlignment,
                       errorBuilder: (_, __, ___) => Container(
-                        height: 140,
+                        height: 200,
                         color: p.primaryLight,
-                        child: Icon(Icons.spa_outlined, color: p.primary, size: 40),
+                        child: Icon(Icons.spa_outlined,
+                            color: p.primary, size: 40),
                       ),
                     ),
                   ),
@@ -788,10 +1047,12 @@ class _HabitCard extends StatelessWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         color: p.primary.withValues(alpha: 0.3),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(20)),
                       ),
                       child: const Center(
-                        child: Icon(Icons.check_circle_rounded, color: Colors.white, size: 44),
+                        child: Icon(Icons.check_circle_rounded,
+                            color: Colors.white, size: 44),
                       ),
                     ),
                   ),
@@ -817,7 +1078,8 @@ class _HabitCard extends StatelessWidget {
                   Positioned(
                     top: 10,
                     right: 10,
-                    child: _Badge(text: '🔥 $days ${s.days}'),
+                    child: _Badge(
+                        text: '🔥 $days ${days == 1 ? s.dayOne : s.days}'),
                   ),
               ],
             ),
@@ -827,11 +1089,24 @@ class _HabitCard extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Row(
                 children: [
-                  // Arco 40px (giorni di questa abitudine specifica)
-                  _HabitArc(
-                    daysCompleted: days,
-                    color: _isWater ? p.accent : p.primary,
-                    size: 40,
+                  // Arco 40px (giorni di questa abitudine specifica) —
+                  // toccabile: apre la stessa scheda calendario della card
+                  // "Adesso", non un'altra grafica diversa.
+                  GestureDetector(
+                    onTap: () => _openHabitCalendarSheet(
+                      context,
+                      habit: habit,
+                      daysCompleted: days,
+                      todayCount: todayCount,
+                      todayTarget: todayTarget,
+                      p: p,
+                    ),
+                    child: _HabitArc(
+                      daysCompleted: days,
+                      color: _isWater ? p.accent : p.primary,
+                      size: 46,
+                      label: days == 1 ? s.dayOne : s.days,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -842,7 +1117,8 @@ class _HabitCard extends StatelessWidget {
                           s.habitName(habit.id),
                           style: TextStyle(
                             fontSize: isAmb ? 17 : 15,
-                            fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
+                            fontWeight:
+                                isAmb ? FontWeight.w300 : FontWeight.w600,
                             fontFamily: isAmb ? 'CormorantGaramond' : null,
                             color: p.text,
                           ),
@@ -850,7 +1126,9 @@ class _HabitCard extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(
                           // Usa la descrizione localizzata (BwStrings) — coachDaily è in italiano.
-                          done ? '✓ ${s.completedToday}' : s.habitDesc(habit.id),
+                          done
+                              ? '✓ ${s.completedToday}'
+                              : s.habitDesc(habit.id),
                           style: TextStyle(fontSize: 11, color: p.textSec),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -866,14 +1144,18 @@ class _HabitCard extends StatelessWidget {
                     GestureDetector(
                       onTap: onStartTimer,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
                           color: p.btn,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           _timerLabel(habit.id, s),
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.btnText),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: p.btnText),
                         ),
                       ),
                     )
@@ -883,7 +1165,8 @@ class _HabitCard extends StatelessWidget {
                     GestureDetector(
                       onTap: done ? null : onComplete,
                       child: Container(
-                        width: 36, height: 36,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: done ? p.primary : Colors.transparent,
@@ -893,7 +1176,8 @@ class _HabitCard extends StatelessWidget {
                           ),
                         ),
                         child: done
-                            ? const Icon(Icons.check, color: Colors.white, size: 18)
+                            ? const Icon(Icons.check,
+                                color: Colors.white, size: 18)
                             : null,
                       ),
                     ),
@@ -935,7 +1219,8 @@ class _SlowdownMenuSheet extends StatelessWidget {
         children: [
           // Handle
           Container(
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
               color: p.textMut,
@@ -944,7 +1229,8 @@ class _SlowdownMenuSheet extends StatelessWidget {
           ),
           Text(
             s.habitName(habit.id),
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.text),
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w700, color: p.text),
           ),
           const SizedBox(height: 6),
           // Il rallentamento non è per-abitudine: mette in pausa TUTTE le
@@ -1016,7 +1302,8 @@ class _SlowdownOption extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: p.text),
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w500, color: p.text),
               ),
             ),
           ],
@@ -1041,34 +1328,63 @@ class _Badge extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+        style: const TextStyle(
+            color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
       ),
     );
   }
 }
 
 // ── Arco progresso abitudine ──────────────────────────────────────────────────
+/// Un solo obiettivo chiaro alla volta, con un numero — non un anello muto.
+/// Le soglie combaciano esattamente con HabitStatus (progression_provider.dart):
+/// 7 giorni = assimilata, 66 = automatica. Principio da game design: l'utente
+/// non deve mai doversi chiedere "verso cosa sto lavorando".
+/// [todayCount]/[todayTarget]: progresso di oggi non ancora tradotto in un
+/// giorno assimilato (solo l'acqua, oggi — più bicchieri, un solo giorno).
+/// Senza questo l'etichetta diceva "falla per la prima volta" anche con
+/// dei bicchieri già bevuti oggi, contraddicendo la card acqua in Home.
+String habitGoalLabel(
+  BwStrings s,
+  int daysCompleted, {
+  int? todayCount,
+  int? todayTarget,
+}) {
+  if (daysCompleted <= 0) {
+    if (todayCount != null && todayTarget != null && todayCount > 0) {
+      return s.habitGoalInProgressToday(todayCount, todayTarget);
+    }
+    return s.habitGoalFirstTime;
+  }
+  if (daysCompleted < 7) return s.habitGoalBuilding(daysCompleted, 7);
+  if (daysCompleted < 66) return s.habitGoalBonus(daysCompleted, 66);
+  return s.habitGoalMastered;
+}
+
 /// Mostra i giorni completati dell'abitudine specifica verso la prossima fase.
 /// NON mostra la fase globale di Welly.
 class _HabitArc extends StatelessWidget {
   final int daysCompleted;
   final Color color;
   final double size;
+  final String label;
 
   const _HabitArc({
     required this.daysCompleted,
     required this.color,
     required this.size,
+    required this.label,
   });
 
-  /// Range [from, to] della milestone corrente.
-  /// Il progresso si calcola come (days - from) / (to - from),
-  /// così l'arco non "salta indietro" al passaggio di soglia.
+  /// Range [from, to] della milestone corrente — DEVE combaciare con le
+  /// soglie reali di HabitStatus (progression_provider.dart), non con
+  /// numeri presi in prestito dal sistema di streak globale: prima usava
+  /// 7/21/66/90, che non corrispondono a nessun vero cambio di stato
+  /// dell'abitudine (l'assimilazione scatta a 7, l'automatismo a 66) —
+  /// l'anello si riempiva verso un traguardo che non esisteva davvero.
   static (int, int) _milestone(int days) {
-    if (days < 7)  return (0, 7);   // Prima settimana
-    if (days < 21) return (7, 21);  // Tre settimane
-    if (days < 66) return (21, 66); // 66 giorni (habit formation)
-    return (66, 90);                // Maestria
+    if (days < 7) return (0, 7); // Verso l'assimilazione
+    return (7, 66); // Assimilata → verso l'automatismo
   }
 
   @override
@@ -1083,6 +1399,7 @@ class _HabitArc extends StatelessWidget {
           fromMilestone: from,
           toMilestone: to,
           color: color,
+          label: label,
         ),
       ),
     );
@@ -1094,12 +1411,14 @@ class _ArcPainter extends CustomPainter {
   final int fromMilestone;
   final int toMilestone;
   final Color color;
+  final String label;
 
   const _ArcPainter({
     required this.days,
     required this.fromMilestone,
     required this.toMilestone,
     required this.color,
+    required this.label,
   });
 
   @override
@@ -1110,7 +1429,8 @@ class _ArcPainter extends CustomPainter {
 
     // Anello di sfondo
     canvas.drawCircle(
-      center, radius,
+      center,
+      radius,
       Paint()
         ..color = color.withValues(alpha: 0.15)
         ..style = PaintingStyle.stroke
@@ -1146,10 +1466,22 @@ class _ArcPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    tp.paint(
-      canvas,
-      center - Offset(tp.width / 2, tp.height / 2),
-    );
+    // Etichetta sotto il numero: chiarisce che sono i giorni totali.
+    final lp = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: color.withValues(alpha: 0.8),
+          fontSize: size.width * 0.19,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final gap = size.width * 0.02;
+    final top = center.dy - (tp.height + gap + lp.height) / 2;
+    tp.paint(canvas, Offset(center.dx - tp.width / 2, top));
+    lp.paint(canvas, Offset(center.dx - lp.width / 2, top + tp.height + gap));
   }
 
   @override
@@ -1157,7 +1489,8 @@ class _ArcPainter extends CustomPainter {
       old.days != days ||
       old.fromMilestone != fromMilestone ||
       old.toMilestone != toMilestone ||
-      old.color != color;
+      old.color != color ||
+      old.label != label;
 }
 
 // ── Section Label ─────────────────────────────────────────────────────────────
@@ -1192,9 +1525,11 @@ class _ConfiguratorCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: (completed ? p.primary : p.accent).withValues(alpha: 0.12),
+                color:
+                    (completed ? p.primary : p.accent).withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -1210,11 +1545,16 @@ class _ConfiguratorCard extends StatelessWidget {
                 children: [
                   Text(
                     completed ? s.configuratorDoneTitle : s.configuratorTitle,
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: p.text),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    completed ? s.configuratorDoneSubtitle : s.configuratorSubtitle,
+                    completed
+                        ? s.configuratorDoneSubtitle
+                        : s.configuratorSubtitle,
                     style: TextStyle(fontSize: 12, color: p.textSec),
                   ),
                 ],
@@ -1278,14 +1618,18 @@ class _LockedHabitTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 child: ColorFiltered(
                   colorFilter: const ColorFilter.mode(
-                    Colors.grey, BlendMode.saturation,
+                    Colors.grey,
+                    BlendMode.saturation,
                   ),
                   child: Image.asset(
                     habit.imageAsset,
-                    width: 44, height: 44,
+                    width: 44,
+                    height: 44,
                     fit: BoxFit.cover,
+                    alignment: habit.imageAlignment,
                     errorBuilder: (_, __, ___) => Container(
-                      width: 44, height: 44,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
                         color: p.bg2,
                         borderRadius: BorderRadius.circular(8),
@@ -1328,7 +1672,8 @@ class _LockedHabitTile extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.lock_outline, color: p.textMut.withValues(alpha: 0.4), size: 14),
+          Icon(Icons.lock_outline,
+              color: p.textMut.withValues(alpha: 0.4), size: 14),
         ],
       ),
     );

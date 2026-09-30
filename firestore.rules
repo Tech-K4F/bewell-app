@@ -51,6 +51,14 @@ service cloud.firestore {
         && request.resource.data.pendingReferralBonus ==
              (resource.data.pendingReferralBonus is number
                  ? resource.data.pendingReferralBonus : 0) + 50;
+
+      // Il proprietario può eliminare il proprio documento (cancellazione
+      // account). Esplicita e separata da `allow write`: su una delete
+      // `request.resource` è null, quindi la condizione di `write` sopra
+      // (che legge `request.resource.data`) fallirebbe sempre — senza
+      // questa regola l'utente non potrebbe davvero cancellare il proprio
+      // profilo, nonostante l'app gliel'avesse promesso.
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     // referralCodes/{code} — indice inverso codice → uid proprietario.
@@ -61,6 +69,15 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid;
       allow update, delete: if false;
+    }
+
+    // app_config/features — interruttori remoti per funzioni non ancora
+    // pronte in produzione (vedi RemoteFlagsService). Lettura pubblica
+    // (anche senza autenticazione: serve prima ancora che l'utente faccia
+    // login), scrittura mai dal client — si modifica solo da console/admin.
+    match /app_config/{document} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // feedback/{autoId} — scrittura sola andata dall'app, mai letta dal

@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:math' show pi;
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/theme_provider.dart';
@@ -26,7 +29,8 @@ class BwBanner {
     );
   }
 
-  static void showHabitUnlock(BuildContext context, {
+  static void showHabitUnlock(
+    BuildContext context, {
     required String emoji,
     required String habitName,
     required String coachIntro,
@@ -49,6 +53,7 @@ class BwBanner {
     required String subtitle,
     required bool isHabitUnlock,
   }) {
+    HapticFeedback.mediumImpact();
     final overlay = Overlay.of(context);
     final p = context.read<ThemeProvider>().paletteData;
     final isAmb = context.read<ThemeProvider>().isAmbient;
@@ -103,6 +108,7 @@ class _BwBannerWidgetState extends State<_BwBannerWidget>
   late final Animation<Offset> _slide;
   late final Animation<double> _fade;
   late final Animation<double> _scale;
+  late final ConfettiController _confettiCtrl;
   Timer? _timer;
 
   @override
@@ -112,6 +118,11 @@ class _BwBannerWidgetState extends State<_BwBannerWidget>
       vsync: this,
       duration: Duration(milliseconds: widget.isHabitUnlock ? 460 : 380),
     );
+    // Confetti solo per i badge (achievement) — l'unlock abitudine è un
+    // annuncio, non un traguardo raggiunto: qui il coriandolo sarebbe rumore.
+    _confettiCtrl =
+        ConfettiController(duration: const Duration(milliseconds: 1000));
+    if (!widget.isHabitUnlock) _confettiCtrl.play();
 
     _slide = Tween<Offset>(begin: const Offset(0, -1.4), end: Offset.zero)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
@@ -142,6 +153,7 @@ class _BwBannerWidgetState extends State<_BwBannerWidget>
   void dispose() {
     _timer?.cancel();
     _ctrl.dispose();
+    _confettiCtrl.dispose();
     super.dispose();
   }
 
@@ -151,125 +163,166 @@ class _BwBannerWidgetState extends State<_BwBannerWidget>
     final p = widget.p;
     final isUnlock = widget.isHabitUnlock;
 
-    return Positioned(
-      top: top,
-      left: 16,
-      right: 16,
-      child: SlideTransition(
-        position: _slide,
-        child: FadeTransition(
-          opacity: _fade,
-          child: ScaleTransition(
-            scale: _scale,
-            child: Material(
-              color: Colors.transparent,
-              child: GestureDetector(
-                onTap: _dismiss,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isUnlock
-                        ? Color.lerp(p.card, p.primaryLight, 0.35)
-                        : p.card,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: p.primary.withValues(alpha: isUnlock ? 0.55 : 0.35),
-                      width: isUnlock ? 1.5 : 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: p.primary.withValues(alpha: isUnlock ? 0.32 : 0.18),
-                        blurRadius: isUnlock ? 32 : 20,
-                        spreadRadius: isUnlock ? 3 : 1,
-                        offset: const Offset(0, 4),
-                      ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      // Emoji container — circolare con glow per habit unlock
-                      Container(
-                        width: isUnlock ? 56 : 52,
-                        height: isUnlock ? 56 : 52,
-                        decoration: BoxDecoration(
-                          color: p.primaryLight,
-                          borderRadius: BorderRadius.circular(isUnlock ? 28 : 14),
-                          boxShadow: isUnlock
-                              ? [
-                                  BoxShadow(
-                                    color: p.primary.withValues(alpha: 0.25),
-                                    blurRadius: 16,
-                                    spreadRadius: 2,
-                                  )
-                                ]
-                              : null,
+    // Inserito via Overlay.insert() direttamente, senza un Material come
+    // antenato: senza questo Flutter sottolinea il testo in giallo/doppio,
+    // lo stesso problema visto ed risolto nella bolla del tutorial.
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(children: [
+        if (!isUnlock)
+          Positioned(
+            top: top - 10,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConfettiWidget(
+                  confettiController: _confettiCtrl,
+                  blastDirection: pi / 2,
+                  blastDirectionality: BlastDirectionality.explosive,
+                  maxBlastForce: 16,
+                  minBlastForce: 6,
+                  emissionFrequency: 0.06,
+                  numberOfParticles: 14,
+                  gravity: 0.3,
+                  shouldLoop: false,
+                  colors: [p.primary, p.accent, p.primaryLight],
+                ),
+              ),
+            ),
+          ),
+        Positioned(
+          top: top,
+          left: 16,
+          right: 16,
+          child: SlideTransition(
+            position: _slide,
+            child: FadeTransition(
+              opacity: _fade,
+              child: ScaleTransition(
+                scale: _scale,
+                child: Material(
+                  color: Colors.transparent,
+                  child: GestureDetector(
+                    onTap: _dismiss,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isUnlock
+                            ? Color.lerp(p.card, p.primaryLight, 0.35)
+                            : p.card,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: p.primary
+                              .withValues(alpha: isUnlock ? 0.55 : 0.35),
+                          width: isUnlock ? 1.5 : 1,
                         ),
-                        child: Center(
-                          child: Text(
-                            widget.emoji,
-                            style: TextStyle(fontSize: isUnlock ? 28 : 26),
+                        boxShadow: [
+                          BoxShadow(
+                            color: p.primary
+                                .withValues(alpha: isUnlock ? 0.32 : 0.18),
+                            blurRadius: isUnlock ? 32 : 20,
+                            spreadRadius: isUnlock ? 3 : 1,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              widget.label,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: p.primary,
-                                letterSpacing: 0.5,
+                      child: Row(
+                        children: [
+                          // Emoji container — circolare con glow per habit unlock
+                          Container(
+                            width: isUnlock ? 56 : 52,
+                            height: isUnlock ? 56 : 52,
+                            decoration: BoxDecoration(
+                              color: p.primaryLight,
+                              borderRadius:
+                                  BorderRadius.circular(isUnlock ? 28 : 14),
+                              boxShadow: isUnlock
+                                  ? [
+                                      BoxShadow(
+                                        color:
+                                            p.primary.withValues(alpha: 0.25),
+                                        blurRadius: 16,
+                                        spreadRadius: 2,
+                                      )
+                                    ]
+                                  : null,
+                            ),
+                            child: Center(
+                              child: Text(
+                                widget.emoji,
+                                style: TextStyle(fontSize: isUnlock ? 28 : 26),
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              widget.title,
-                              style: TextStyle(
-                                fontSize: widget.isAmb ? 16 : (isUnlock ? 15 : 14),
-                                fontWeight: widget.isAmb
-                                    ? FontWeight.w300
-                                    : FontWeight.w700,
-                                fontFamily: widget.isAmb ? 'CormorantGaramond' : null,
-                                color: p.text,
-                                height: 1.2,
-                              ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  widget.label,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: p.primary,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.title,
+                                  style: TextStyle(
+                                    fontSize: widget.isAmb
+                                        ? 16
+                                        : (isUnlock ? 15 : 14),
+                                    fontWeight: widget.isAmb
+                                        ? FontWeight.w300
+                                        : FontWeight.w700,
+                                    fontFamily: widget.isAmb
+                                        ? 'CormorantGaramond'
+                                        : null,
+                                    color: p.text,
+                                    height: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  widget.subtitle,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: p.textSec,
+                                    height: 1.35,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              widget.subtitle,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: p.textSec,
-                                height: 1.35,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child:
+                                Icon(Icons.close, size: 14, color: p.textMut),
+                          ),
+                        ],
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(Icons.close, size: 14, color: p.textMut),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
         ),
-      ),
+      ]),
     );
   }
 }

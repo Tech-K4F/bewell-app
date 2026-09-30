@@ -1,5 +1,8 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../config/legal_links.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -162,8 +165,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const SizedBox(height: 20),
 
                         // Errore globale
-                        if (auth.state == AuthState.error && auth.lastError != null)
-                          _buildErrorBanner(auth.lastError!.localizedMessage(s), auth, p),
+                        if (auth.state == AuthState.error &&
+                            auth.lastError != null)
+                          _buildErrorBanner(
+                              auth.lastError!.localizedMessage(s), auth, p),
 
                         // Nome
                         BwNameField(
@@ -182,8 +187,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           errorText: _emailError,
                           enabled: !isLoading,
                           focusNode: _emailFocus,
-                          onEditingComplete: () =>
-                              FocusScope.of(context).requestFocus(_passwordFocus),
+                          onEditingComplete: () => FocusScope.of(context)
+                              .requestFocus(_passwordFocus),
                         ),
                         const SizedBox(height: 14),
 
@@ -194,7 +199,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           enabled: !isLoading,
                           focusNode: _passwordFocus,
                           showStrengthBar: true,
-                          onEditingComplete: _canSubmit ? _validateAndSubmit : null,
+                          onEditingComplete:
+                              _canSubmit ? _validateAndSubmit : null,
                         ),
                         const SizedBox(height: 20),
 
@@ -220,8 +226,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         // Link login
                         Center(
                           child: GestureDetector(
-                            onTap: () =>
-                                Navigator.of(context).pushReplacementNamed('/login'),
+                            onTap: () => Navigator.of(context)
+                                .pushReplacementNamed('/login'),
                             child: RichText(
                               text: TextSpan(
                                 style: TextStyle(
@@ -284,22 +290,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Future<void> _handleNavigation(BuildContext context, AuthProvider auth) async {
+  Future<void> _handleNavigation(
+      BuildContext context, AuthProvider auth) async {
     final nav = auth.pendingNavigation;
     auth.consumeNavigation();
     switch (nav) {
       case AuthNavigation.toWelcome:
-        Navigator.of(context).pushReplacementNamed('/welly-welcome');
+        // Vedi commento gemello in login_screen.dart: senza sincronizzare
+        // qui, AppProvider.user restava nullo per l'intero onboarding di
+        // un utente nuovo e la schermata Profilo appariva bianca.
+        await context.read<AppProvider>().onLoginComplete();
+        if (context.mounted) {
+          Navigator.of(context).pushReplacementNamed('/welly-welcome');
+        }
       case AuthNavigation.toHome:
         await context.read<AppProvider>().onLoginComplete();
-        if (context.mounted) Navigator.of(context).pushReplacementNamed('/home');
+        if (context.mounted)
+          Navigator.of(context).pushReplacementNamed('/home');
       default:
         break;
     }
   }
 }
 
-class _TosCheckbox extends StatelessWidget {
+class _TosCheckbox extends StatefulWidget {
   final bool accepted;
   final ValueChanged<bool> onChanged;
   final BwPaletteData p;
@@ -313,27 +327,63 @@ class _TosCheckbox extends StatelessWidget {
   });
 
   @override
+  State<_TosCheckbox> createState() => _TosCheckboxState();
+}
+
+class _TosCheckboxState extends State<_TosCheckbox> {
+  // I link ai Termini/Privacy erano testo colorato senza nessun tap handler
+  // — l'utente spuntava una casella che referenzia documenti che non poteva
+  // aprire da nessuna parte nell'app.
+  late final TapGestureRecognizer _termsTap;
+  late final TapGestureRecognizer _privacyTap;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsTap = TapGestureRecognizer()
+      ..onTap = () => _open(LegalLinks.termsOfService);
+    _privacyTap = TapGestureRecognizer()
+      ..onTap = () => _open(LegalLinks.privacyPolicy);
+  }
+
+  @override
+  void dispose() {
+    _termsTap.dispose();
+    _privacyTap.dispose();
+    super.dispose();
+  }
+
+  Future<void> _open(String url) async {
+    final uri = Uri.parse(url);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onChanged(!accepted),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 22,
-            height: 22,
-            child: Checkbox(
-              value: accepted,
-              onChanged: (v) => onChanged(v ?? false),
-              activeColor: p.primary,
-              side: BorderSide(color: p.textMut),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
+    final p = widget.p;
+    final s = widget.s;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 22,
+          height: 22,
+          child: Checkbox(
+            value: widget.accepted,
+            onChanged: (v) => widget.onChanged(v ?? false),
+            activeColor: p.primary,
+            side: BorderSide(color: p.textMut),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: GestureDetector(
+            // Il tap sul resto della riga (fuori dai due link) continua a
+            // spuntare la casella, come prima.
+            onTap: () => widget.onChanged(!widget.accepted),
             child: RichText(
               text: TextSpan(
                 style: TextStyle(
@@ -345,17 +395,23 @@ class _TosCheckbox extends StatelessWidget {
                   TextSpan(text: s.tosAccept),
                   TextSpan(
                     text: s.tosTerms,
+                    recognizer: _termsTap,
                     style: TextStyle(
                       color: p.primary,
                       fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.underline,
+                      decorationColor: p.primary,
                     ),
                   ),
                   TextSpan(text: s.tosAnd),
                   TextSpan(
                     text: s.tosPrivacy,
+                    recognizer: _privacyTap,
                     style: TextStyle(
                       color: p.primary,
                       fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.underline,
+                      decorationColor: p.primary,
                     ),
                   ),
                   TextSpan(text: s.tosSuffix),
@@ -363,12 +419,8 @@ class _TosCheckbox extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
-
-
-
-

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ── Stili disponibili ────────────────────────────────────────────────────────
@@ -184,7 +185,8 @@ class ThemeProvider extends ChangeNotifier {
     final styleIdx = prefs.getInt('bw_style') ?? 0;
     final paletteIdx = prefs.getInt('bw_palette') ?? 0;
     _style = BwStyle.values[styleIdx.clamp(0, BwStyle.values.length - 1)];
-    _palette = BwPalette.values[paletteIdx.clamp(0, BwPalette.values.length - 1)];
+    _palette =
+        BwPalette.values[paletteIdx.clamp(0, BwPalette.values.length - 1)];
     notifyListeners();
   }
 
@@ -209,7 +211,12 @@ class ThemeProvider extends ChangeNotifier {
   }) {
     final p = paletteData;
     final isAmb = _style == BwStyle.ambient;
-    final fontFamily = isAmb ? 'CormorantGaramond' : 'DM Sans';
+    // 'DM Sans' non era mai stato incluso come asset — Flutter non riusciva
+    // a risolverlo e ricadeva silenziosamente sul font di sistema in tutto
+    // lo stile Card (quello di default). google_fonts scarica e mette in
+    // cache il font reale, poi funziona offline.
+    final fontFamily =
+        isAmb ? 'CormorantGaramond' : GoogleFonts.dmSans().fontFamily!;
     final fs = largeText ? 1.20 : 1.0;
 
     // High contrast overrides text colors if enabled
@@ -236,18 +243,51 @@ class ThemeProvider extends ChangeNotifier {
         onError: Colors.white,
       ),
       textTheme: TextTheme(
-        headlineLarge:  TextStyle(color: textColor,    fontSize: 28 * fs, fontWeight: FontWeight.w700, fontFamily: fontFamily),
-        headlineMedium: TextStyle(color: textColor,    fontSize: 22 * fs, fontWeight: FontWeight.w700, fontFamily: fontFamily),
-        headlineSmall:  TextStyle(color: textColor,    fontSize: 18 * fs, fontWeight: FontWeight.w600, fontFamily: fontFamily),
-        bodyLarge:      TextStyle(color: textColor,    fontSize: 16 * fs, fontFamily: fontFamily),
-        bodyMedium:     TextStyle(color: textColor,    fontSize: 14 * fs, fontFamily: fontFamily),
-        bodySmall:      TextStyle(color: textSecColor, fontSize: 12 * fs, fontFamily: fontFamily),
-        labelLarge:     TextStyle(color: textColor,    fontSize: 14 * fs, fontWeight: FontWeight.w600, fontFamily: fontFamily),
-        labelMedium:    TextStyle(color: textSecColor, fontSize: 12 * fs, fontFamily: fontFamily),
-        labelSmall:     TextStyle(color: textSecColor, fontSize: 10 * fs, fontFamily: fontFamily),
-        titleLarge:     TextStyle(color: textColor,    fontSize: 18 * fs, fontWeight: FontWeight.w600, fontFamily: fontFamily),
-        titleMedium:    TextStyle(color: textColor,    fontSize: 15 * fs, fontWeight: FontWeight.w500, fontFamily: fontFamily),
-        titleSmall:     TextStyle(color: textColor,    fontSize: 13 * fs, fontWeight: FontWeight.w500, fontFamily: fontFamily),
+        headlineLarge: TextStyle(
+            color: textColor,
+            fontSize: 28 * fs,
+            fontWeight: FontWeight.w700,
+            fontFamily: fontFamily),
+        headlineMedium: TextStyle(
+            color: textColor,
+            fontSize: 22 * fs,
+            fontWeight: FontWeight.w700,
+            fontFamily: fontFamily),
+        headlineSmall: TextStyle(
+            color: textColor,
+            fontSize: 18 * fs,
+            fontWeight: FontWeight.w600,
+            fontFamily: fontFamily),
+        bodyLarge: TextStyle(
+            color: textColor, fontSize: 16 * fs, fontFamily: fontFamily),
+        bodyMedium: TextStyle(
+            color: textColor, fontSize: 14 * fs, fontFamily: fontFamily),
+        bodySmall: TextStyle(
+            color: textSecColor, fontSize: 12 * fs, fontFamily: fontFamily),
+        labelLarge: TextStyle(
+            color: textColor,
+            fontSize: 14 * fs,
+            fontWeight: FontWeight.w600,
+            fontFamily: fontFamily),
+        labelMedium: TextStyle(
+            color: textSecColor, fontSize: 12 * fs, fontFamily: fontFamily),
+        labelSmall: TextStyle(
+            color: textSecColor, fontSize: 10 * fs, fontFamily: fontFamily),
+        titleLarge: TextStyle(
+            color: textColor,
+            fontSize: 18 * fs,
+            fontWeight: FontWeight.w600,
+            fontFamily: fontFamily),
+        titleMedium: TextStyle(
+            color: textColor,
+            fontSize: 15 * fs,
+            fontWeight: FontWeight.w500,
+            fontFamily: fontFamily),
+        titleSmall: TextStyle(
+            color: textColor,
+            fontSize: 13 * fs,
+            fontWeight: FontWeight.w500,
+            fontFamily: fontFamily),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: p.bg,
@@ -263,5 +303,3 @@ class ThemeProvider extends ChangeNotifier {
     );
   }
 }
-
-

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/theme_provider.dart';
@@ -8,6 +9,9 @@ import '../../providers/progression_provider.dart';
 import '../../models/habit_library.dart';
 import '../../data/habit_guides.dart';
 import '../../widgets/bw_scaffold.dart';
+import '../../widgets/guide_motion_disc.dart';
+import '../../widgets/habit_hero_band.dart';
+import '../../widgets/guide_pose_image.dart';
 
 /// Sequenza guidata passo-passo per abitudini che l'utente non sa
 /// eseguire a memoria (es. "esercizi alla scrivania"): un cerchio
@@ -27,10 +31,28 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
 
   bool _isRunning = false;
   int _stepIndex = 0;
+  int _phaseIndex = 0;
   int _secondsLeft = 0;
   Timer? _ticker;
+  DateTime? _phaseStartedAt;
 
-  List<GuideStep> get _steps => HabitGuides.forHabit(widget.habitId) ?? const [];
+  List<GuideStep> get _steps =>
+      HabitGuides.forHabit(widget.habitId) ?? const [];
+
+  GuidePhase? get _currentPhase {
+    if (!_isRunning || _stepIndex >= _steps.length) return null;
+    final phases = _steps[_stepIndex].phases;
+    return _phaseIndex < phases.length ? phases[_phaseIndex] : null;
+  }
+
+  Color _phaseColor(BwPaletteData p) {
+    return switch (_currentPhase?.kind) {
+      GuidePhaseKind.primary => p.primary,
+      GuidePhaseKind.accent => p.accent,
+      GuidePhaseKind.blend => Color.lerp(p.primary, p.accent, 0.5)!,
+      null => p.primary,
+    };
+  }
 
   @override
   void initState() {
@@ -52,7 +74,9 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
     setState(() {
       _isRunning = true;
       _stepIndex = 0;
-      _secondsLeft = _steps.first.seconds;
+      _phaseIndex = 0;
+      _secondsLeft = _steps.first.phases.first.seconds;
+      _phaseStartedAt = DateTime.now();
     });
     _tick();
   }
@@ -68,20 +92,33 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
       setState(() => _secondsLeft--);
       if (_secondsLeft <= 0) {
         _ticker?.cancel();
-        _nextStep();
+        _nextPhase();
       }
     });
   }
 
-  void _nextStep() {
-    final next = _stepIndex + 1;
-    if (next >= _steps.length) {
+  void _nextPhase() {
+    final phases = _steps[_stepIndex].phases;
+    final nextPhase = _phaseIndex + 1;
+    if (nextPhase < phases.length) {
+      setState(() {
+        _phaseIndex = nextPhase;
+        _secondsLeft = phases[nextPhase].seconds;
+        _phaseStartedAt = DateTime.now();
+      });
+      _tick();
+      return;
+    }
+    final nextStep = _stepIndex + 1;
+    if (nextStep >= _steps.length) {
       _onComplete();
       return;
     }
     setState(() {
-      _stepIndex = next;
-      _secondsLeft = _steps[next].seconds;
+      _stepIndex = nextStep;
+      _phaseIndex = 0;
+      _secondsLeft = _steps[nextStep].phases.first.seconds;
+      _phaseStartedAt = DateTime.now();
     });
     _tick();
   }
@@ -90,6 +127,7 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
     setState(() => _isRunning = false);
     final progression = context.read<ProgressionProvider>();
     final app = context.read<AppProvider>();
+    HapticFeedback.mediumImpact();
     await progression.markCompleted(widget.habitId);
     if (!mounted) return;
     await app.completeHabit(widget.habitId);
@@ -110,7 +148,8 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
         backgroundColor: p.card,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: Text(s.guideWellDone,
-            style: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 18)),
+            style: TextStyle(
+                color: p.text, fontWeight: FontWeight.w700, fontSize: 18)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -126,7 +165,10 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(s.breathingPointsEarned(pts),
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: p.primaryText)),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: p.primaryText)),
             ),
           ],
         ),
@@ -135,7 +177,8 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
             onPressed: () => Navigator.of(context)
               ..pop()
               ..pop(),
-            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+            style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44)),
             child: Text(s.confirm),
           ),
         ],
@@ -149,7 +192,9 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
     final s = context.sL;
     final title = s.habitName(widget.habitId);
     final steps = _steps;
-    final step = _isRunning && _stepIndex < steps.length ? steps[_stepIndex] : null;
+    final step =
+        _isRunning && _stepIndex < steps.length ? steps[_stepIndex] : null;
+    final hasPose = step?.image != null;
 
     return BwScaffold(
       appBar: AppBar(
@@ -163,6 +208,8 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
         child: Column(
           children: [
             if (!_isRunning) ...[
+              HabitHeroBand(habitId: widget.habitId),
+              const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -173,9 +220,13 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: List.generate(steps.length, (i) {
+                    final st = steps[i];
+                    final how = st.how?.call(s);
                     return Padding(
-                      padding: EdgeInsets.only(bottom: i == steps.length - 1 ? 0 : 10),
+                      padding: EdgeInsets.only(
+                          bottom: i == steps.length - 1 ? 0 : 16),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
                             width: 22,
@@ -186,114 +237,186 @@ class _GuidedHabitScreenState extends State<GuidedHabitScreen>
                               shape: BoxShape.circle,
                             ),
                             child: Text('${i + 1}',
-                                style: TextStyle(color: p.primaryText, fontSize: 11, fontWeight: FontWeight.w700)),
+                                style: TextStyle(
+                                    color: p.primaryText,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700)),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Text(steps[i].label(s),
-                                style: TextStyle(color: p.text, fontSize: 13.5)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(st.title(s),
+                                    style: TextStyle(
+                                        color: p.text,
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700)),
+                                if (how != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(how,
+                                      style: TextStyle(
+                                          color: p.textSec,
+                                          fontSize: 12,
+                                          height: 1.4)),
+                                ],
+                              ],
+                            ),
                           ),
+                          if (st.image != null) ...[
+                            const SizedBox(width: 12),
+                            SizedBox(
+                              width: 66,
+                              child: GuidePoseImage(
+                                image: AssetImage(st.image!),
+                                arrows: st.arrows,
+                                borderRadius: 10,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     );
                   }),
                 ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 12),
+              Text(
+                s.guideSafetyNote,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: p.textMut, fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 28),
+            ],
+
+            // Durante l'esercizio: la posa con le frecce del movimento, così
+            // non serve leggere — si guarda e si fa.
+            if (_isRunning && step?.image != null) ...[
+              SizedBox(
+                height: 220,
+                child: GuidePoseImage(
+                  image: AssetImage(step!.image!),
+                  arrows: step.arrows,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                step.title(s),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: p.text, fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+              if (step.how != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  step.how!(s),
+                  textAlign: TextAlign.center,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: p.textSec, fontSize: 12, height: 1.4),
+                ),
+              ],
+              const SizedBox(height: 12),
             ],
 
             // Cerchio guida — area a dimensione fissa così il pulsante
             // interrompi sotto non si sposta mai durante la sequenza.
-            SizedBox(
-              width: 340,
-              height: 340,
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _isRunning || steps.isEmpty ? null : _start,
               child: AnimatedBuilder(
                 animation: _pulseCtrl,
                 builder: (_, __) {
-                  final pulse = _isRunning ? (0.9 + _pulseCtrl.value * 0.1) : 0.75;
-                  final radius = 130 * pulse;
-                  return Center(
-                    child: Container(
-                      width: radius * 2,
-                      height: radius * 2,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            p.primary.withValues(alpha: .55),
-                            p.primary.withValues(alpha: .12),
-                          ],
-                        ),
-                        boxShadow: _isRunning
-                            ? [
-                                BoxShadow(
-                                  color: p.primary.withValues(alpha: .4),
-                                  blurRadius: 40,
-                                  spreadRadius: 5,
-                                )
-                              ]
-                            : null,
-                      ),
-                      child: Center(
-                        child: step != null
-                            ? Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
+                  final color = _isRunning ? _phaseColor(p) : p.primary;
+                  final phase = _currentPhase;
+                  final elapsed = _phaseStartedAt == null
+                      ? 0.0
+                      : DateTime.now()
+                              .difference(_phaseStartedAt!)
+                              .inMilliseconds /
+                          1000;
+                  return GuideMotionDisc(
+                    motion: phase?.motion ?? GuideMotion.calm,
+                    elapsedSeconds: elapsed,
+                    phaseSeconds: phase?.seconds ?? 1,
+                    pulse: _pulseCtrl.value,
+                    size: hasPose ? 250 : 340,
+                    accent: color,
+                    discColor: p.card,
+                    ringColor: p.textMut,
+                    active: _isRunning,
+                    child: step != null && phase != null
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  s.guideStepProgress(
+                                      _stepIndex + 1, steps.length),
+                                  style: TextStyle(
+                                      color: p.textSec,
+                                      fontSize: 12,
+                                      letterSpacing: 1),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$_secondsLeft',
+                                  style: TextStyle(
+                                      color: p.text,
+                                      fontSize: hasPose ? 40 : 52,
+                                      fontWeight: FontWeight.w300),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  phase.label(s),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      color: p.text,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                                if (!hasPose) ...[
+                                  const SizedBox(height: 4),
                                   Text(
-                                    s.guideStepProgress(_stepIndex + 1, steps.length),
-                                    style: TextStyle(color: p.textMut, fontSize: 12, letterSpacing: 1),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '$_secondsLeft',
-                                    style: TextStyle(color: p.text, fontSize: 48, fontWeight: FontWeight.w200),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                                    child: Text(
-                                      step.label(s),
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(color: p.text, fontSize: 14, fontWeight: FontWeight.w600),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text('🧘', style: TextStyle(fontSize: 48)),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    s.guideTapToStart,
+                                    step.title(s),
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(color: p.textSec, fontSize: 14),
+                                    style: TextStyle(
+                                        color: p.textSec, fontSize: 12.5),
                                   ),
                                 ],
+                              ],
+                            ),
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('🧘', style: TextStyle(fontSize: 48)),
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 18),
+                                child: Text(
+                                  s.guideTapToStart,
+                                  textAlign: TextAlign.center,
+                                  style:
+                                      TextStyle(color: p.textSec, fontSize: 14),
+                                ),
                               ),
-                      ),
-                    ),
+                            ],
+                          ),
                   );
                 },
               ),
             ),
-            const SizedBox(height: 48),
+            SizedBox(height: hasPose ? 24 : 48),
 
-            if (!_isRunning)
-              ElevatedButton(
-                onPressed: steps.isEmpty ? null : _start,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: p.btn,
-                  minimumSize: const Size.fromHeight(54),
-                ),
-                child: Text(s.guideStart,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.btnText)),
-              )
-            else
+            if (_isRunning)
               OutlinedButton.icon(
                 onPressed: _stop,
                 icon: Icon(Icons.stop_rounded, color: p.primary),
-                label: Text(s.breathingStop, style: TextStyle(color: p.primary)),
+                label:
+                    Text(s.breathingStop, style: TextStyle(color: p.primary)),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: p.primary),
                   minimumSize: const Size.fromHeight(52),

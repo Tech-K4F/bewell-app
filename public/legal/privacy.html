@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Be Well Privacy Policy</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #F7F4EC;
+    --paper: #FFFFFF;
+    --ink: #21261F;
+    --ink-soft: #565F51;
+    --ink-mute: #8B9285;
+    --line: #DEDACB;
+    --accent: #3E6E52;
+    --accent-soft: #E7EEE5;
+    --flag-bg: #FBF0DC;
+    --flag-border: #DFC28A;
+    --flag-ink: #7A5A1E;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171D19;
+      --paper: #1D2420;
+      --ink: #EBECE5;
+      --ink-soft: #AEB6A8;
+      --ink-mute: #78806F;
+      --line: #333D33;
+      --accent: #7FB89A;
+      --accent-soft: #23342A;
+      --flag-bg: #332A16;
+      --flag-border: #6B5324;
+      --flag-ink: #E3C077;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171D19;
+    --paper: #1D2420;
+    --ink: #EBECE5;
+    --ink-soft: #AEB6A8;
+    --ink-mute: #78806F;
+    --line: #333D33;
+    --accent: #7FB89A;
+    --accent-soft: #23342A;
+    --flag-bg: #332A16;
+    --flag-border: #6B5324;
+    --flag-ink: #E3C077;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Source Serif 4', Georgia, serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 64px 28px 100px;
+  }
+
+  .kicker {
+    font-family: 'Public Sans', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 40px);
+    font-weight: 700;
+    margin: 10px 0 6px;
+    text-wrap: balance;
+  }
+  .updated {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-mute);
+  }
+
+  .flag {
+    margin: 28px 0 8px;
+    padding: 14px 18px;
+    background: var(--flag-bg);
+    border: 1px solid var(--flag-border);
+    border-radius: 10px;
+    font-family: 'Public Sans', sans-serif;
+    font-size: 13px;
+    color: var(--flag-ink);
+    line-height: 1.55;
+  }
+  .flag b { font-weight: 700; }
+
+  .identity {
+    margin-top: 22px;
+    padding: 20px 22px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .identity-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 14.5px;
+  }
+  .identity-row + .identity-row { border-top: 1px dashed var(--line); }
+  .identity-label {
+    font-family: 'Public Sans', sans-serif;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    padding-top: 2px;
+  }
+  .fill {
+    background: var(--flag-bg);
+    border: 1px dashed var(--flag-border);
+    border-radius: 5px;
+    padding: 1px 7px;
+    color: var(--flag-ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+
+  nav.toc {
+    margin: 36px 0 8px;
+    padding: 18px 22px;
+    background: var(--accent-soft);
+    border-radius: 12px;
+  }
+  nav.toc .kicker { margin-bottom: 8px; display: block; }
+  nav.toc ol {
+    margin: 0;
+    padding-left: 20px;
+    font-family: 'Public Sans', sans-serif;
+    font-size: 13.5px;
+    columns: 2;
+    color: var(--ink-soft);
+  }
+  nav.toc li { margin-bottom: 6px; break-inside: avoid; }
+  nav.toc a { color: var(--ink); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+
+  section { margin-top: 44px; }
+  h2 {
+    font-family: 'Public Sans', sans-serif;
+    font-size: 12.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+  h3 {
+    font-size: 21px;
+    font-weight: 700;
+    margin: 2px 0 14px;
+    text-wrap: balance;
+  }
+  p { margin: 0 0 14px; font-size: 16px; }
+  ul, ol.plain { margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 6px; font-size: 16px; }
+
+  .datatable {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0 20px;
+    font-family: 'Public Sans', sans-serif;
+    font-size: 13.5px;
+    overflow-x: auto;
+    display: block;
+  }
+  .datatable thead, .datatable tbody { display: table; width: 100%; table-layout: fixed; }
+  .datatable th {
+    text-align: left;
+    padding: 9px 12px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 11.5px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .datatable td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-soft);
+    vertical-align: top;
+  }
+  .datatable tr:last-child td { border-bottom: none; }
+
+  .pill {
+    display: inline-block;
+    font-family: 'Public Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .pill.local { background: var(--flag-bg); color: var(--flag-ink); }
+
+  footer {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-family: 'Public Sans', sans-serif;
+    font-size: 12.5px;
+    color: var(--ink-mute);
+  }
+
+  @media (max-width: 560px) {
+    nav.toc ol { columns: 1; }
+    .identity-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="kicker">Be Well · Informativa Privacy</div>
+  <h1>Come trattiamo i tuoi dati</h1>
+  <div class="updated">Ultimo aggiornamento: da inserire alla pubblicazione</div>
+
+  <div class="flag">
+    <b>Nota redazionale — da rimuovere prima della pubblicazione.</b>
+    Questo documento è scritto per essere valido da subito con il Titolare come persona fisica.
+    Il blocco "Titolare del trattamento" qui sotto è l'<b>unico punto</b> da aggiornare quando nascerà la società:
+    tutto il resto del documento fa riferimento a "il Titolare" o "noi", mai al nome per esteso, così l'aggiornamento
+    è una modifica di poche righe, non una riscrittura.
+  </div>
+
+  <div class="identity" id="titolare">
+    <div class="identity-row">
+      <span class="identity-label">Titolare</span>
+      <span><span class="fill">[Nome e Cognome]</span> — sviluppatore/titolare dell'app Be Well</span>
+    </div>
+    <div class="identity-row">
+      <span class="identity-label">Indirizzo</span>
+      <span><span class="fill">[Indirizzo completo]</span></span>
+    </div>
+    <div class="identity-row">
+      <span class="identity-label">Email</span>
+      <span>hello@know4future.com</span>
+    </div>
+    <div class="identity-row">
+      <span class="identity-label">App</span>
+      <span>Be Well — com.k4f.bewell</span>
+    </div>
+  </div>
+
+  <nav class="toc">
+    <span class="kicker">Indice</span>
+    <ol>
+      <li><a href="#s1">1. Chi siamo</a></li>
+      <li><a href="#s2">2. Quali dati raccogliamo</a></li>
+      <li><a href="#s3">3. Cosa resta solo sul tuo telefono</a></li>
+      <li><a href="#s4">4. Perché trattiamo i tuoi dati</a></li>
+      <li><a href="#s5">5. Con chi li condividiamo</a></li>
+      <li><a href="#s6">6. Pubblicità e consenso</a></li>
+      <li><a href="#s7">7. Per quanto li conserviamo</a></li>
+      <li><a href="#s8">8. I tuoi diritti</a></li>
+      <li><a href="#s9">9. Sicurezza</a></li>
+      <li><a href="#s10">10. Minori</a></li>
+      <li><a href="#s11">11. Modifiche a questa informativa</a></li>
+      <li><a href="#s12">12. Contatti</a></li>
+    </ol>
+  </nav>
+
+  <section id="s1">
+    <h2>01</h2>
+    <h3>Chi siamo</h3>
+    <p>Be Well è un'app per la costruzione di abitudini di benessere — idratazione, respirazione, movimento, concentrazione, sonno. Questa informativa spiega quali dati trattiamo quando usi l'app, per quale motivo, e come puoi controllarli.</p>
+    <p>Il Titolare del trattamento è indicato nel riquadro qui sopra. Ovunque in questo documento leggi "noi" o "il Titolare", si intende quella persona (o, da quando sarà costituita, la società che ne prenderà il posto).</p>
+  </section>
+
+  <section id="s2">
+    <h2>02</h2>
+    <h3>Quali dati raccogliamo</h3>
+    <p>Solo i dati elencati qui sotto, e solo quando servono a far funzionare una funzione specifica dell'app.</p>
+    <table class="datatable">
+      <thead>
+        <tr><th>Dato</th><th>Quando</th><th>Perché</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Nome, email</td><td>Registrazione account</td><td>Creare e gestire il tuo account, farti accedere</td></tr>
+        <tr><td>Credenziali di accesso Google/Apple</td><td>Se scegli l'accesso rapido</td><td>Autenticazione, gestita direttamente da Google/Apple — non vediamo la tua password</td></tr>
+        <tr><td>Codice invito e relazioni di invito (chi ha invitato chi)</td><td>Se usi o generi un codice referral</td><td>Assegnare i punti bonus dell'invito</td></tr>
+        <tr><td>Testo del feedback che invii</td><td>Solo se usi la funzione "Invia un feedback"</td><td>Leggere le tue segnalazioni e migliorare l'app</td></tr>
+        <tr><td>Eventi d'uso in forma aggregata (es. "abitudine completata", "schermata aperta")</td><td>Sempre, in forma anonima/aggregata</td><td>Capire quali funzioni sono usate, correggere bug</td></tr>
+        <tr><td>Identificativo pubblicitario del dispositivo</td><td>Solo se hai dato il consenso agli annunci personalizzati</td><td>Mostrarti annunci pertinenti tramite Google AdMob</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="s3">
+    <h2>03</h2>
+    <h3>Cosa resta solo sul tuo telefono</h3>
+    <p>Una parte importante di quello che scrivi in Be Well <b>non lascia mai il tuo dispositivo</b> — non viene inviata a nessun server, non la vediamo nemmeno noi. Include:</p>
+    <ul>
+      <li><span class="pill local">Solo locale</span> Le risposte al questionario iniziale (ore di sonno, livello di stress, tempo schermo, obiettivi)</li>
+      <li><span class="pill local">Solo locale</span> Lo storico delle tue abitudini, streak, punti e badge</li>
+      <li><span class="pill local">Solo locale</span> Il conteggio dei bicchieri d'acqua e le preferenze di notifica</li>
+    </ul>
+    <p>Questi dati vengono cancellati se disinstalli l'app o cancelli i dati dell'app dalle impostazioni del telefono. Non fanno parte di nessun backup sui nostri server, quindi non possiamo recuperarli per te se li perdi in questo modo — è il prezzo del non trattarli affatto.</p>
+  </section>
+
+  <section id="s4">
+    <h2>04</h2>
+    <h3>Perché trattiamo i tuoi dati</h3>
+    <p>Le basi giuridiche (art. 6 GDPR) su cui ci appoggiamo sono:</p>
+    <ul>
+      <li><b>Esecuzione del contratto</b> — creare il tuo account, farti usare l'app, gestire punti e ricompense.</li>
+      <li><b>Consenso</b> — per gli annunci personalizzati (vedi sezione 6): senza il tuo consenso esplicito non li attiviamo.</li>
+      <li><b>Legittimo interesse</b> — analisi d'uso aggregate per migliorare l'app, sicurezza e prevenzione di abusi (es. blocco tentativi di accesso ripetuti).</li>
+    </ul>
+  </section>
+
+  <section id="s5">
+    <h2>05</h2>
+    <h3>Con chi condividiamo i dati</h3>
+    <p>Non vendiamo i tuoi dati a nessuno. Li condividiamo solo con i fornitori tecnici che ci permettono di far funzionare l'app, ognuno con il proprio ruolo:</p>
+    <table class="datatable">
+      <thead>
+        <tr><th>Fornitore</th><th>Ruolo</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Google Firebase (Authentication, Cloud Firestore, Analytics)</td><td>Autenticazione account, archiviazione di codici invito e feedback, statistiche d'uso aggregate</td></tr>
+        <tr><td>Google AdMob</td><td>Annunci pubblicitari — personalizzati solo con il tuo consenso (sezione 6)</td></tr>
+        <tr><td>Google Sign-In / Sign in with Apple</td><td>Accesso rapido, se lo scegli tu</td></tr>
+      </tbody>
+    </table>
+    <p>Questi fornitori possono trattare dati anche fuori dall'Unione Europea; dove succede, si appoggiano alle garanzie previste dal GDPR per il trasferimento internazionale di dati (es. clausole contrattuali standard).</p>
+  </section>
+
+  <section id="s6">
+    <h2>06</h2>
+    <h3>Pubblicità e consenso</h3>
+    <p>Se ti trovi nello Spazio Economico Europeo o nel Regno Unito, alla prima apertura dell'app ti chiediamo esplicitamente se acconsenti agli annunci personalizzati, prima di mostrarti qualsiasi pubblicità. Se non acconsenti, vedrai comunque annunci, ma non basati sui tuoi interessi. Su iOS ti chiediamo inoltre il permesso di tracciamento (App Tracking Transparency) richiesto da Apple per lo stesso scopo. Puoi cambiare idea in qualsiasi momento dalle impostazioni del tuo dispositivo.</p>
+  </section>
+
+  <section id="s7">
+    <h2>07</h2>
+    <h3>Per quanto tempo conserviamo i dati</h3>
+    <p>Conserviamo i dati del tuo account finché mantieni l'account attivo. Se elimini il tuo account dalla sezione Profilo dell'app, cancelliamo il tuo profilo e i dati associati sui nostri server entro breve tempo. I dati locali sul dispositivo (sezione 3) vengono rimossi contestualmente all'eliminazione dell'account, o quando disinstalli l'app.</p>
+  </section>
+
+  <section id="s8">
+    <h2>08</h2>
+    <h3>I tuoi diritti</h3>
+    <p>In qualsiasi momento puoi chiederci di:</p>
+    <ul>
+      <li>Accedere ai dati che abbiamo su di te</li>
+      <li>Correggerli se sono sbagliati</li>
+      <li>Cancellarli — puoi farlo tu stesso in autonomia da Profilo → Elimina account, oppure scrivendoci</li>
+      <li>Riceverli in un formato portabile</li>
+      <li>Opporti al trattamento basato su legittimo interesse</li>
+      <li>Revocare il consenso agli annunci personalizzati in qualsiasi momento</li>
+    </ul>
+    <p>Per esercitare questi diritti scrivi a <b>hello@know4future.com</b>. Hai anche sempre diritto di presentare reclamo al Garante per la Protezione dei Dati Personali (www.garanteprivacy.it).</p>
+  </section>
+
+  <section id="s9">
+    <h2>09</h2>
+    <h3>Sicurezza</h3>
+    <p>Le credenziali di accesso sono gestite da Firebase Authentication, che non ci mostra mai la tua password in chiaro. Applichiamo controlli contro i tentativi di accesso ripetuti e limitiamo l'accesso ai tuoi dati a chi ne ha effettivamente bisogno per farli funzionare.</p>
+  </section>
+
+  <section id="s10">
+    <h2>10</h2>
+    <h3>Minori</h3>
+    <p>Be Well non è pensata per bambini sotto i 16 anni. Se sei genitore o tutore e ritieni che un minore ci abbia fornito dati personali senza il tuo consenso, scrivici e li rimuoveremo.</p>
+  </section>
+
+  <section id="s11">
+    <h2>11</h2>
+    <h3>Modifiche a questa informativa</h3>
+    <p>Se cambiamo sostanzialmente come trattiamo i tuoi dati, aggiorniamo questa pagina e, per cambiamenti rilevanti, te lo segnaliamo anche dentro l'app.</p>
+  </section>
+
+  <section id="s12">
+    <h2>12</h2>
+    <h3>Contatti</h3>
+    <p>Per qualsiasi domanda su questa informativa o sui tuoi dati: <b>hello@know4future.com</b>.</p>
+  </section>
+
+  <footer>
+    Be Well — Informativa Privacy · <span class="fill">redatta come bozza, da rivedere con un legale prima della pubblicazione</span>
+  </footer>
+
+</div>
+</body>
+</html>

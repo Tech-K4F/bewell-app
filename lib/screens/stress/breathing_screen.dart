@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/habit_hero_band.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/progression_provider.dart';
 import '../../models/habit_library.dart';
@@ -32,8 +34,9 @@ class _BreathingScreenState extends State<BreathingScreen>
   int _totalCycles = 3;
 
   // Box: 4-4-4-4 | 4-7-8: 4-7-8-0 (nessuna seconda trattenuta)
-  List<int> get _durations =>
-      widget.habitId == 'breathing_478' ? const [4, 7, 8, 0] : const [4, 4, 4, 4];
+  List<int> get _durations => widget.habitId == 'breathing_478'
+      ? const [4, 7, 8, 0]
+      : const [4, 4, 4, 4];
 
   int get _currentPhaseDuration => _durations[_phaseIndex];
 
@@ -52,8 +55,8 @@ class _BreathingScreenState extends State<BreathingScreen>
   Color _phaseColor(BwPaletteData p) {
     if (!_isRunning) return p.primary;
     return switch (_phaseIndex) {
-      0 => p.primary,                            // inspira
-      2 => p.accent,                              // espira
+      0 => p.primary, // inspira
+      2 => p.accent, // espira
       _ => Color.lerp(p.primary, p.accent, 0.5)!, // trattieni
     };
   }
@@ -65,8 +68,8 @@ class _BreathingScreenState extends State<BreathingScreen>
       vsync: this,
       duration: const Duration(seconds: 4),
     );
-    _scale = Tween<double>(begin: 0.45, end: 1.0).animate(
-      CurvedAnimation(parent: _scaleCtrl, curve: Curves.easeInOut));
+    _scale = Tween<double>(begin: 0.45, end: 1.0)
+        .animate(CurvedAnimation(parent: _scaleCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -143,6 +146,7 @@ class _BreathingScreenState extends State<BreathingScreen>
     setState(() => _isRunning = false);
     final progression = context.read<ProgressionProvider>();
     final app = context.read<AppProvider>();
+    HapticFeedback.mediumImpact();
     await progression.markCompleted(widget.habitId);
     if (!mounted) return;
     await app.completeHabit(widget.habitId);
@@ -163,7 +167,8 @@ class _BreathingScreenState extends State<BreathingScreen>
         backgroundColor: p.card,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: Text(s.breathingWellDone,
-            style: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 18)),
+            style: TextStyle(
+                color: p.text, fontWeight: FontWeight.w700, fontSize: 18)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -179,7 +184,10 @@ class _BreathingScreenState extends State<BreathingScreen>
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(s.breathingPointsEarned(pts),
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: p.primaryText)),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: p.primaryText)),
             ),
           ],
         ),
@@ -188,7 +196,8 @@ class _BreathingScreenState extends State<BreathingScreen>
             onPressed: () => Navigator.of(context)
               ..pop()
               ..pop(),
-            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+            style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44)),
             child: Text(s.confirm),
           ),
           TextButton(
@@ -221,6 +230,8 @@ class _BreathingScreenState extends State<BreathingScreen>
         child: Column(
           children: [
             if (!_isRunning) ...[
+              HabitHeroBand(habitId: widget.habitId),
+              const SizedBox(height: 16),
               // Info card: durata di ogni fase
               Container(
                 padding: const EdgeInsets.all(16),
@@ -232,7 +243,10 @@ class _BreathingScreenState extends State<BreathingScreen>
                 child: Column(
                   children: [
                     Text(title,
-                        style: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 15)),
+                        style: TextStyle(
+                            color: p.text,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15)),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -241,9 +255,13 @@ class _BreathingScreenState extends State<BreathingScreen>
                         return Column(
                           children: [
                             Text(_phaseLabel3(s, i),
-                                style: TextStyle(color: p.textMut, fontSize: 10)),
+                                style:
+                                    TextStyle(color: p.textMut, fontSize: 10)),
                             Text('${_durations[i]}s',
-                                style: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 18)),
+                                style: TextStyle(
+                                    color: p.text,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 18)),
                           ],
                         );
                       }),
@@ -257,7 +275,8 @@ class _BreathingScreenState extends State<BreathingScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(s.breathingCycles, style: TextStyle(color: p.textMut, fontSize: 14)),
+                  Text(s.breathingCycles,
+                      style: TextStyle(color: p.textMut, fontSize: 14)),
                   const SizedBox(width: 6),
                   ...[3, 5, 7].map((n) {
                     final sel = n == _totalCycles;
@@ -271,7 +290,8 @@ class _BreathingScreenState extends State<BreathingScreen>
                         decoration: BoxDecoration(
                           color: sel ? p.primary : Colors.transparent,
                           shape: BoxShape.circle,
-                          border: Border.all(color: sel ? p.primary : p.cardBorder),
+                          border:
+                              Border.all(color: sel ? p.primary : p.cardBorder),
                         ),
                         child: Center(
                           child: Text('$n',
@@ -291,115 +311,117 @@ class _BreathingScreenState extends State<BreathingScreen>
             // Cerchio animato — area a dimensione fissa: il cerchio pulsa e
             // cambia colore al suo interno senza mai spostare gli elementi
             // sotto (in particolare il pulsante interrompi).
-            SizedBox(
-              width: 340,
-              height: 340,
-              child: AnimatedBuilder(
-                animation: _scale,
-                builder: (_, __) {
-                  final radius = 70 + (_scale.value * 80);
-                  final color = _phaseColor(p);
-                  return Center(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        if (_isRunning)
-                          ...List.generate(3, (i) {
-                            final r = radius + (i + 1) * 20;
-                            return AnimatedContainer(
-                              duration: const Duration(milliseconds: 400),
-                              width: r * 2,
-                              height: r * 2,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: color.withValues(alpha: 0.18 * (1 - i * 0.3)),
-                                  width: 1,
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _isRunning ? null : _start,
+              child: SizedBox(
+                width: 340,
+                height: 340,
+                child: AnimatedBuilder(
+                  animation: _scale,
+                  builder: (_, __) {
+                    final radius = 70 + (_scale.value * 80);
+                    final color = _phaseColor(p);
+                    return Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (_isRunning)
+                            ...List.generate(3, (i) {
+                              final r = radius + (i + 1) * 20;
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 400),
+                                width: r * 2,
+                                height: r * 2,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: color.withValues(
+                                        alpha: 0.18 * (1 - i * 0.3)),
+                                    width: 1,
+                                  ),
                                 ),
-                              ),
-                            );
-                          }),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 400),
-                          width: radius * 2,
-                          height: radius * 2,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                color.withValues(alpha: .6),
-                                color.withValues(alpha: .12),
-                              ],
-                            ),
-                            boxShadow: _isRunning
-                                ? [
-                                    BoxShadow(
-                                      color: color.withValues(alpha: .5),
-                                      blurRadius: 44,
-                                      spreadRadius: 6,
-                                    )
-                                  ]
-                                : null,
-                          ),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_isRunning) ...[
-                                  Text(
-                                    _phaseLabel(s),
-                                    style: TextStyle(
-                                      color: p.text,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w300,
-                                      letterSpacing: 2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '${_currentPhaseDuration - _phaseSecond}',
-                                    style: TextStyle(color: p.text, fontSize: 48, fontWeight: FontWeight.w200),
-                                  ),
-                                  Text(
-                                    '${_cycleCount + 1}/$_totalCycles',
-                                    style: TextStyle(color: p.textMut, fontSize: 12),
-                                  ),
-                                ] else ...[
-                                  const Text('🫁', style: TextStyle(fontSize: 48)),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    s.breathingTapToStart,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: p.textSec, fontSize: 14),
-                                  ),
+                              );
+                            }),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 400),
+                            width: radius * 2,
+                            height: radius * 2,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  color.withValues(alpha: .6),
+                                  color.withValues(alpha: .12),
                                 ],
-                              ],
+                              ),
+                              boxShadow: _isRunning
+                                  ? [
+                                      BoxShadow(
+                                        color: color.withValues(alpha: .5),
+                                        blurRadius: 44,
+                                        spreadRadius: 6,
+                                      )
+                                    ]
+                                  : null,
+                            ),
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_isRunning) ...[
+                                    Text(
+                                      _phaseLabel(s),
+                                      style: TextStyle(
+                                        color: p.text,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w300,
+                                        letterSpacing: 2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '${_currentPhaseDuration - _phaseSecond}',
+                                      style: TextStyle(
+                                          color: p.text,
+                                          fontSize: 48,
+                                          fontWeight: FontWeight.w200),
+                                    ),
+                                    Text(
+                                      '${_cycleCount + 1}/$_totalCycles',
+                                      style: TextStyle(
+                                          color: p.textMut, fontSize: 12),
+                                    ),
+                                  ] else ...[
+                                    const Text('🫁',
+                                        style: TextStyle(fontSize: 48)),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      s.breathingTapToStart,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          color: p.textSec, fontSize: 14),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 48),
 
-            if (!_isRunning)
-              ElevatedButton(
-                onPressed: _start,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: p.btn,
-                  minimumSize: const Size.fromHeight(54),
-                ),
-                child: Text(s.breathingStart,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.btnText)),
-              )
-            else
+            if (_isRunning)
               OutlinedButton.icon(
                 onPressed: _stop,
                 icon: Icon(Icons.stop_rounded, color: p.primary),
-                label: Text(s.breathingStop, style: TextStyle(color: p.primary)),
+                label:
+                    Text(s.breathingStop, style: TextStyle(color: p.primary)),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: p.primary),
                   minimumSize: const Size.fromHeight(52),

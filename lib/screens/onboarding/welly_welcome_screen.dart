@@ -23,6 +23,9 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
   String _userType = 'worker'; // 'student' | 'worker' — default: worker
   final _nameCtrl = TextEditingController(text: 'Welly');
   bool _firstDrinkDone = false;
+  // Dopo il primo bicchiere la stessa pagina mostra i punti guadagnati
+  // (prima erano due schermate separate).
+  bool _pointsShown = false;
 
   @override
   void initState() {
@@ -40,12 +43,22 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
   }
 
   void _next() {
-    if (_page < 4) {
+    if (_page < 3) {
       _pageCtrl.nextPage(
         duration: const Duration(milliseconds: 380),
         curve: Curves.easeOutCubic,
       );
       setState(() => _page++);
+    }
+  }
+
+  void _back() {
+    if (_page > 0) {
+      _pageCtrl.previousPage(
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic,
+      );
+      setState(() => _page--);
     }
   }
 
@@ -75,8 +88,8 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
     await prefs.setInt('water_count', 1);
 
     setState(() => _firstDrinkDone = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    _next();
+    await Future.delayed(const Duration(milliseconds: 900));
+    if (mounted) setState(() => _pointsShown = true);
   }
 
   @override
@@ -90,20 +103,37 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Freccia indietro — riservata per non far saltare il layout
+            // quando compare/scompare tra pagina 1 e le successive.
+            SizedBox(
+              height: 40,
+              child: _page > 0
+                  ? Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        icon: Icon(Icons.arrow_back_ios_new,
+                            size: 18, color: p.textMut),
+                        onPressed: _back,
+                      ),
+                    )
+                  : null,
+            ),
             // Progress dots
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
               child: Row(
-                children: List.generate(5, (i) => Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    height: 2,
-                    decoration: BoxDecoration(
-                      color: i <= _page ? p.primary : p.bg2,
-                      borderRadius: BorderRadius.circular(1),
-                    ),
-                  ),
-                )),
+                children: List.generate(
+                    4,
+                    (i) => Expanded(
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            height: 2,
+                            decoration: BoxDecoration(
+                              color: i <= _page ? p.primary : p.bg2,
+                              borderRadius: BorderRadius.circular(1),
+                            ),
+                          ),
+                        )),
               ),
             ),
 
@@ -129,13 +159,19 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
                       _next();
                     },
                   ),
-                  _Page3(
-                    p: p,
-                    wellyName: _wellyName,
-                    done: _firstDrinkDone,
-                    onDrink: _drinkFirst,
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    child: _pointsShown
+                        ? _Page4(
+                            key: const ValueKey('points'), p: p, onNext: _next)
+                        : _Page3(
+                            key: const ValueKey('drink'),
+                            p: p,
+                            wellyName: _wellyName,
+                            done: _firstDrinkDone,
+                            onDrink: _drinkFirst,
+                          ),
                   ),
-                  _Page4(p: p, onNext: _next),
                   _Page5(p: p, onFinish: _finish),
                 ],
               ),
@@ -266,8 +302,8 @@ class _Page2 extends StatelessWidget {
               ),
               decoration: InputDecoration(
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                    vertical: 18, horizontal: 20),
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
                 hintText: 'Welly',
                 hintStyle: TextStyle(color: p.textMut),
               ),
@@ -409,6 +445,7 @@ class _Page3 extends StatelessWidget {
   final bool done;
   final VoidCallback onDrink;
   const _Page3({
+    super.key,
     required this.p,
     required this.wellyName,
     required this.done,
@@ -427,7 +464,6 @@ class _Page3 extends StatelessWidget {
             mood: done ? WellyMood.radiant : WellyMood.returning,
           ),
           const SizedBox(height: 28),
-
           Text(
             s.firstHabitTitle,
             style: TextStyle(
@@ -458,9 +494,7 @@ class _Page3 extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-
           const Spacer(),
-
           if (!done)
             _WellyButton(
               label: s.drinkFirstGlass,
@@ -472,8 +506,7 @@ class _Page3 extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.check_circle_rounded,
-                    color: p.primary, size: 22),
+                Icon(Icons.check_circle_rounded, color: p.primary, size: 22),
                 const SizedBox(width: 8),
                 Text(
                   '💧 1/8',
@@ -495,7 +528,7 @@ class _Page3 extends StatelessWidget {
 class _Page4 extends StatelessWidget {
   final BwPaletteData p;
   final VoidCallback onNext;
-  const _Page4({required this.p, required this.onNext});
+  const _Page4({super.key, required this.p, required this.onNext});
 
   @override
   Widget build(BuildContext context) {
@@ -559,7 +592,6 @@ class _Page5 extends StatelessWidget {
         children: [
           CompanionWidget(size: 150, mood: WellyMood.welcoming),
           const SizedBox(height: 28),
-
           Text(
             s.notifPermTitle,
             style: TextStyle(
@@ -580,9 +612,7 @@ class _Page5 extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-
           const Spacer(),
-
           _WellyButton(
             label: s.notifPermAllow,
             p: p,
@@ -619,10 +649,10 @@ class _RewardsPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.sL;
     final items = [
-      ('🎟️', 'Buono sconto', '10% su partner selezionati'),
-      ('☕', 'Voucher caffè', 'Bevanda gratuita'),
-      ('✨', 'Premium', 'Funzioni avanzate'),
-      ('🎁', 'Sorprese', 'E molto altro...'),
+      ('🎟️', s.previewDiscountTitle, s.previewDiscountSub),
+      ('☕', s.previewCoffeeTitle, s.previewCoffeeSub),
+      ('✨', s.previewPremiumTitle, s.previewPremiumSub),
+      ('🎁', s.previewSurpriseTitle, s.previewSurpriseSub),
     ];
 
     return Stack(
@@ -635,36 +665,38 @@ class _RewardsPreview extends StatelessWidget {
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
           childAspectRatio: 2.2,
-          children: items.map((item) => Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: p.card,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: p.cardBorder, width: 0.5),
-            ),
-            child: Row(
-              children: [
-                Text(item.$1, style: const TextStyle(fontSize: 20)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(item.$2,
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: p.text)),
-                      Text(item.$3,
-                          style: TextStyle(
-                              fontSize: 10, color: p.textSec)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          )).toList(),
+          children: items
+              .map((item) => Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: p.card,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: p.cardBorder, width: 0.5),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(item.$1, style: const TextStyle(fontSize: 20)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(item.$2,
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: p.text)),
+                              Text(item.$3,
+                                  style: TextStyle(
+                                      fontSize: 10, color: p.textSec)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ))
+              .toList(),
         ),
 
         // Overlay sfocatura + lock
@@ -675,8 +707,8 @@ class _RewardsPreview extends StatelessWidget {
               color: p.bg.withValues(alpha: 0.55),
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: p.primary,
                     borderRadius: BorderRadius.circular(20),
@@ -755,9 +787,3 @@ class _WellyButton extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-

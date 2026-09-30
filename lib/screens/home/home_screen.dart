@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/app_provider.dart';
@@ -16,6 +17,9 @@ import '../../providers/tutorial_provider.dart';
 import '../../services/analytics_service.dart';
 import '../../widgets/spotlight_overlay.dart';
 import '../../widgets/banner_ad_widget.dart';
+import '../habits/habits_screen.dart' show habitGoalLabel;
+import '../../widgets/mission_start_dialog.dart';
+import '../../widgets/daily_objectives_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,8 +44,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // ── Water cooldown + undo ─────────────────────────────────────────────────
   bool _waterCooldownActive = false;
   Timer? _waterCooldownTimer;
-  DateTime? _lastGlassAddedAt; // null se non sono stati aggiunti bicchieri (o dopo undo)
-  int? _lastGlassPoints;        // punti dell'ultimo bicchiere (per rimuoverli in undo)
+  DateTime?
+      _lastGlassAddedAt; // null se non sono stati aggiunti bicchieri (o dopo undo)
+  int? _lastGlassPoints; // punti dell'ultimo bicchiere (per rimuoverli in undo)
   // 2 minuti: abbastanza per evitare tap accidentali rapidi,
   // non così lungo da bloccare chi vuole davvero aggiungere un bicchiere.
   static const _cooldownDuration = Duration(minutes: 2);
@@ -73,6 +78,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  /// Messaggio di Welly che cambia con l'ora e i progressi di oggi. Il primo
+  /// giorno resta il testo guida di avvio (spiega cosa fare).
+  String _wellyMessage(
+    BwStrings s,
+    ProgressionProvider progression, {
+    required String coachMessage,
+    required bool waterDone,
+    required bool allDone,
+  }) {
+    final hasHistory = progression.activeHabits
+        .any((h) => progression.daysCompletedFor(h.id) > 0);
+    if (!hasHistory && !waterDone) return coachMessage;
+    final hour = DateTime.now().hour;
+    final count = progression.todayWaterCount;
+    if (allDone) return s.wellyMsgAllDone;
+    if (hour >= 21) return s.wellyMsgEvening;
+    if (waterDone) return s.wellyMsgWaterDone;
+    if (count > 0) {
+      return s.wellyMsgWaterProgress(count, progression.todayWaterTarget);
+    }
+    return hour < 12 ? s.wellyMsgMorning : s.wellyMsgAfternoon;
+  }
+
   // ── WellyMood —————————————————————————————————————————————————————————————
   WellyMood _getCurrentMood(int waterCount, bool allHabitsDone, int hour) {
     if (allHabitsDone) return WellyMood.radiant;
@@ -84,9 +112,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return WellyMood.calm;
   }
 
+  String _greeting(BwStrings s) {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return s.goodMorning;
+    if (hour < 18) return s.goodAfternoon;
+    return s.goodEvening;
+  }
+
   void _updateMood(bool allHabitsDone) {
     if (!mounted) return;
-    final mood = _getCurrentMood(_waterCount, allHabitsDone, DateTime.now().hour);
+    final mood =
+        _getCurrentMood(_waterCount, allHabitsDone, DateTime.now().hour);
     if (mood != _wellyMood) setState(() => _wellyMood = mood);
   }
 
@@ -115,8 +151,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await prefs.setString('app_first_launch_date', todayStr);
     }
     final firstLaunchStr = prefs.getString('app_first_launch_date') ?? todayStr;
-    final firstLaunch = DateTime.tryParse(firstLaunchStr.replaceAll('-', '/')) ?? today;
-    final appDay = today.difference(DateTime(firstLaunch.year, firstLaunch.month, firstLaunch.day)).inDays + 1;
+    final firstLaunch =
+        DateTime.tryParse(firstLaunchStr.replaceAll('-', '/')) ?? today;
+    final appDay = today
+            .difference(
+                DateTime(firstLaunch.year, firstLaunch.month, firstLaunch.day))
+            .inDays +
+        1;
 
     final userType = prefs.getString('user_type') ?? 'worker';
     final scheduleConfirmed = prefs.getBool('work_schedule_confirmed') ?? false;
@@ -132,7 +173,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ? DateTime.fromMillisecondsSinceEpoch(lastGlassMs)
         : null;
     final lastGlassPts = prefs.getInt('water_last_glass_pts');
-    final neverMissDismissed = prefs.getString('never_miss_twice_dismissed_date') ?? '';
+    final neverMissDismissed =
+        prefs.getString('never_miss_twice_dismissed_date') ?? '';
 
     if (mounted) {
       setState(() {
@@ -147,7 +189,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         // lasciando gli utenti 'both' bloccati sugli orari di default senza
         // mai poterli modificare.
         _showWorkBanner = (userType == 'worker' || userType == 'both') &&
-            !scheduleConfirmed && appDay >= 2;
+            !scheduleConfirmed &&
+            appDay >= 2;
         _waterCooldownActive = cooldownActive;
         _lastGlassAddedAt = lastGlassAt;
         _lastGlassPoints = lastGlassPts;
@@ -171,15 +214,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// mostrare testo — altrimenti il pulsante sotto il faro resta un pulsante
   /// "finto" e l'utente è costretto a usare "Avanti" invece di provare.
   List<SpotlightStep> _buildHomeSpotlightSteps() => [
-    const SpotlightStep(textId: 'home_welcome'),                                    // intro a schermo intero
-    const SpotlightStep(textId: 'home_water',    targetId: 'spot_water_section'),   // tracker acqua
-    SpotlightStep(textId: 'home_add_glass',targetId: 'spot_add_glass',
-                  onTargetTap: _addWater),                                    // pulsante bicchiere — davvero cliccabile
-    const SpotlightStep(textId: 'home_welly',    targetId: 'spot_welly',            // companion
-                  shape: SpotlightShape.circle, padding: 20),
-    const SpotlightStep(textId: 'home_phase',    targetId: 'spot_phase'),           // badge fase
-    const SpotlightStep(textId: 'home_nav',      targetId: 'spot_nav'),             // nav bar
-  ];
+        const SpotlightStep(textId: 'home_welcome'), // intro a schermo intero
+        const SpotlightStep(
+            textId: 'home_water',
+            targetId: 'spot_water_section'), // tracker acqua
+        SpotlightStep(
+            textId: 'home_add_glass',
+            targetId: 'spot_add_glass',
+            onTargetTap: _addWater), // pulsante bicchiere — davvero cliccabile
+        const SpotlightStep(
+            textId: 'home_welly',
+            targetId: 'spot_welly', // companion
+            shape: SpotlightShape.circle,
+            padding: 20),
+        const SpotlightStep(
+            textId: 'home_phase', targetId: 'spot_phase'), // badge fase
+        const SpotlightStep(
+            textId: 'home_nav', targetId: 'spot_nav'), // nav bar
+      ];
 
   Future<void> _checkHomeSpotlight() async {
     if (!mounted) return;
@@ -190,6 +242,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Nuovo utente: aspetta che l'UI sia completamente renderizzata
       await Future.delayed(const Duration(milliseconds: 700));
       if (mounted) ctrl.startTutorial('home_tour', _buildHomeSpotlightSteps());
+      // Missioni (acqua, e qualunque altra abitudine già attiva fin dal
+      // primo giorno) annunciate DOPO il tour, non prima: prima l'utente
+      // vede la Home spiegata nel suo insieme, poi gli obiettivi concreti —
+      // non il contrario. Un listener una tantum aspetta la chiusura del
+      // tour invece di provare ad "awaitare" startTutorial, che è fire-and
+      // -forget (l'utente scorre gli step a suo ritmo).
+      void onTourChange() {
+        if (!ctrl.isActive) {
+          ctrl.removeListener(onTourChange);
+          if (mounted) {
+            MissionStartDialog.checkPending(context).then((shown) {
+              if (mounted && !shown) {
+                DailyObjectivesDialog.maybeShowForToday(context);
+              }
+            });
+          }
+        }
+      }
+
+      ctrl.addListener(onTourChange);
       // Marca home_first_open (e il suo seguito in catena) come già visto:
       // lo spotlight copre lo stesso contenuto. In precedenza questo
       // scriveva un bool SharedPreferences che TutorialProvider non legge
@@ -201,9 +273,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         await tutorial.markSeenExternally('home_first_open_2');
       }
     } else {
-      // Utente esistente: popup Welly classico
+      // Utente esistente: popup Welly classico + eventuali missioni non
+      // ancora annunciate (si autocorregge ad ogni visita se qualcuna era
+      // sfuggita).
       if (mounted) {
-        context.read<TutorialProvider>().scheduleTrigger('home_first_open', context);
+        context
+            .read<TutorialProvider>()
+            .scheduleTrigger('home_first_open', context);
+        final shownMission = await MissionStartDialog.checkPending(context);
+        if (mounted && !shownMission) {
+          await DailyObjectivesDialog.maybeShowForToday(context);
+        }
       }
     }
   }
@@ -234,6 +314,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _addWater() async {
     if (_waterCount >= _waterTargetN) return;
     if (_waterCooldownActive) return; // cooldown attivo
+    HapticFeedback.lightImpact();
     // Tutorial: primo bicchiere → mostra il dialogo del tracker acqua
     if (_waterCount == 0 && mounted) {
       context.read<TutorialProvider>().trigger('water_tracker_first', context);
@@ -257,12 +338,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     AnalyticsService.instance.logWellyMoodShown('drinking');
     // Salva su prefs: cooldown, conta bicchieri, info undo
     await prefs.setInt('water_count', newCount);
-    await prefs.setInt('water_cooldown_until', cooldownUntil.millisecondsSinceEpoch);
+    await prefs.setInt(
+        'water_cooldown_until', cooldownUntil.millisecondsSinceEpoch);
     await prefs.setInt('water_last_glass_at', now.millisecondsSinceEpoch);
     await prefs.setInt('water_last_glass_pts', pts);
 
     if (mounted) {
       await context.read<AppProvider>().awardWaterGlass(pts);
+      // Sincronizza Habits: senza questo, la card acqua lì restava a "falla
+      // per la prima volta" anche con bicchieri già bevuti oggi in Home —
+      // due schermate che raccontavano due storie diverse sulla stessa abitudine.
+      context
+          .read<ProgressionProvider>()
+          .setTodayWaterCount(newCount, target: _waterTargetN);
     }
 
     // Timer che aggiorna l'UI quando scade il cooldown
@@ -287,7 +375,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (newCount >= _waterTargetN && mounted) {
       AnalyticsService.instance.logWaterGoalReached();
       // Tutorial: prima abitudine completata (anche via acqua)
-      context.read<TutorialProvider>().scheduleTrigger('first_completion', context);
+      context
+          .read<TutorialProvider>()
+          .scheduleTrigger('first_completion', context);
       await context.read<ProgressionProvider>().markCompleted('water');
       if (mounted) {
         await context.read<AppProvider>().completeHabit('water');
@@ -324,6 +414,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Rimuovi i punti dell'ultimo bicchiere
     if (mounted && ptsToRemove > 0) {
       await context.read<AppProvider>().removeWaterGlassPoints(ptsToRemove);
+    }
+    if (mounted) {
+      context.read<ProgressionProvider>().setTodayWaterCount(newCount);
     }
   }
 
@@ -362,7 +455,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final fraction = _waterTargetN > 0 ? _waterCount / _waterTargetN : 0.0;
     if (fraction < 0.31) return s.waterLow;
     if (fraction < 0.61) return s.waterMid;
-    if (fraction < 1.0) return s.waterMid; // "Quasi — ancora poco." verrà da TASK 2
+    if (fraction < 1.0)
+      return s.waterMid; // "Quasi — ancora poco." verrà da TASK 2
     return s.waterDone;
   }
 
@@ -370,7 +464,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final last = progression.stateOf('water')?.lastCompletedAt;
     if (last == null) return false;
     final now = DateTime.now();
-    return last.year == now.year && last.month == now.month && last.day == now.day;
+    return last.year == now.year &&
+        last.month == now.month &&
+        last.day == now.day;
   }
 
   @override
@@ -381,22 +477,57 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final isAmb = theme.isAmbient;
         final user = context.watch<AppProvider>().user;
         final s = context.sL;
-        final message = progression.getLocalizedMessage(s);
+        final coachMessage = progression.getLocalizedMessage(s);
         final phase = progression.currentPhase;
         final nextHabit = progression.nextHabitToUnlock;
         final pendingPair = progression.pendingChoicePair;
         final isWaterDone = _isWaterDoneToday(progression);
 
+        // Abitudini attive diverse dall'acqua non ancora fatte oggi: senza
+        // questo, l'unica azione proposta su Home era sempre e solo
+        // l'acqua — per qualunque altra abitudine attiva l'utente doveva
+        // pensare da sé di aprire la scheda Abitudini per scoprire cosa
+        // fare, invece di trovarselo già in evidenza qui.
+        final schedule = context.watch<ScheduleProvider>();
+        final nonWaterActive =
+            progression.activeHabits.where((h) => h.id != 'water').toList();
+        final notDoneNonWater = nonWaterActive.where((h) {
+          final last = progression.stateOf(h.id)?.lastCompletedAt;
+          if (last == null) return true;
+          final now = DateTime.now();
+          return !(last.year == now.year &&
+              last.month == now.month &&
+              last.day == now.day);
+        }).toList();
+        final todayActionHabit = notDoneNonWater.isEmpty
+            ? null
+            : schedule.getHabitForNow(notDoneNonWater, DateTime.now().hour) ??
+                notDoneNonWater.first;
+        final allNonWaterDone =
+            nonWaterActive.isNotEmpty && notDoneNonWater.isEmpty;
+
+        final message = _wellyMessage(
+          s,
+          progression,
+          coachMessage: coachMessage,
+          waterDone: isWaterDone,
+          allDone: isWaterDone && (nonWaterActive.isEmpty || allNonWaterDone),
+        );
+
         // Aggiorna mood Welly (solo se non c'è animazione drink in corso)
-        if (_wellyMood != WellyMood.drinking && _wellyMood != WellyMood.radiant) {
+        if (_wellyMood != WellyMood.drinking &&
+            _wellyMood != WellyMood.radiant) {
           final allHabitsDone = progression.activeHabits.isNotEmpty &&
               progression.activeHabits.every((h) {
                 final last = progression.stateOf(h.id)?.lastCompletedAt;
                 if (last == null) return false;
                 final now = DateTime.now();
-                return last.year == now.year && last.month == now.month && last.day == now.day;
+                return last.year == now.year &&
+                    last.month == now.month &&
+                    last.day == now.day;
               });
-          final computed = _getCurrentMood(_waterCount, allHabitsDone || isWaterDone, DateTime.now().hour);
+          final computed = _getCurrentMood(
+              _waterCount, allHabitsDone || isWaterDone, DateTime.now().hour);
           if (computed != _wellyMood) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) setState(() => _wellyMood = computed);
@@ -410,7 +541,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: ListView(
               padding: EdgeInsets.fromLTRB(20, isAmb ? 80 : 24, 20, 32),
               children: [
-
                 // ── Greeting ─────────────────────────────────────────
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -420,7 +550,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            s.goodMorning,
+                            _greeting(s),
                             style: TextStyle(
                               fontSize: 13,
                               fontStyle: FontStyle.italic,
@@ -493,23 +623,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 // Scopo: intervento gentile prima che il secondo skip diventi abitudine.
                 // Dismissione persistita in prefs per sopravvivere ai tab switch.
                 if (user != null &&
-                    context.watch<AppProvider>().shouldShowNeverMissTwiceBanner &&
+                    context
+                        .watch<AppProvider>()
+                        .shouldShowNeverMissTwiceBanner &&
                     _waterCount == 0 &&
-                    _neverMissTwiceDismissedDate != '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}') ...[
+                    _neverMissTwiceDismissedDate !=
+                        '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}') ...[
                   _NeverMissTwiceBanner(
                     p: p,
                     onAddWater: () async {
-                      final todayStr = '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}';
+                      final todayStr =
+                          '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}';
                       final prefs = await SharedPreferences.getInstance();
-                      await prefs.setString('never_miss_twice_dismissed_date', todayStr);
-                      if (mounted) setState(() => _neverMissTwiceDismissedDate = todayStr);
+                      await prefs.setString(
+                          'never_miss_twice_dismissed_date', todayStr);
+                      if (mounted)
+                        setState(() => _neverMissTwiceDismissedDate = todayStr);
                       _addWater();
                     },
                     onDismiss: () async {
-                      final todayStr = '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}';
+                      final todayStr =
+                          '${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}';
                       final prefs = await SharedPreferences.getInstance();
-                      await prefs.setString('never_miss_twice_dismissed_date', todayStr);
-                      if (mounted) setState(() => _neverMissTwiceDismissedDate = todayStr);
+                      await prefs.setString(
+                          'never_miss_twice_dismissed_date', todayStr);
+                      if (mounted)
+                        setState(() => _neverMissTwiceDismissedDate = todayStr);
                     },
                   ),
                   const SizedBox(height: 16),
@@ -555,7 +694,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           fontSize: isAmb ? 18 : 16,
                           fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
                           color: p.text,
-                          fontStyle: isAmb ? FontStyle.italic : FontStyle.normal,
+                          fontStyle:
+                              isAmb ? FontStyle.italic : FontStyle.normal,
                           letterSpacing: isAmb ? 1 : 0,
                         ),
                       ),
@@ -607,7 +747,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.check_circle_rounded, color: p.primary, size: 18),
+                        Icon(Icons.check_circle_rounded,
+                            color: p.primary, size: 18),
                         const SizedBox(width: 8),
                         Text(
                           s.waterDone,
@@ -637,7 +778,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                           child: Center(
                             child: Text(
-                              _waterCooldownActive ? s.waterCooldown : s.addGlass,
+                              _waterCooldownActive
+                                  ? s.waterCooldown
+                                  : s.addGlass,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -659,7 +802,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       Expanded(
                         child: Builder(builder: (ctx) {
                           final canUndo = _lastGlassAddedAt != null &&
-                              DateTime.now().difference(_lastGlassAddedAt!).inMinutes < 2 &&
+                              DateTime.now()
+                                      .difference(_lastGlassAddedAt!)
+                                      .inMinutes <
+                                  2 &&
                               !isWaterDone;
                           return GestureDetector(
                             onTap: canUndo ? _undoGlass : null,
@@ -671,7 +817,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 decoration: BoxDecoration(
                                   color: Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: p.textMut.withValues(alpha: 0.4), width: 1),
+                                  border: Border.all(
+                                      color: p.textMut.withValues(alpha: 0.4),
+                                      width: 1),
                                 ),
                                 child: Center(
                                   child: Text(
@@ -698,7 +846,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             decoration: BoxDecoration(
                               color: Colors.transparent,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: p.textMut.withValues(alpha: 0.4), width: 1),
+                              border: Border.all(
+                                  color: p.textMut.withValues(alpha: 0.4),
+                                  width: 1),
                             ),
                             child: Center(
                               child: Text(
@@ -717,6 +867,52 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ],
 
+                // ── Prossima azione (abitudini diverse dall'acqua) ────
+                if (todayActionHabit != null) ...[
+                  const SizedBox(height: 24),
+                  _Divider(p: p),
+                  const SizedBox(height: 20),
+                  Text(
+                    s.habitsNowLabel.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: p.primary,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _TodayActionCard(
+                    habit: todayActionHabit,
+                    daysCompleted:
+                        progression.daysCompletedFor(todayActionHabit.id),
+                    p: p,
+                    s: s,
+                    onTap: () => context.read<AppProvider>().setNavIndex(1),
+                  ),
+                ] else if (allNonWaterDone) ...[
+                  const SizedBox(height: 24),
+                  _Divider(p: p),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Icon(Icons.check_circle_rounded,
+                          color: p.primary, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          s.habitsAllDone,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: p.textSec,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
                 const SizedBox(height: 24),
                 _Divider(p: p),
                 const SizedBox(height: 20),
@@ -726,7 +922,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   children: [
                     _StatPill(
                       emoji: '🔥',
-                      label: '${context.watch<AppProvider>().liveStreak} ${s.daysStreak}',
+                      label:
+                          '${context.watch<AppProvider>().liveStreak} ${s.daysStreak}',
                       p: p,
                     ),
                     const SizedBox(width: 8),
@@ -753,12 +950,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     s.comingNext,
                     style: TextStyle(
                       fontSize: isAmb ? 16 : 13,
-                      fontStyle: isAmb
-                          ? FontStyle.italic
-                          : FontStyle.normal,
-                      fontWeight: isAmb
-                          ? FontWeight.w300
-                          : FontWeight.w600,
+                      fontStyle: isAmb ? FontStyle.italic : FontStyle.normal,
+                      fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
                       color: p.textSec,
                       letterSpacing: isAmb ? 1 : 0,
                     ),
@@ -813,9 +1006,7 @@ class _StatPill extends StatelessWidget {
           const SizedBox(width: 5),
           Text(label,
               style: TextStyle(
-                  fontSize: 11,
-                  color: p.textSec,
-                  fontWeight: FontWeight.w500)),
+                  fontSize: 11, color: p.textSec, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -837,7 +1028,6 @@ class _NextHabitPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final daysLeft = progression.daysUntilUnlock(habit.id);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -852,13 +1042,17 @@ class _NextHabitPreview extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: ColorFiltered(
-                  colorFilter: const ColorFilter.mode(
-                      Colors.grey, BlendMode.saturation),
+                  colorFilter:
+                      const ColorFilter.mode(Colors.grey, BlendMode.saturation),
                   child: Image.asset(
                     habit.imageAsset,
-                    width: 52, height: 52, fit: BoxFit.cover,
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                    alignment: habit.imageAlignment,
                     errorBuilder: (_, __, ___) => Container(
-                      width: 52, height: 52,
+                      width: 52,
+                      height: 52,
                       decoration: BoxDecoration(
                           color: p.bg2,
                           borderRadius: BorderRadius.circular(10)),
@@ -872,8 +1066,7 @@ class _NextHabitPreview extends StatelessWidget {
                     color: p.bg.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.lock_outline,
-                      color: p.textMut, size: 18),
+                  child: Icon(Icons.lock_outline, color: p.textMut, size: 18),
                 ),
               ),
             ],
@@ -893,12 +1086,14 @@ class _NextHabitPreview extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  daysLeft <= 0
-                      ? s.almostReady
-                      : daysLeft == 1
-                          ? s.unlocksTomorrow
-                          : '${s.unlocksIn} $daysLeft ${s.days}',
+                  // Stesso trattamento "senza data" della card in Habits
+                  // (_LockedHabitTile) — lo sblocco dipende dal consolidare
+                  // le abitudini attuali, non da un conto alla rovescia in
+                  // giorni fissi, quindi le due schermate ora concordano.
+                  s.habitDesc(habit.id),
                   style: TextStyle(fontSize: 11, color: p.textMut),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -909,12 +1104,93 @@ class _NextHabitPreview extends StatelessWidget {
   }
 }
 
+// ── Card azione di oggi (abitudini attive diverse dall'acqua) ────────────────
+class _TodayActionCard extends StatelessWidget {
+  final HabitDefinition habit;
+  final int daysCompleted;
+  final BwPaletteData p;
+  final BwStrings s;
+  final VoidCallback onTap;
+
+  const _TodayActionCard({
+    required this.habit,
+    required this.daysCompleted,
+    required this.p,
+    required this.s,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: p.primaryLight,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: p.primary.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(
+                habit.imageAsset,
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
+                alignment: habit.imageAlignment,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                      color: p.card, borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    s.habitName(habit.id),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: p.text,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    habitGoalLabel(s, daysCompleted),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: p.primaryText,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: p.primary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Speech bubble Welly ───────────────────────────────────────────────────────
 class _WellySpeechBubble extends StatelessWidget {
   final String message;
   final BwPaletteData p;
   final bool isAmb;
-  const _WellySpeechBubble({required this.message, required this.p, required this.isAmb});
+  const _WellySpeechBubble(
+      {required this.message, required this.p, required this.isAmb});
 
   @override
   Widget build(BuildContext context) {
@@ -926,7 +1202,8 @@ class _WellySpeechBubble extends StatelessWidget {
           decoration: BoxDecoration(
             color: p.primaryLight,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: p.primary.withValues(alpha: 0.2), width: 0.5),
+            border:
+                Border.all(color: p.primary.withValues(alpha: 0.2), width: 0.5),
           ),
           child: Text(
             message,
@@ -1009,13 +1286,14 @@ class _PendingChoiceCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 40, height: 40,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: p.primary.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.auto_awesome_outlined,
-                  color: p.primary, size: 20),
+              child:
+                  Icon(Icons.auto_awesome_outlined, color: p.primary, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1087,7 +1365,9 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
 
     return Container(
       padding: EdgeInsets.only(
-        left: 20, right: 20, top: 20,
+        left: 20,
+        right: 20,
+        top: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 32,
       ),
       decoration: BoxDecoration(
@@ -1102,7 +1382,8 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
           // Handle
           Center(
             child: Container(
-              width: 36, height: 4,
+              width: 36,
+              height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
                 color: p.textMut,
@@ -1113,7 +1394,8 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
 
           Text(
             context.sL.waterContainerSettings,
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: p.text),
+            style: TextStyle(
+                fontSize: 17, fontWeight: FontWeight.w700, color: p.text),
           ),
           const SizedBox(height: 20),
 
@@ -1150,7 +1432,8 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
             // Slider bicchiere 150-400ml step 50
             Text(
               'Dimensione: ${_ml}ml',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
+              style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
             ),
             const SizedBox(height: 8),
             SliderTheme(
@@ -1173,37 +1456,41 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
             // Scelta borraccia
             Text(
               'Dimensione',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
+              style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
             ),
             const SizedBox(height: 10),
             Row(
-              children: _bottleSizes.map((size) => Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _ml = size),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _ml == size ? p.primaryLight : p.card,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _ml == size ? p.primary : p.cardBorder,
-                        width: _ml == size ? 1.5 : 0.5,
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        size >= 1000 ? '1L' : '${size}ml',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _ml == size ? p.primaryText : p.textSec,
+              children: _bottleSizes
+                  .map((size) => Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _ml = size),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _ml == size ? p.primaryLight : p.card,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _ml == size ? p.primary : p.cardBorder,
+                                width: _ml == size ? 1.5 : 0.5,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                size >= 1000 ? '1L' : '${size}ml',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color:
+                                      _ml == size ? p.primaryText : p.textSec,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-              )).toList(),
+                      ))
+                  .toList(),
             ),
           ],
 
@@ -1237,7 +1524,10 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
               child: Center(
                 child: Text(
                   context.sL.workScheduleSave,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.btnText),
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: p.btnText),
                 ),
               ),
             ),
@@ -1285,7 +1575,8 @@ class _SlowdownBanner extends StatelessWidget {
               GestureDetector(
                 onTap: onNo,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
                     color: p.card,
                     borderRadius: BorderRadius.circular(8),
@@ -1293,7 +1584,10 @@ class _SlowdownBanner extends StatelessWidget {
                   ),
                   child: Text(
                     s.slowdownNo,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.text),
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: p.text),
                   ),
                 ),
               ),
@@ -1301,14 +1595,18 @@ class _SlowdownBanner extends StatelessWidget {
               GestureDetector(
                 onTap: onYes,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
                     color: p.primary,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     s.slowdownYes,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white),
                   ),
                 ),
               ),
@@ -1369,7 +1667,8 @@ class _WorkScheduleBanner extends StatelessWidget {
               GestureDetector(
                 onTap: onEdit,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
                     color: p.card,
                     borderRadius: BorderRadius.circular(8),
@@ -1377,7 +1676,10 @@ class _WorkScheduleBanner extends StatelessWidget {
                   ),
                   child: Text(
                     s.workScheduleEdit,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: p.text),
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: p.text),
                   ),
                 ),
               ),
@@ -1385,14 +1687,18 @@ class _WorkScheduleBanner extends StatelessWidget {
               GestureDetector(
                 onTap: onConfirm,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
                     color: p.primary,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     s.workScheduleConfirm,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white),
                   ),
                 ),
               ),
@@ -1433,15 +1739,16 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
   void initState() {
     super.initState();
     final s = widget.initial;
-    _startMorning   = s.startMorning;
-    _endMorning     = s.endMorning;
+    _startMorning = s.startMorning;
+    _endMorning = s.endMorning;
     _startAfternoon = s.startAfternoon;
-    _endAfternoon   = s.endAfternoon;
-    _lunchHour      = s.lunchHour;
-    _lunchDuration  = s.lunchDurationMin;
+    _endAfternoon = s.endAfternoon;
+    _lunchHour = s.lunchHour;
+    _lunchDuration = s.lunchDurationMin;
   }
 
-  Future<void> _pickHour(BuildContext ctx, int current, ValueChanged<int> onPicked) async {
+  Future<void> _pickHour(
+      BuildContext ctx, int current, ValueChanged<int> onPicked) async {
     final result = await showTimePicker(
       context: ctx,
       initialTime: TimeOfDay(hour: current, minute: 0),
@@ -1462,7 +1769,9 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
 
     return Container(
       padding: EdgeInsets.only(
-        left: 20, right: 20, top: 20,
+        left: 20,
+        right: 20,
+        top: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 32,
       ),
       decoration: BoxDecoration(
@@ -1477,7 +1786,8 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
           // Handle
           Center(
             child: Container(
-              width: 36, height: 4,
+              width: 36,
+              height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
                 color: p.textMut,
@@ -1488,14 +1798,19 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
 
           Text(
             s.workScheduleTitle,
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: p.text),
+            style: TextStyle(
+                fontSize: 17, fontWeight: FontWeight.w700, color: p.text),
           ),
           const SizedBox(height: 20),
 
           // Mattina
           Text(
             s.workScheduleMorning,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.textSec, letterSpacing: 0.5),
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: p.textSec,
+                letterSpacing: 0.5),
           ),
           const SizedBox(height: 8),
           Row(
@@ -1505,7 +1820,8 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
                   label: 'Inizio',
                   time: _fmt(_startMorning),
                   p: p,
-                  onTap: () => _pickHour(context, _startMorning, (h) => setState(() => _startMorning = h)),
+                  onTap: () => _pickHour(context, _startMorning,
+                      (h) => setState(() => _startMorning = h)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1514,7 +1830,8 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
                   label: 'Fine',
                   time: _fmt(_endMorning),
                   p: p,
-                  onTap: () => _pickHour(context, _endMorning, (h) => setState(() => _endMorning = h)),
+                  onTap: () => _pickHour(context, _endMorning,
+                      (h) => setState(() => _endMorning = h)),
                 ),
               ),
             ],
@@ -1525,7 +1842,11 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
           // Pomeriggio
           Text(
             s.workScheduleAfternoon,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.textSec, letterSpacing: 0.5),
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: p.textSec,
+                letterSpacing: 0.5),
           ),
           const SizedBox(height: 8),
           Row(
@@ -1535,7 +1856,8 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
                   label: 'Inizio',
                   time: _fmt(_startAfternoon),
                   p: p,
-                  onTap: () => _pickHour(context, _startAfternoon, (h) => setState(() => _startAfternoon = h)),
+                  onTap: () => _pickHour(context, _startAfternoon,
+                      (h) => setState(() => _startAfternoon = h)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1544,7 +1866,8 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
                   label: 'Fine',
                   time: _fmt(_endAfternoon),
                   p: p,
-                  onTap: () => _pickHour(context, _endAfternoon, (h) => setState(() => _endAfternoon = h)),
+                  onTap: () => _pickHour(context, _endAfternoon,
+                      (h) => setState(() => _endAfternoon = h)),
                 ),
               ),
             ],
@@ -1558,7 +1881,8 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
             child: Row(
               children: [
                 Container(
-                  width: 20, height: 20,
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
                     color: _hasLunch ? p.primary : p.card,
                     borderRadius: BorderRadius.circular(5),
@@ -1574,7 +1898,8 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
                 const SizedBox(width: 10),
                 Text(
                   s.workScheduleLunch,
-                  style: TextStyle(fontSize: 13, color: p.text, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                      fontSize: 13, color: p.text, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -1589,13 +1914,15 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
                     label: 'Orario',
                     time: _fmt(_lunchHour),
                     p: p,
-                    onTap: () => _pickHour(context, _lunchHour, (h) => setState(() => _lunchHour = h)),
+                    onTap: () => _pickHour(context, _lunchHour,
+                        (h) => setState(() => _lunchHour = h)),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: p.card,
                       borderRadius: BorderRadius.circular(10),
@@ -1607,11 +1934,14 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
                         isExpanded: true,
                         style: TextStyle(fontSize: 13, color: p.text),
                         dropdownColor: p.card,
-                        items: [30, 45, 60, 90].map((d) => DropdownMenuItem(
-                          value: d,
-                          child: Text('${d} min'),
-                        )).toList(),
-                        onChanged: (v) => setState(() => _lunchDuration = v ?? 30),
+                        items: [30, 45, 60, 90]
+                            .map((d) => DropdownMenuItem(
+                                  value: d,
+                                  child: Text('${d} min'),
+                                ))
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _lunchDuration = v ?? 30),
                       ),
                     ),
                   ),
@@ -1645,7 +1975,10 @@ class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
               child: Center(
                 child: Text(
                   s.workScheduleSave,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.btnText),
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: p.btnText),
                 ),
               ),
             ),
@@ -1683,11 +2016,16 @@ class _TimeButton extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(fontSize: 10, color: p.textMut, fontWeight: FontWeight.w500)),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 10,
+                    color: p.textMut,
+                    fontWeight: FontWeight.w500)),
             const SizedBox(height: 2),
             Text(
               time,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: p.text),
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w700, color: p.text),
             ),
           ],
         ),

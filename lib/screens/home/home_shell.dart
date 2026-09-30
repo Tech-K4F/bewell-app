@@ -10,6 +10,9 @@ import '../../services/analytics_service.dart';
 import '../../widgets/badge_toast.dart';
 import '../../widgets/habits/habit_intro_sheet.dart';
 import '../../widgets/habit_consolidated_dialog.dart';
+import '../../widgets/badge_unlocked_dialog.dart';
+import '../../widgets/mission_start_dialog.dart';
+import '../../widgets/streak_milestone_dialog.dart';
 import '../../providers/tutorial_provider.dart';
 import '../home/home_screen.dart';
 import '../habits/habits_screen.dart';
@@ -17,6 +20,8 @@ import '../growth/growth_screen.dart';
 import '../marketplace/marketplace_screen.dart';
 import '../profile/profile_screen.dart';
 import '../../widgets/spotlight_overlay.dart';
+import '../../providers/schedule_provider.dart';
+import '../../services/smart_reminders.dart';
 
 enum NavItem { home, habits, growth, marketplace, profile }
 
@@ -30,13 +35,27 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   ProgressionProvider? _progressionRef;
   AppProvider? _appRef;
+  ScheduleProvider? _scheduleRef;
   bool _introShowing = false;
+
+  /// Aggiorna [_introShowing] e specchia lo stato su [SpotlightController],
+  /// così TutorialProvider.trigger() vede questi popup a schermo intero e
+  /// non ci si accavalla sopra (successo qui il giorno 1 di un'abitudine:
+  /// il dialog "first_completion" e il badge "primo passo" scattano nello
+  /// stesso istante, uno da questo file e uno dal motore tutorial).
+  void _setIntroShowing(bool value) {
+    _introShowing = value;
+    if (!mounted) return;
+    final ctrl = context.read<SpotlightController>();
+    ctrl.setExternalBusy(value);
+    if (!value) context.read<TutorialProvider>().retryQueueIfIdle(context);
+  }
+
   /// Chiave dell'ultima coppia mostrata: previene il re-show se l'utente
   /// chiude il foglio senza scegliere (pendingChoicePair rimane non-null).
   String? _lastShownPairKey;
   Set<String> _knownActiveIds = {};
   int _knownPhase = 1;
-  bool _knownFocusUnlocked = false;
   int _knownStreak = -1; // -1 = not yet seeded
   /// key delle famiglie badge (ProgressionProvider.allBadges) già maxate —
   /// seminato al primo caricamento, poi diffato per mostrare il toast solo
@@ -59,8 +78,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       if (!mounted) return;
       _progressionRef = context.read<ProgressionProvider>()
         ..addListener(_onProgressionChange);
-      _appRef = context.read<AppProvider>()
-        ..addListener(_onAppChange);
+      _appRef = context.read<AppProvider>()..addListener(_onAppChange);
+      // Cambio orari di lavoro / tipo utente → ripianifica i promemoria subito,
+      // non solo quando l'app va in background.
+      _scheduleRef = context.read<ScheduleProvider>()
+        ..addListener(_refreshSmartReminders);
       // NON seminare qui: progression.init() è ancora in corso (asincrono) e _states
       // è vuoto → currentPhase = 1 anche se l'utente è già a fase 3.
       // Il seeding reale avviene in _onProgressionChange() al primo isInitialized=true.
@@ -77,6 +99,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     NotificationService.instance.setForeground(false);
     _progressionRef?.removeListener(_onProgressionChange);
     _appRef?.removeListener(_onAppChange);
+    _scheduleRef?.removeListener(_refreshSmartReminders);
     super.dispose();
   }
 
@@ -104,6 +127,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
         NotificationService.instance.setForeground(false);
+        _refreshSmartReminders();
       case AppLifecycleState.inactive:
         break; // transient state, keep current value
     }
@@ -121,14 +145,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       _progressionSeeded = true;
       _knownPhase = prog.currentPhase;
       _knownActiveIds = prog.activeHabits.map((h) => h.id).toSet();
-      _knownFocusUnlocked = prog.activeHabits.any((h) => h.id == 'focus_25');
-      _knownMaxedBadgeKeys = prog.allBadges(context.sL)
+      _knownMaxedBadgeKeys = prog
+          .allBadges(context.sL)
           .where((b) => b.isMaxed)
           .map((b) => b.key)
           .toSet();
       return; // Non sparare alcun popup/toast sul primo caricamento
     }
     _checkConsolidationCelebration(prog);
+    _refreshSmartReminders();
+  }
+
+  /// Aggiorna il piano dei promemoria (cosa è attivo, cosa è già fatto oggi):
+  /// ripianifica solo se qualcosa è davvero cambiato.
+  void _refreshSmartReminders() {
+    if (!mounted) return;
+    SmartReminders.refresh(
+      context.read<ProgressionProvider>(),
+      context.read<ScheduleProvider>(),
+    );
   }
 
   // ── Celebrazione consolidamento ───────────────────────────────────────────
@@ -136,22 +171,37 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   // festeggiato per sé, non liquidato come passo intermedio verso la
   // prossima cosa da fare.
   void _checkConsolidationCelebration(ProgressionProvider prog) {
-    final habitId = prog.nextConsolidationToCelebrate;
-    if (habitId == null) {
+    final pending = prog.nextConsolidationToCelebrate;
+    if (pending == null) {
       _afterConsolidationChecks();
       return;
     }
-    if (_introShowing) return; // riproverà al prossimo notifyListeners()
-    _introShowing = true;
+    final (habitId, isAutomatic) = pending;
+    if (_introShowing || context.read<SpotlightController>().isActive) {
+      return; // riproverà al prossimo notifyListeners()
+    }
+    _setIntroShowing(true);
+    // Sappiamo già, prima di mostrare la celebrazione, se subito dopo si
+    // aprirà la scelta della prossima abitudine — il CTA del dialog lo
+    // anticipa invece di lasciare che il foglio arrivi come un salto
+    // scollegato dal momento appena vissuto.
+    final hasNextChoice = prog.pendingChoicePair != null;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) {
-        _introShowing = false;
+        _setIntroShowing(false);
         return;
       }
-      await HabitConsolidatedDialog.show(context, habitId);
+      final pts = isAutomatic ? pointsForAutomatic : pointsForConsolidation;
+      await context.read<AppProvider>().addPoints(pts);
+      if (!mounted) {
+        _setIntroShowing(false);
+        return;
+      }
+      await HabitConsolidatedDialog.show(context, habitId,
+          points: pts, isAutomatic: isAutomatic, hasNextChoice: hasNextChoice);
       prog.consumeNextConsolidation();
       if (!mounted) return;
-      _introShowing = false;
+      _setIntroShowing(false);
       _afterConsolidationChecks();
     });
   }
@@ -161,6 +211,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     _checkNewHabits();
     _checkProgressionTutorials();
     _checkNewBadges();
+    // Ripetuto ad ogni cambio di stato: si autocorregge se una missione
+    // (es. Focus appena sbloccato con un salto giorni da debug) fosse
+    // sfuggita al primo giro invece di restare persa per sempre.
+    MissionStartDialog.checkPending(context);
   }
 
   void _onAppChange() {
@@ -186,11 +240,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       }
     }
 
-    // Sblocco Focus 25
+    // Sblocco Focus 25 — l'annuncio "nuova missione" è gestito centralmente
+    // da MissionStartDialog.checkPending (chiamato da _afterConsolidationChecks
+    // ad ogni cambio di stato, non solo sulla transizione): qui resta solo
+    // la spiegazione scientifica del Pomodoro, che TutorialProvider.trigger()
+    // mostra comunque una volta sola (si autoprotegge via _seen).
     final focusNowUnlocked =
         progression.activeHabits.any((h) => h.id == 'focus_25');
-    if (focusNowUnlocked && !_knownFocusUnlocked) {
-      _knownFocusUnlocked = true;
+    if (focusNowUnlocked) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) tutorial.trigger('focus_unlocked', context);
       });
@@ -219,12 +276,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       });
     }
 
-    // Milestone: 7, 21, 66 giorni consecutivi
+    // Milestone: 7, 21, 66 giorni consecutivi — celebrazione a schermo
+    // intero (coriandoli), non il dialog Welly piatto usato per il resto
+    // dei tutorial: è un motore di ritorno a sé, va sentito come tale.
     for (final days in [7, 21, 66]) {
       if (prev < days && curr >= days) {
         final eventId = 'milestone_${days}_days';
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) tutorial.trigger(eventId, context);
+        if (tutorial.hasSeen(eventId)) continue;
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          if (_introShowing || context.read<SpotlightController>().isActive) {
+            // Un'altra celebrazione è già a schermo — non perdere l'evento,
+            // mostralo con il dialog standard invece di accodare a tempo indefinito.
+            tutorial.trigger(eventId, context);
+            return;
+          }
+          _setIntroShowing(true);
+          await StreakMilestoneDialog.show(context, days);
+          await tutorial.markSeenExternally(eventId);
+          if (mounted) _setIntroShowing(false);
         });
       }
     }
@@ -267,7 +337,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   // ── Popup scelta coppia ───────────────────────────────────────────────────
 
   void _checkPendingChoice() {
-    if (!mounted || _introShowing) return;
+    if (!mounted ||
+        _introShowing ||
+        context.read<SpotlightController>().isActive) {
+      return;
+    }
     final pair = context.read<ProgressionProvider>().pendingChoicePair;
     if (pair == null) {
       _lastShownPairKey = null; // coppia accettata → reset per la prossima
@@ -278,7 +352,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     // Se questa coppia è già stata mostrata (e l'utente ha chiuso senza scegliere),
     // non la mostriamo di nuovo automaticamente — resta visibile nella home come card.
     if (pairKey == _lastShownPairKey) return;
-    _introShowing = true;
+    _setIntroShowing(true);
     _lastShownPairKey = pairKey;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -291,13 +365,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           // successivo così il popup appare DOPO che lo sheet si è chiuso.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
-              context.read<TutorialProvider>()
+              context
+                  .read<TutorialProvider>()
                   .scheduleTrigger('habit_chosen_$habitId', context);
             }
           });
         },
       ).then((_) {
-        if (mounted) setState(() => _introShowing = false);
+        if (mounted) _setIntroShowing(false);
       });
     });
   }
@@ -330,12 +405,43 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     if (!mounted) return;
     final progression = context.read<ProgressionProvider>();
     final s = context.sL;
+    final newlyMaxed = <BadgeInfo>[];
     for (final b in progression.allBadges(s)) {
       final justMaxed = b.isMaxed && !_knownMaxedBadgeKeys.contains(b.key);
       if (b.isMaxed) _knownMaxedBadgeKeys.add(b.key);
-      if (justMaxed) {
-        BwBanner.showBadge(context, emoji: b.emoji, title: b.name, subtitle: b.description);
+      if (justMaxed) newlyMaxed.add(b);
+    }
+    if (newlyMaxed.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showBadgeCelebrations(newlyMaxed);
+    });
+  }
+
+  /// Mostra le celebrazioni una alla volta: prima erano toast impilabili
+  /// senza ricompensa, ora sono popup a schermo intero che assegnano punti
+  /// reali, quindi più badge sbloccati nello stesso istante vanno in coda
+  /// invece che accavallarsi.
+  Future<void> _showBadgeCelebrations(List<BadgeInfo> badges) async {
+    for (final b in badges) {
+      if (!mounted) return;
+      // Un dialog Welly del motore tutorial può scattare nello stesso
+      // istante (es. "first_completion" e il badge "primo passo" sparano
+      // entrambi al primo giorno completato) — senza controllare anche
+      // isActive qui, i due popup si accavallavano a schermo.
+      final tutorialActive = context.read<SpotlightController>().isActive;
+      if (_introShowing || tutorialActive) {
+        // Un'altra celebrazione occupa già lo schermo: non perdere il
+        // badge, avvisane con il toast leggero invece di bloccare la coda.
+        BwBanner.showBadge(context,
+            emoji: b.emoji, title: b.name, subtitle: b.description);
+        continue;
       }
+      _setIntroShowing(true);
+      final pts = pointsForBadge(b);
+      await context.read<AppProvider>().addPoints(pts);
+      if (!mounted) return;
+      await BadgeUnlockedDialog.show(context, b, points: pts);
+      if (mounted) _setIntroShowing(false);
     }
   }
 
@@ -343,25 +449,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   static String _habitEmoji(String habitId) {
     const map = {
-      'focus_25':         '⏱',
-      'neck_stretch':     '🧘',
-      'posture':          '🪑',
-      'breathing_box':    '🌬',
-      'walk_lunch':       '🚶',
-      'desk_exercise':    '💪',
-      'water_morning':    '🌅',
-      'stretching_active':'🤸',
-      'lunch_park':       '🌳',
-      'breathing_478':    '🌬',
-      'focus_50':         '🎯',
-      'meditation':       '🧘',
-      'sleep_routine':    '🌙',
-      'nap':              '😴',
-      'snack':            '🍎',
-      'lunch_no_screen':  '📵',
-      'focus_no_phone':   '🔇',
-      'stairs':           '🪜',
-      'wake_consistent':  '⏰',
+      'focus_25': '⏱',
+      'neck_stretch': '🧘',
+      'posture': '🪑',
+      'breathing_box': '🌬',
+      'walk_lunch': '🚶',
+      'desk_exercise': '💪',
+      'water_morning': '🌅',
+      'stretching_active': '🤸',
+      'lunch_park': '🌳',
+      'breathing_478': '🌬',
+      'focus_50': '🎯',
+      'meditation': '🧘',
+      'sleep_routine': '🌙',
+      'nap': '😴',
+      'snack': '🍎',
+      'lunch_no_screen': '📵',
+      'focus_no_phone': '🔇',
+      'stairs': '🪜',
+      'wake_consistent': '⏰',
     };
     return map[habitId] ?? '✨';
   }
@@ -416,10 +522,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   bool _habitsUnlocked(ProgressionProvider p) =>
       p.activeHabits.any((h) => h.id == 'focus_25');
 
-  bool _growthUnlocked(ProgressionProvider p) =>
-      p.totalDaysCompleted >= 14;
+  bool _growthUnlocked(ProgressionProvider p) => p.totalDaysCompleted >= 14;
 
-  List<_NavTab> _buildTabs(BuildContext context, ProgressionProvider progression) {
+  List<_NavTab> _buildTabs(
+      BuildContext context, ProgressionProvider progression) {
     final s = context.sL;
     return [
       const _NavTab(
@@ -532,7 +638,7 @@ class _ProgressiveNavBar extends StatelessWidget {
                   },
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedOpacity(
-                    opacity: isAvailable ? 1.0 : 0.35,
+                    opacity: isAvailable ? 1.0 : 0.6,
                     duration: const Duration(milliseconds: 300),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -550,8 +656,8 @@ class _ProgressiveNavBar extends StatelessWidget {
                                 right: -6,
                                 top: -6,
                                 child: Container(
-                                  width: 14,
-                                  height: 14,
+                                  width: 16,
+                                  height: 16,
                                   decoration: BoxDecoration(
                                     color: p.bg2,
                                     shape: BoxShape.circle,
@@ -559,7 +665,7 @@ class _ProgressiveNavBar extends StatelessWidget {
                                         color: p.cardBorder, width: 0.5),
                                   ),
                                   child: Icon(Icons.lock_outline,
-                                      size: 8, color: p.textMut),
+                                      size: 10, color: p.textSec),
                                 ),
                               ),
                           ],
@@ -570,9 +676,8 @@ class _ProgressiveNavBar extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 10,
                             color: isActive ? p.primary : p.textMut,
-                            fontWeight: isActive
-                                ? FontWeight.w600
-                                : FontWeight.w400,
+                            fontWeight:
+                                isActive ? FontWeight.w600 : FontWeight.w400,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -599,11 +704,16 @@ class _ProgressiveNavBar extends StatelessWidget {
   String _translateLabel(BuildContext context, NavItem item) {
     final s = context.sL;
     switch (item) {
-      case NavItem.home:        return s.navHome;
-      case NavItem.habits:      return s.navHabits;
-      case NavItem.growth:      return s.navGrowth;
-      case NavItem.marketplace: return s.navRewards;
-      case NavItem.profile:     return s.navProfile;
+      case NavItem.home:
+        return s.navHome;
+      case NavItem.habits:
+        return s.navHabits;
+      case NavItem.growth:
+        return s.navGrowth;
+      case NavItem.marketplace:
+        return s.navRewards;
+      case NavItem.profile:
+        return s.navProfile;
     }
   }
 
@@ -646,7 +756,8 @@ class _ComingSoonScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 80, height: 80,
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
                     color: p.primaryLight,
                     shape: BoxShape.circle,
@@ -659,7 +770,9 @@ class _ComingSoonScreen extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.w700, color: p.text,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: p.text,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -670,7 +783,8 @@ class _ComingSoonScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 28),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: p.primaryLight,
                     borderRadius: BorderRadius.circular(20),
@@ -684,7 +798,8 @@ class _ComingSoonScreen extends StatelessWidget {
                       Text(
                         s.lockedForNow,
                         style: TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
                           color: p.primary,
                         ),
                       ),

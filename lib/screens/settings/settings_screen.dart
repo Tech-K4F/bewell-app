@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../config/legal_links.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/settings_provider.dart';
@@ -16,8 +18,10 @@ class SettingsScreen extends StatelessWidget {
       builder: (_) => AlertDialog(
         backgroundColor: p.card,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(s.comingSoonTitle, style: TextStyle(color: p.text, fontSize: 16)),
-        content: Text(s.comingSoonBody, style: TextStyle(color: p.textSec, fontSize: 13, height: 1.5)),
+        title: Text(s.comingSoonTitle,
+            style: TextStyle(color: p.text, fontSize: 16)),
+        content: Text(s.comingSoonBody,
+            style: TextStyle(color: p.textSec, fontSize: 13, height: 1.5)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -43,12 +47,12 @@ class SettingsScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(s.settingsTitle,
-                style: TextStyle(color: p.text, fontSize: 17, fontWeight: FontWeight.w600)),
+                style: TextStyle(
+                    color: p.text, fontSize: 17, fontWeight: FontWeight.w600)),
           ),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
             children: [
-
               // ── ASPETTO ────────────────────────────────────────────────────
               _SectionHeader(label: context.sL.themeTitle, p: p),
               _SettingsCard(p: p, children: [
@@ -57,7 +61,8 @@ class SettingsScreen extends StatelessWidget {
                   iconBg: p.primaryLight,
                   iconColor: p.primary,
                   label: s.appearance,
-                  subtitle: '${theme.style == BwStyle.card ? s.themeCard : s.themeAmbient} · ${theme.paletteData.name}',
+                  subtitle:
+                      '${theme.style == BwStyle.card ? s.themeCard : s.themeAmbient} · ${theme.paletteData.name}',
                   p: p,
                   onTap: () => Navigator.push(
                     context,
@@ -112,7 +117,17 @@ class SettingsScreen extends StatelessWidget {
                   iconColor: const Color(0xFFB87333),
                   label: context.sL.privacy,
                   p: p,
-                  onTap: () => _showComingSoon(context, p),
+                  onTap: () => launchUrl(Uri.parse(LegalLinks.privacyPolicy),
+                      mode: LaunchMode.externalApplication),
+                ),
+                _NavRow(
+                  icon: Icons.description_outlined,
+                  iconBg: const Color(0x1A2B5EA7),
+                  iconColor: const Color(0xFF2B5EA7),
+                  label: context.sL.tosTerms,
+                  p: p,
+                  onTap: () => launchUrl(Uri.parse(LegalLinks.termsOfService),
+                      mode: LaunchMode.externalApplication),
                 ),
                 _NavRow(
                   icon: Icons.help_outline,
@@ -220,7 +235,8 @@ class _NavRow extends StatelessWidget {
             Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                  color: iconBg, borderRadius: BorderRadius.circular(8)),
               child: Icon(icon, color: iconColor, size: 17),
             ),
             const SizedBox(width: 12),
@@ -228,9 +244,15 @@ class _NavRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: TextStyle(color: p.text, fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text(label,
+                      style: TextStyle(
+                          color: p.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500)),
                   if (subtitle != null)
-                    Text(subtitle!, style: TextStyle(color: p.textSec, fontSize: 11, height: 1.3)),
+                    Text(subtitle!,
+                        style: TextStyle(
+                            color: p.textSec, fontSize: 11, height: 1.3)),
                 ],
               ),
             ),
@@ -272,7 +294,8 @@ class _ToggleRow extends StatelessWidget {
           Container(
             width: 32,
             height: 32,
-            decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(
+                color: iconBg, borderRadius: BorderRadius.circular(8)),
             child: Icon(icon, color: iconColor, size: 17),
           ),
           const SizedBox(width: 12),
@@ -280,8 +303,14 @@ class _ToggleRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(color: p.text, fontSize: 14, fontWeight: FontWeight.w500)),
-                Text(subtitle, style: TextStyle(color: p.textSec, fontSize: 11, height: 1.3)),
+                Text(label,
+                    style: TextStyle(
+                        color: p.text,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500)),
+                Text(subtitle,
+                    style:
+                        TextStyle(color: p.textSec, fontSize: 11, height: 1.3)),
               ],
             ),
           ),
@@ -304,15 +333,36 @@ class _NotificationFrequencyCard extends StatelessWidget {
   final SettingsProvider settings;
   final BwPaletteData p;
   final BwStrings s;
-  const _NotificationFrequencyCard({required this.settings, required this.p, required this.s});
+  const _NotificationFrequencyCard(
+      {required this.settings, required this.p, required this.s});
 
   @override
   Widget build(BuildContext context) {
     final options = [
-      (NotificationFrequency.off,    s.notifFreqOff,    s.notifFreqOffDesc,    Icons.notifications_off_outlined),
-      (NotificationFrequency.low,    s.notifFreqLow,    s.notifFreqLowDesc,    Icons.notifications_none),
-      (NotificationFrequency.normal, s.notifFreqNormal, s.notifFreqNormalDesc, Icons.notifications_outlined),
-      (NotificationFrequency.high,   s.notifFreqHigh,   s.notifFreqHighDesc,   Icons.notifications_active_outlined),
+      (
+        NotificationFrequency.off,
+        s.notifFreqOff,
+        s.notifFreqOffDesc,
+        Icons.notifications_off_outlined
+      ),
+      (
+        NotificationFrequency.low,
+        s.notifFreqLow,
+        s.notifFreqLowDesc,
+        Icons.notifications_none
+      ),
+      (
+        NotificationFrequency.normal,
+        s.notifFreqNormal,
+        s.notifFreqNormalDesc,
+        Icons.notifications_outlined
+      ),
+      (
+        NotificationFrequency.high,
+        s.notifFreqHigh,
+        s.notifFreqHighDesc,
+        Icons.notifications_active_outlined
+      ),
     ];
     return _SettingsCard(
       p: p,
@@ -332,7 +382,8 @@ class _NotificationFrequencyCard extends StatelessWidget {
                     color: selected ? p.primary.withValues(alpha: .15) : p.bg2,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, color: selected ? p.primary : p.textMut, size: 17),
+                  child: Icon(icon,
+                      color: selected ? p.primary : p.textMut, size: 17),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -343,12 +394,17 @@ class _NotificationFrequencyCard extends StatelessWidget {
                           style: TextStyle(
                               color: p.text,
                               fontSize: 14,
-                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
-                      Text(desc, style: TextStyle(color: p.textSec, fontSize: 11, height: 1.3)),
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500)),
+                      Text(desc,
+                          style: TextStyle(
+                              color: p.textSec, fontSize: 11, height: 1.3)),
                     ],
                   ),
                 ),
-                if (selected) Icon(Icons.check_circle_rounded, color: p.primary, size: 20),
+                if (selected)
+                  Icon(Icons.check_circle_rounded, color: p.primary, size: 20),
               ],
             ),
           ),
@@ -381,7 +437,8 @@ class _SnoozeCardState extends State<_SnoozeCard> {
 
     if (settings.isSnoozed) {
       final until = settings.snoozeUntil!;
-      final label = '${until.hour.toString().padLeft(2, '0')}:${until.minute.toString().padLeft(2, '0')}';
+      final label =
+          '${until.hour.toString().padLeft(2, '0')}:${until.minute.toString().padLeft(2, '0')}';
       return _SettingsCard(p: p, children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -390,17 +447,22 @@ class _SnoozeCardState extends State<_SnoozeCard> {
               Container(
                 width: 32,
                 height: 32,
-                decoration: BoxDecoration(color: p.bg2, borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(
+                    color: p.bg2, borderRadius: BorderRadius.circular(8)),
                 child: Icon(Icons.snooze_rounded, color: p.textMut, size: 17),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(s.notifSnoozeActive(label),
-                    style: TextStyle(color: p.text, fontSize: 13.5, fontWeight: FontWeight.w500)),
+                    style: TextStyle(
+                        color: p.text,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500)),
               ),
               TextButton(
                 onPressed: () => settings.clearSnooze(),
-                child: Text(s.notifSnoozeCancel, style: TextStyle(color: p.primary, fontSize: 13)),
+                child: Text(s.notifSnoozeCancel,
+                    style: TextStyle(color: p.primary, fontSize: 13)),
               ),
             ],
           ),
@@ -416,16 +478,23 @@ class _SnoozeCardState extends State<_SnoozeCard> {
             Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(color: p.bg2, borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                  color: p.bg2, borderRadius: BorderRadius.circular(8)),
               child: Icon(Icons.snooze_rounded, color: p.textMut, size: 17),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(s.notifSnoozeLabel,
-                  style: TextStyle(color: p.text, fontSize: 14, fontWeight: FontWeight.w500)),
+                  style: TextStyle(
+                      color: p.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500)),
             ),
             Text(s.notifSnoozeHours(_hours.round()),
-                style: TextStyle(color: p.primary, fontSize: 13, fontWeight: FontWeight.w700)),
+                style: TextStyle(
+                    color: p.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700)),
           ],
         ),
       ),
@@ -449,7 +518,3 @@ class _SnoozeCardState extends State<_SnoozeCard> {
     ]);
   }
 }
-
-
-
-

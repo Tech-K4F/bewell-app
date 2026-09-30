@@ -51,9 +51,48 @@ class AuthProvider extends ChangeNotifier {
     return wellyWelcomed ? AuthNavigation.toHome : AuthNavigation.toWelcome;
   }
 
+  static const _kFailedAttemptsKey = 'auth_failed_attempts';
+  static const _kLockUntilKey = 'auth_lock_until_ms';
+
+  // Il blocco anti brute-force viveva solo in memoria: bastava riavviare
+  // l'app o forzarne la chiusura per azzerarlo, quindi non proteggeva
+  // davvero da tentativi ripetuti. Ora persiste su SharedPreferences e
+  // sopravvive al riavvio.
+  Future<void> _loadLockState() async {
+    final prefs = await SharedPreferences.getInstance();
+    _failedAttempts = prefs.getInt(_kFailedAttemptsKey) ?? 0;
+    final lockMs = prefs.getInt(_kLockUntilKey);
+    if (lockMs != null) {
+      final lockUntil = DateTime.fromMillisecondsSinceEpoch(lockMs);
+      if (DateTime.now().isBefore(lockUntil)) {
+        _lockUntil = lockUntil;
+        Timer(lockUntil.difference(DateTime.now()), _unlock);
+      } else {
+        // Il blocco è già scaduto nel frattempo (app rimasta chiusa oltre
+        // i 15 minuti) — azzera anche il contatore, non solo il lock.
+        await _persistLockState(clear: true);
+      }
+    }
+  }
+
+  Future<void> _persistLockState({bool clear = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (clear) {
+      await prefs.remove(_kFailedAttemptsKey);
+      await prefs.remove(_kLockUntilKey);
+      return;
+    }
+    await prefs.setInt(_kFailedAttemptsKey, _failedAttempts);
+    if (_lockUntil != null) {
+      await prefs.setInt(_kLockUntilKey, _lockUntil!.millisecondsSinceEpoch);
+    }
+  }
+
   Future<void> init() async {
+    await _loadLockState();
     // FIX: connectivity_plus 6.x restituisce List<ConnectivityResult>
-    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+    _connectivity.onConnectivityChanged
+        .listen((List<ConnectivityResult> results) {
       _isOnline = results.isNotEmpty &&
           results.any((r) => r != ConnectivityResult.none);
       notifyListeners();
@@ -61,8 +100,8 @@ class AuthProvider extends ChangeNotifier {
 
     final results = await _connectivity.checkConnectivity();
     // FIX: checkConnectivity restituisce List in v6.x
-    _isOnline = results.isNotEmpty &&
-        results.any((r) => r != ConnectivityResult.none);
+    _isOnline =
+        results.isNotEmpty && results.any((r) => r != ConnectivityResult.none);
 
     try {
       _biometricAvailable = await _localAuth.canCheckBiometrics &&
@@ -115,8 +154,7 @@ class AuthProvider extends ChangeNotifier {
       return;
     }
     _setState(AuthState.loading);
-    final result =
-        await _auth.loginWithEmail(email: email, password: password);
+    final result = await _auth.loginWithEmail(email: email, password: password);
     await _handleAuthResult(result);
   }
 
@@ -197,7 +235,29 @@ class AuthProvider extends ChangeNotifier {
     _failedAttempts = 0;
     _lockUntil = null;
     _isFirstLogin = false;
+    unawaited(_persistLockState(clear: true));
     _setState(AuthState.unauthenticated, navigate: AuthNavigation.toLogin);
+  }
+
+  /// Elimina definitivamente l'account (Firebase Auth + documento Firestore)
+  /// e tutti i dati locali. Se Firebase richiede un login recente per
+  /// un'operazione sensibile come questa, ritorna false senza eliminare
+  /// nulla — la UI deve invitare l'utente a rifare il login e riprovare.
+  Future<bool> deleteAccount() async {
+    _setState(AuthState.loading);
+    final result = await _auth.deleteAccount();
+    if (!result.success) {
+      _setError(result.error!);
+      return false;
+    }
+    _failedAttempts = 0;
+    _lockUntil = null;
+    _isFirstLogin = false;
+    unawaited(_persistLockState(clear: true));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    _setState(AuthState.unauthenticated, navigate: AuthNavigation.toLogin);
+    return true;
   }
 
   Future<void> _handleAuthResult(AuthResult result) async {
@@ -205,6 +265,7 @@ class AuthProvider extends ChangeNotifier {
       _failedAttempts = 0;
       _lockUntil = null;
       _isFirstLogin = result.isFirstLogin;
+      unawaited(_persistLockState(clear: true));
       _setState(
         AuthState.authenticated,
         navigate: await _postAuthNavigation(),
@@ -213,12 +274,13 @@ class AuthProvider extends ChangeNotifier {
       if (result.error == AuthError.invalidCredentials) {
         _failedAttempts++;
         if (_failedAttempts >= 5) {
-          _lockUntil =
-              DateTime.now().add(const Duration(minutes: 15));
+          _lockUntil = DateTime.now().add(const Duration(minutes: 15));
+          unawaited(_persistLockState());
           _setState(AuthState.locked);
           Timer(const Duration(minutes: 15), _unlock);
           return;
         }
+        unawaited(_persistLockState());
       }
       _setError(result.error!);
     }
@@ -227,6 +289,7 @@ class AuthProvider extends ChangeNotifier {
   void _unlock() {
     _lockUntil = null;
     _failedAttempts = 0;
+    unawaited(_persistLockState(clear: true));
     _setState(AuthState.unauthenticated);
   }
 
@@ -275,6 +338,7 @@ enum AuthNavigation {
   toLogin,
   toRegister,
   toHome,
+
   /// Carosello di benvenuto "Be Well" (`/welly-welcome`) — il configuratore
   /// a 5 fasi NON fa più parte del flusso post-auth: è facoltativo e si
   /// raggiunge dalla sezione Abitudini dopo il primo sblocco.

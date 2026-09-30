@@ -21,9 +21,9 @@ class GrowthScreen extends StatefulWidget {
 class _GrowthScreenState extends State<GrowthScreen> {
   static const List<SpotlightStep> _growthSteps = [
     SpotlightStep(textId: 'growth_welcome'),
-    SpotlightStep(textId: 'growth_phase',   targetId: 'spot_companion_hero'),
+    SpotlightStep(textId: 'growth_phase', targetId: 'spot_companion_hero'),
     SpotlightStep(textId: 'growth_heatmap', targetId: 'spot_heatmap'),
-    SpotlightStep(textId: 'growth_badges',  targetId: 'spot_badges'),
+    SpotlightStep(textId: 'growth_badges', targetId: 'spot_badges'),
   ];
 
   @override
@@ -44,11 +44,14 @@ class _GrowthScreenState extends State<GrowthScreen> {
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) ctrl.startTutorial('growth_tour', _growthSteps);
       if (mounted) {
-        await context.read<TutorialProvider>().markSeenExternally('growth_first_visit');
+        await context
+            .read<TutorialProvider>()
+            .markSeenExternally('growth_first_visit');
       }
     } else {
       if (mounted) {
-        context.read<TutorialProvider>()
+        context
+            .read<TutorialProvider>()
             .scheduleTrigger('growth_first_visit', context);
       }
     }
@@ -66,116 +69,128 @@ class _GrowthScreenState extends State<GrowthScreen> {
           bottomNavigationBar: const BannerAdWidget(),
           body: SafeArea(
             child: ListView(
-            padding: EdgeInsets.fromLTRB(20, isAmb ? 72 : 24, 20, 40),
-            children: [
-
-              // ── Header inline ───────────────────────────────────────
-              Text(
-                isAmb ? s.yourJourney.toLowerCase() : s.yourJourney,
-                style: TextStyle(
-                  fontSize: isAmb ? 28 : 22,
-                  fontWeight: isAmb ? FontWeight.w300 : FontWeight.w700,
-                  fontFamily: isAmb ? 'CormorantGaramond' : null,
-                  color: p.text,
-                  letterSpacing: isAmb ? 1 : 0,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${progression.totalDaysCompleted} ${s.days}',
-                style: TextStyle(fontSize: 13, color: p.textSec),
-              ),
-              const SizedBox(height: 20),
-
-              // ── Companion + fase + messaggio narrativo ──────────────────
-              SpotlightTarget(
-                id: 'spot_companion_hero',
-                child: _CompanionHero(p: p, isAmb: isAmb, progression: progression),
-              ),
-
-              const SizedBox(height: 24),
-
-              // ── Timeline fasi orizzontale ───────────────────────────────
-              _PhaseTimeline(p: p, isAmb: isAmb, progression: progression),
-
-              const SizedBox(height: 24),
-
-              // ── Card Reward (amber-light) ────────────────────────────────
-              _SectionLabel(label: s.rewardsHeader, p: p),
-              const SizedBox(height: 8),
-              Text(
-                s.rewardsHeaderSub,
-                style: TextStyle(fontSize: 13, color: p.textSec),
-              ),
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MarketplaceScreen()),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: p.card,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: p.accent.withValues(alpha: 0.35), width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44, height: 44,
-                        decoration: BoxDecoration(
-                          color: p.accent.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.card_giftcard_rounded, color: p.accent, size: 22),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(s.rewards, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.text)),
-                            const SizedBox(height: 2),
-                            Text(s.rewardsLockedDesc, style: TextStyle(fontSize: 12, color: p.textSec)),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.chevron_right_rounded, color: p.accent, size: 20),
-                    ],
+              padding: EdgeInsets.fromLTRB(20, isAmb ? 72 : 24, 20, 40),
+              children: [
+                // ── Header inline ───────────────────────────────────────
+                Text(
+                  isAmb ? s.yourJourney.toLowerCase() : s.yourJourney,
+                  style: TextStyle(
+                    fontSize: isAmb ? 28 : 22,
+                    fontWeight: isAmb ? FontWeight.w300 : FontWeight.w700,
+                    fontFamily: isAmb ? 'CormorantGaramond' : null,
+                    color: p.text,
+                    letterSpacing: isAmb ? 1 : 0,
                   ),
                 ),
-              ),
+                const SizedBox(height: 6),
+                Text(
+                  '${progression.totalDaysCompleted} ${s.days}',
+                  style: TextStyle(fontSize: 13, color: p.textSec),
+                ),
+                const SizedBox(height: 20),
 
-              const SizedBox(height: 28),
+                // ── Companion + fase + messaggio narrativo ──────────────────
+                SpotlightTarget(
+                  id: 'spot_companion_hero',
+                  child: _CompanionHero(
+                      p: p, isAmb: isAmb, progression: progression),
+                ),
 
-              // ── Heatmap consistenza ──────────────────────────────────────
-              SpotlightTarget(
-                id: 'spot_heatmap',
-                child: _HeatmapSection(p: p, progression: progression),
-              ),
+                const SizedBox(height: 24),
 
-              const SizedBox(height: 28),
+                // ── Timeline fasi orizzontale ───────────────────────────────
+                _PhaseTimeline(p: p, isAmb: isAmb, progression: progression),
 
-              // ── Momenti memorabili ───────────────────────────────────────
-              _MilestonesSection(p: p, progression: progression),
+                const SizedBox(height: 24),
 
-              const SizedBox(height: 28),
+                // ── Card Reward (amber-light) ────────────────────────────────
+                _SectionLabel(label: s.rewardsHeader, p: p),
+                const SizedBox(height: 8),
+                Text(
+                  s.rewardsHeaderSub,
+                  style: TextStyle(fontSize: 13, color: p.textSec),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const MarketplaceScreen()),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: p.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                          color: p.accent.withValues(alpha: 0.35), width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: p.accent.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.card_giftcard_rounded,
+                              color: p.accent, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(s.rewards,
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: p.text)),
+                              const SizedBox(height: 2),
+                              Text(s.rewardsLockedDesc,
+                                  style: TextStyle(
+                                      fontSize: 12, color: p.textSec)),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded,
+                            color: p.accent, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
 
-              // ── Percorso Welly ───────────────────────────────────────────
-              _WellyJourneySection(p: p, isAmb: isAmb, progression: progression),
+                const SizedBox(height: 28),
 
-              const SizedBox(height: 28),
+                // ── Heatmap consistenza ──────────────────────────────────────
+                SpotlightTarget(
+                  id: 'spot_heatmap',
+                  child: _HeatmapSection(p: p, progression: progression),
+                ),
 
-              // ── Badge ───────────────────────────────────────────────────
-              _SectionLabel(label: context.sL.badges, p: p),
-              const SizedBox(height: 12),
-              SpotlightTarget(
-                id: 'spot_badges',
-                child: _BadgeGrid(p: p, progression: progression),
-              ),
-            ],
-          ),
+                const SizedBox(height: 28),
+
+                // ── Momenti memorabili ───────────────────────────────────────
+                _MilestonesSection(p: p, progression: progression),
+
+                const SizedBox(height: 28),
+
+                // ── Percorso Welly ───────────────────────────────────────────
+                _WellyJourneySection(
+                    p: p, isAmb: isAmb, progression: progression),
+
+                const SizedBox(height: 28),
+
+                // ── Badge ───────────────────────────────────────────────────
+                _SectionLabel(label: context.sL.badges, p: p),
+                const SizedBox(height: 12),
+                SpotlightTarget(
+                  id: 'spot_badges',
+                  child: _BadgeGrid(p: p, progression: progression),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -199,9 +214,8 @@ class _CompanionHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final phase = progression.currentPhase;
     final s = context.sL;
-    final phaseLabel = [
-      s.phase1, s.phase2, s.phase3, s.phase4, s.phase5
-    ][phase - 1];
+    final phaseLabel =
+        [s.phase1, s.phase2, s.phase3, s.phase4, s.phase5][phase - 1];
     final totalDays = progression.totalDaysCompleted;
 
     return Column(
@@ -236,7 +250,6 @@ class _CompanionHero extends StatelessWidget {
     );
   }
 }
-
 
 // ── Phase Timeline ────────────────────────────────────────────────────────────
 /// Riga orizzontale con 5 fasi collegate da una linea sottile.
@@ -287,7 +300,8 @@ class _PhaseTimeline extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 18, height: 18,
+              width: 18,
+              height: 18,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isCurrent
@@ -296,14 +310,14 @@ class _PhaseTimeline extends StatelessWidget {
                         ? p.primary.withValues(alpha: 0.5)
                         : Colors.transparent,
                 border: Border.all(
-                  color: isFuture
-                      ? p.textMut.withValues(alpha: 0.3)
-                      : p.primary,
+                  color:
+                      isFuture ? p.textMut.withValues(alpha: 0.3) : p.primary,
                   width: 1.5,
                 ),
               ),
               child: isReached && !isCurrent
-                  ? const Center(child: Icon(Icons.check, size: 10, color: Colors.white))
+                  ? const Center(
+                      child: Icon(Icons.check, size: 10, color: Colors.white))
                   : null,
             ),
             const SizedBox(height: 4),
@@ -342,79 +356,182 @@ class _BadgeGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final badges = progression.allBadges(context.sL);
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: badges.length,
-      itemBuilder: (_, i) => _BadgeTile(badge: badges[i], p: p),
+    return Column(
+      children: [
+        for (var i = 0; i < badges.length; i++) ...[
+          if (i > 0) const SizedBox(height: 10),
+          _BadgeQuestCard(badge: badges[i], p: p),
+        ],
+      ],
     );
   }
 }
 
-class _BadgeTile extends StatelessWidget {
+/// Card "da conquistare" con barra di progresso e ricompensa in punti
+/// sempre visibili — prima era una tile piatta con solo "2/50" in piccolo,
+/// senza mai mostrare cosa si guadagna sbloccando il badge.
+class _BadgeQuestCard extends StatelessWidget {
   final BadgeInfo badge;
   final BwPaletteData p;
-  const _BadgeTile({required this.badge, required this.p});
+  const _BadgeQuestCard({required this.badge, required this.p});
 
   @override
   Widget build(BuildContext context) {
     final s = context.sL;
-    // Livello massimo di questa famiglia già raggiunto → tile piena e a colori.
-    // Altrimenti è il prossimo obiettivo: emoji smorzata + progresso reale,
-    // così l'utente vede sempre cosa manca per sbloccarlo.
     final isMaxed = badge.progress >= badge.target;
     final complete = badge.earned && isMaxed;
+    final ratio = badge.target > 0
+        ? (badge.progress / badge.target).clamp(0.0, 1.0)
+        : 0.0;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: p.card,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: complete ? p.primary.withValues(alpha: 0.4) : p.cardBorder,
           width: complete ? 1 : 0.5,
         ),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Opacity(
-            opacity: complete ? 1.0 : 0.4,
-            child: Text(badge.emoji, style: const TextStyle(fontSize: 28)),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            badge.name,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: complete ? p.text : p.textSec,
+          // Icona: illustrazione se disponibile (futuro asset generato),
+          // altrimenti l'emoji di sempre — nessuna modifica alla UI il
+          // giorno in cui arriverà l'artwork vero.
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: complete ? p.primaryLight : p.bg2,
+              shape: BoxShape.circle,
+              boxShadow: complete
+                  ? [
+                      BoxShadow(
+                        color: p.primary.withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      )
+                    ]
+                  : null,
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          if (complete)
-            Text(
-              badge.description,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 9, color: p.textSec),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            )
-          else
-            Text(
-              '${s.growthNextGoal}: ${badge.progress}/${badge.target}',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 9, color: p.textMut, fontWeight: FontWeight.w600),
+            child: Center(
+              child: badge.imageAsset != null
+                  ? ClipOval(
+                      child: complete
+                          ? Image.asset(
+                              badge.imageAsset!,
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Text(badge.emoji,
+                                  style: const TextStyle(fontSize: 24)),
+                            )
+                          : ColorFiltered(
+                              colorFilter: const ColorFilter.mode(
+                                  Colors.grey, BlendMode.saturation),
+                              child: Opacity(
+                                opacity: 0.55,
+                                child: Image.asset(
+                                  badge.imageAsset!,
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Text(
+                                      badge.emoji,
+                                      style: const TextStyle(fontSize: 24)),
+                                ),
+                              ),
+                            ),
+                    )
+                  : Opacity(
+                      opacity: complete ? 1.0 : 0.45,
+                      child: Text(badge.emoji,
+                          style: const TextStyle(fontSize: 24)),
+                    ),
             ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        badge.name,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: complete ? p.text : p.textSec,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (complete)
+                      Icon(Icons.check_circle_rounded,
+                          color: p.primary, size: 18)
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('⭐', style: TextStyle(fontSize: 10)),
+                            const SizedBox(width: 3),
+                            Text(
+                              '+${pointsForBadge(badge)}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.amber,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  badge.description,
+                  style: TextStyle(fontSize: 10, color: p.textMut, height: 1.3),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: complete ? 1.0 : ratio,
+                    minHeight: 6,
+                    backgroundColor: p.bg2,
+                    color: complete ? p.primary : p.accent,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  complete
+                      ? s.itemUnlocked
+                      : '${badge.progress}/${badge.target}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: complete ? p.primary : p.textMut,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -475,7 +592,8 @@ class _HeatmapSectionState extends State<_HeatmapSection> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   margin: const EdgeInsets.only(left: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: selected ? p.primary : p.card,
                     borderRadius: BorderRadius.circular(12),
@@ -518,12 +636,12 @@ class _HeatmapSectionState extends State<_HeatmapSection> {
                         final idx = row * 7 + col;
                         final val = idx < data.length ? data[idx] : 0;
                         final isToday = idx == data.length - 1;
-                        final alpha = val == 0
-                            ? 0.08
-                            : (val / maxVal).clamp(0.2, 1.0);
+                        final alpha =
+                            val == 0 ? 0.08 : (val / maxVal).clamp(0.2, 1.0);
                         return Container(
                           margin: const EdgeInsets.all(1.5),
-                          width: 14, height: 14,
+                          width: 14,
+                          height: 14,
                           decoration: BoxDecoration(
                             color: p.primary.withValues(alpha: alpha),
                             borderRadius: BorderRadius.circular(2),
@@ -569,11 +687,11 @@ class _MilestonesSection extends StatelessWidget {
 
     // Milestone predefinite: (giorni, chiave label, emoji)
     final milestones = <(int, String, String)>[
-      (7,   s.milestone7days,   '🌱'),
-      (14,  s.milestone14days,  '🌿'),
-      (21,  s.milestone21days,  '⭐'),
-      (42,  s.milestone42days,  '🌳'),
-      (66,  s.milestone66days,  '💎'),
+      (7, s.milestone7days, '🌱'),
+      (14, s.milestone14days, '🌿'),
+      (21, s.milestone21days, '⭐'),
+      (42, s.milestone42days, '🌳'),
+      (66, s.milestone66days, '💎'),
       (100, s.milestone100days, '✨'),
     ];
 
@@ -621,7 +739,8 @@ class _MilestonesSection extends StatelessWidget {
                 color: reached ? p.primaryLight : p.card,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: reached ? p.primary.withValues(alpha: 0.3) : p.cardBorder,
+                  color:
+                      reached ? p.primary.withValues(alpha: 0.3) : p.cardBorder,
                   width: reached ? 1 : 0.5,
                 ),
               ),
@@ -629,7 +748,8 @@ class _MilestonesSection extends StatelessWidget {
                 children: [
                   // Dot indicatore
                   Container(
-                    width: 10, height: 10,
+                    width: 10,
+                    height: 10,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: reached ? p.primary : Colors.transparent,
@@ -675,8 +795,21 @@ class _MilestonesSection extends StatelessWidget {
   }
 
   String _monthName(int month) {
-    const names = ['', 'gen', 'feb', 'mar', 'apr', 'mag', 'giu',
-                       'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+    const names = [
+      '',
+      'gen',
+      'feb',
+      'mar',
+      'apr',
+      'mag',
+      'giu',
+      'lug',
+      'ago',
+      'set',
+      'ott',
+      'nov',
+      'dic'
+    ];
     return names[month.clamp(1, 12)];
   }
 }
@@ -697,7 +830,7 @@ class _WellyJourneySection extends StatelessWidget {
     final s = context.sL;
     final currentPhase = progression.currentPhase;
 
-    const phaseEmojis  = ['🌱', '🌿', '🌾', '🌳', '✨'];
+    const phaseEmojis = ['🌱', '🌿', '🌾', '🌳', '✨'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -734,11 +867,17 @@ class _WellyJourneySection extends StatelessWidget {
               final isCurrent = phase == currentPhase;
               final isReached = phase <= currentPhase;
               final isFuture = phase > currentPhase;
-              final phaseDate = isReached ? progression.phaseReachedDate(phase) : null;
-              final habitsLeft = isFuture ? progression.habitsUntilPhase(phase) : 0;
+              final phaseDate =
+                  isReached ? progression.phaseReachedDate(phase) : null;
+              final habitsLeft =
+                  isFuture ? progression.habitsUntilPhase(phase) : 0;
 
               final phaseLabels = [
-                s.phase1, s.phase2, s.phase3, s.phase4, s.phase5
+                s.phase1,
+                s.phase2,
+                s.phase3,
+                s.phase4,
+                s.phase5
               ];
 
               return Padding(
@@ -752,7 +891,8 @@ class _WellyJourneySection extends StatelessWidget {
                         children: [
                           // Dot
                           Container(
-                            width: 20, height: 20,
+                            width: 20,
+                            height: 20,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: isCurrent
@@ -761,13 +901,17 @@ class _WellyJourneySection extends StatelessWidget {
                                       ? p.primary.withValues(alpha: 0.4)
                                       : Colors.transparent,
                               border: Border.all(
-                                color: isFuture ? p.textMut.withValues(alpha: 0.3) : p.primary,
+                                color: isFuture
+                                    ? p.textMut.withValues(alpha: 0.3)
+                                    : p.primary,
                                 width: 1.5,
                               ),
                             ),
                             child: isReached
                                 ? Icon(
-                                    isCurrent ? Icons.radio_button_checked : Icons.check,
+                                    isCurrent
+                                        ? Icons.radio_button_checked
+                                        : Icons.check,
                                     size: 11,
                                     color: Colors.white,
                                   )
@@ -786,10 +930,13 @@ class _WellyJourneySection extends StatelessWidget {
                       ),
                     ),
                     // Emoji fase
-                    Text(phaseEmojis[i], style: TextStyle(
-                      fontSize: 20,
-                      color: isFuture ? p.textMut.withValues(alpha: 0.4) : null,
-                    )),
+                    Text(phaseEmojis[i],
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: isFuture
+                              ? p.textMut.withValues(alpha: 0.4)
+                              : null,
+                        )),
                     const SizedBox(width: 10),
                     // Info fase
                     Expanded(
@@ -800,21 +947,28 @@ class _WellyJourneySection extends StatelessWidget {
                             '${s.phase} $phase — ${phaseLabels[i]}',
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w400,
-                              color: isFuture ? p.textMut.withValues(alpha: 0.4) : p.text,
+                              fontWeight:
+                                  isCurrent ? FontWeight.w700 : FontWeight.w400,
+                              color: isFuture
+                                  ? p.textMut.withValues(alpha: 0.4)
+                                  : p.text,
                             ),
                           ),
                           if (phaseDate != null)
                             Text(
                               phase == 1
-                                  ? s.phaseStarted('${phaseDate.day}/${phaseDate.month}')
-                                  : s.phaseReached('${phaseDate.day}/${phaseDate.month}'),
+                                  ? s.phaseStarted(
+                                      '${phaseDate.day}/${phaseDate.month}')
+                                  : s.phaseReached(
+                                      '${phaseDate.day}/${phaseDate.month}'),
                               style: TextStyle(fontSize: 10, color: p.textSec),
                             )
                           else if (isFuture)
                             Text(
                               s.growthHabitsToRoot(habitsLeft),
-                              style: TextStyle(fontSize: 10, color: p.textMut.withValues(alpha: 0.4)),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: p.textMut.withValues(alpha: 0.4)),
                             ),
                         ],
                       ),
@@ -849,12 +1003,3 @@ class _SectionLabel extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-
-
-

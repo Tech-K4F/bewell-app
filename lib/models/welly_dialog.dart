@@ -23,8 +23,12 @@ class TutorialAction {
     this.isDismiss = false,
   });
 
-  /// Azione primaria "Capito!" — avanza nella catena o chiude.
-  static const ok = TutorialAction(label: 'ok', advance: true);
+  /// Azione primaria "Capito!" — chiude sempre, anche se il dialog ha una
+  /// catena (nextDialogId). Prima aveva advance:true come "more", quindi
+  /// era indistinguibile da "Di più →": entrambi i bottoni avanzavano
+  /// sempre nella catena, rendendo "Ho capito" incapace di chiudere il
+  /// tutorial come il suo testo promette.
+  static const ok = TutorialAction(label: 'ok');
 
   /// Azione secondaria "Di più →" — sempre avanza.
   static const more = TutorialAction(label: 'more', advance: true);
@@ -69,12 +73,18 @@ class WellyDialog {
   /// Emoji avatar in base al mood.
   String get moodEmoji {
     switch (mood) {
-      case TutorialMood.gentle:      return '🌿';
-      case TutorialMood.happy:       return '😊';
-      case TutorialMood.excited:     return '✨';
-      case TutorialMood.celebrating: return '🎉';
-      case TutorialMood.thinking:    return '💭';
-      case TutorialMood.welcoming:   return '🤗';
+      case TutorialMood.gentle:
+        return '🌿';
+      case TutorialMood.happy:
+        return '😊';
+      case TutorialMood.excited:
+        return '✨';
+      case TutorialMood.celebrating:
+        return '🎉';
+      case TutorialMood.thinking:
+        return '💭';
+      case TutorialMood.welcoming:
+        return '🤗';
     }
   }
 }

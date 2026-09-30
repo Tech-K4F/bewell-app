@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -187,6 +189,39 @@ class AuthService {
     await _google.signOut();
     await _firebase.signOut();
     // NON cancellare _kInstallFlag — serve per distinguere primo avvio
+  }
+
+  // ── Eliminazione account ──────────────────────────────────────────────
+  // Richiesta obbligatoria da Google Play e App Store per ogni app che
+  // permette la creazione di un account — prima non esisteva alcun modo
+  // di farlo, solo il logout.
+  Future<AuthResult> deleteAccount() async {
+    final user = _firebase.currentUser;
+    if (user == null) return AuthResult.failure(AuthError.serverError);
+    try {
+      final uid = user.uid;
+      // Il documento Firestore viene ripulito per primo: se la delete
+      // dell'account Auth va a buon fine ma questa fallisse dopo, resterebbe
+      // un profilo orfano — nell'ordine inverso l'utente rischierebbe di
+      // restare bloccato con un account che non riesce comunque a eliminare.
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+      } catch (e) {
+        debugPrint(
+            'AuthService deleteAccount: pulizia Firestore fallita ($e), procedo comunque con Auth');
+      }
+      await user.delete();
+      await _google.signOut();
+      await _storage.deleteAll();
+      return AuthResult.success(user: null, isFirstLogin: false);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        return AuthResult.failure(AuthError.requiresRecentLogin);
+      }
+      return AuthResult.failure(_mapFirebaseError(e));
+    } catch (_) {
+      return AuthResult.failure(AuthError.serverError);
+    }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────

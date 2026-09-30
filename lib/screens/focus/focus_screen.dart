@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
@@ -8,7 +9,10 @@ import '../../providers/app_provider.dart';
 import '../../providers/progression_provider.dart';
 import '../../models/habit_library.dart';
 import '../../widgets/bw_scaffold.dart';
+import '../../widgets/habit_hero_band.dart';
 import '../../services/analytics_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/smart_reminders.dart';
 
 enum _TimerState { idle, running, paused, done }
 
@@ -22,12 +26,20 @@ class FocusScreen extends StatefulWidget {
 }
 
 class _FocusScreenState extends State<FocusScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   int get _totalSeconds => widget.durationMinutes * 60;
   String get _habitId => widget.durationMinutes >= 50 ? 'focus_50' : 'focus_25';
   late int _remaining;
   _TimerState _state = _TimerState.idle;
   Timer? _timer;
+  // Il conto alla rovescia si basa sull'ORA REALE di fine, non sul numero di
+  // tick: con lo schermo spento Android congela i Timer dell'app, e il
+  // timer restava fermo mentre il tempo vero passava.
+  DateTime? _endsAt;
+  // Se l'app non è davanti all'utente, la notifica di fine sessione deve
+  // restare programmata: il timer può arrivare a zero anche in background,
+  // e cancellarla in quel momento farebbe sparire l'avviso.
+  AppLifecycleState _lifecycle = AppLifecycleState.resumed;
   late AnimationController _pulseCtrl;
 
   // ── Pomodoro block counter (solo per sessioni da 25 min) ─────────────────
@@ -52,14 +64,15 @@ class _FocusScreenState extends State<FocusScreen>
       return '${loc.focusDeepWork} · ${s}s';
     }
     // Pomodoro: blocco corrente + minuti alla pausa
-    final pauseIn = _remaining ~/ 60;
     final loc = context.sL;
-    return '${loc.focusBlock} $_blockNumber ${loc.focusBlockOf4} · ${loc.focusBreak} ${pauseIn}min';
+    return '${loc.focusBlock} $_blockNumber ${loc.focusBlockOf4} · ${loc.focusThenBreak}';
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    NotificationService.instance.ensureExactAlarms();
     _remaining = _totalSeconds;
     _pulseCtrl = AnimationController(
       vsync: this,
@@ -69,7 +82,9 @@ class _FocusScreenState extends State<FocusScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    SmartReminders.cancelFocusEnd();
     _pulseCtrl.dispose();
     super.dispose();
   }
@@ -78,24 +93,69 @@ class _FocusScreenState extends State<FocusScreen>
     if (_state == _TimerState.idle) {
       AnalyticsService.instance.logFocusSessionStarted(_totalSeconds ~/ 60);
     }
+    _endsAt = DateTime.now().add(Duration(seconds: _remaining));
     setState(() => _state = _TimerState.running);
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() {
-        if (_remaining > 0) {
-          _remaining--;
-        } else {
-          _state = _TimerState.done;
-          _timer?.cancel();
-          AnalyticsService.instance.logFocusSessionCompleted(_totalSeconds ~/ 60);
-          _sessionsCompletedThisVisit++;
-          _markHabitCompleted();
-          // Avanza il contatore blocco Pomodoro (1-4, poi torna a 1)
-          if (_isPomodoro) {
-            _blockNumber = _blockNumber < 4 ? _blockNumber + 1 : 1;
-          }
-        }
-      });
+    _scheduleEndNotification();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+  }
+
+  /// Riallinea il timer all'ora reale di fine. Chiamato ogni secondo e al
+  /// ritorno in app: se la sessione è finita mentre lo schermo era spento,
+  /// qui viene completata subito.
+  void _tick() {
+    final endsAt = _endsAt;
+    if (endsAt == null || _state != _TimerState.running || !mounted) return;
+    final left =
+        (endsAt.difference(DateTime.now()).inMilliseconds / 1000).ceil();
+    final inForeground = _lifecycle == AppLifecycleState.resumed;
+    // Con l'app aperta l'utente vede già la fine: niente notifica doppia.
+    if (inForeground && left <= 3) SmartReminders.cancelFocusEnd();
+    setState(() {
+      if (left > 0) {
+        _remaining = left;
+        return;
+      }
+      _remaining = 0;
+      _state = _TimerState.done;
+      _timer?.cancel();
+      AnalyticsService.instance.logFocusSessionCompleted(_totalSeconds ~/ 60);
+      _sessionsCompletedThisVisit++;
+      _markHabitCompleted();
+      // Avanza il contatore blocco Pomodoro (1-4, poi torna a 1)
+      if (_isPomodoro) {
+        _blockNumber = _blockNumber < 4 ? _blockNumber + 1 : 1;
+      }
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycle = state;
+    if (state == AppLifecycleState.resumed) _tick();
+  }
+
+  /// Se l'app va in background mentre il timer corre, avvisa alla fine con le
+  /// attività brevi ancora da fare già raggruppate ("ora: Acqua e Stretching").
+  /// Annullata a ogni pausa/stop/fine, quindi non suona mai con l'app aperta.
+  void _scheduleEndNotification() {
+    final progression = context.read<ProgressionProvider>();
+    final now = DateTime.now();
+    final pending = progression.activeHabits
+        .where((h) {
+          if (h.category == HabitCategory.focus) return false;
+          final last = progression.stateOf(h.id)?.lastCompletedAt;
+          return !(last != null &&
+              last.year == now.year &&
+              last.month == now.month &&
+              last.day == now.day);
+        })
+        .map((h) => h.id)
+        .toList()
+      ..sort((a, b) => (a == 'water' ? 0 : 1).compareTo(b == 'water' ? 0 : 1));
+    SmartReminders.scheduleFocusEnd(
+      after: Duration(seconds: _remaining),
+      pendingHabitIds: pending,
+    );
   }
 
   /// Registra il completamento dell'abitudine (punti/streak/progressione).
@@ -103,6 +163,7 @@ class _FocusScreenState extends State<FocusScreen>
   Future<void> _markHabitCompleted() async {
     final progression = context.read<ProgressionProvider>();
     final app = context.read<AppProvider>();
+    HapticFeedback.mediumImpact();
     await progression.markCompleted(_habitId);
     if (!mounted) return;
     await app.completeHabit(_habitId);
@@ -123,7 +184,10 @@ class _FocusScreenState extends State<FocusScreen>
   }
 
   void _pause() {
+    _tick();
+    if (_state != _TimerState.running) return;
     _timer?.cancel();
+    SmartReminders.cancelFocusEnd();
     setState(() => _state = _TimerState.paused);
   }
 
@@ -131,6 +195,7 @@ class _FocusScreenState extends State<FocusScreen>
 
   void _stop() {
     _timer?.cancel();
+    SmartReminders.cancelFocusEnd();
     setState(() {
       _state = _TimerState.idle;
       _remaining = _totalSeconds;
@@ -154,7 +219,8 @@ class _FocusScreenState extends State<FocusScreen>
         final isAmb = theme.isAmbient;
         final streak = app.liveStreak;
         final sessionsLabel = '$_sessionsCompletedThisVisit';
-        final minutesLabel = '${_sessionsCompletedThisVisit * widget.durationMinutes}';
+        final minutesLabel =
+            '${_sessionsCompletedThisVisit * widget.durationMinutes}';
 
         return BwScaffold(
           body: SafeArea(
@@ -165,16 +231,26 @@ class _FocusScreenState extends State<FocusScreen>
 
                 // ── Header ──────────────────────────────────────────────
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      isAmb ? context.sL.focusTitle.toLowerCase() : context.sL.focusTitle,
-                      style: TextStyle(
-                        fontSize: isAmb ? 28 : 22,
-                        fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
-                        fontFamily: isAmb ? 'CormorantGaramond' : null,
-                        fontStyle: isAmb ? FontStyle.normal : null,
-                        color: p.text,
+                    IconButton(
+                      onPressed: () => Navigator.maybePop(context),
+                      icon: Icon(Icons.arrow_back_rounded, color: p.text),
+                      tooltip:
+                          MaterialLocalizations.of(context).backButtonTooltip,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        isAmb
+                            ? context.sL.focusTitle.toLowerCase()
+                            : context.sL.focusTitle,
+                        style: TextStyle(
+                          fontSize: isAmb ? 28 : 22,
+                          fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
+                          fontFamily: isAmb ? 'CormorantGaramond' : null,
+                          fontStyle: isAmb ? FontStyle.normal : null,
+                          color: p.text,
+                        ),
                       ),
                     ),
                     Container(
@@ -193,7 +269,9 @@ class _FocusScreenState extends State<FocusScreen>
                   ],
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
+                HabitHeroBand(habitId: _habitId),
+                const SizedBox(height: 24),
 
                 // ── Ring timer ──────────────────────────────────────────
                 Center(
@@ -215,11 +293,9 @@ class _FocusScreenState extends State<FocusScreen>
                               _timeLabel,
                               style: TextStyle(
                                 fontSize: isAmb ? 52 : 44,
-                                fontWeight: isAmb
-                                    ? FontWeight.w300
-                                    : FontWeight.w600,
-                                fontFamily:
-                                    isAmb ? 'CormorantGaramond' : null,
+                                fontWeight:
+                                    isAmb ? FontWeight.w300 : FontWeight.w600,
+                                fontFamily: isAmb ? 'CormorantGaramond' : null,
                                 color: p.text,
                               ),
                             ),
@@ -228,11 +304,9 @@ class _FocusScreenState extends State<FocusScreen>
                               style: TextStyle(
                                 fontSize: 12,
                                 color: p.textSec,
-                                fontFamily:
-                                    isAmb ? 'CormorantGaramond' : null,
-                                fontStyle: isAmb
-                                    ? FontStyle.italic
-                                    : FontStyle.normal,
+                                fontFamily: isAmb ? 'CormorantGaramond' : null,
+                                fontStyle:
+                                    isAmb ? FontStyle.italic : FontStyle.normal,
                                 letterSpacing: isAmb ? 1.5 : 0,
                               ),
                             ),
@@ -261,7 +335,9 @@ class _FocusScreenState extends State<FocusScreen>
                 // ── Bottoni ──────────────────────────────────────────────
                 if (_state == _TimerState.idle) ...[
                   _BigButton(
-                    label: context.sL.focusNewSession,
+                    label: _sessionsCompletedThisVisit == 0
+                        ? context.sL.focusStartSession
+                        : context.sL.focusNewSession,
                     color: p.btn,
                     textColor: p.btnText,
                     onTap: _start,
@@ -338,18 +414,39 @@ class _FocusScreenState extends State<FocusScreen>
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      _AmbStat(label: context.sL.focusSessions, value: sessionsLabel, p: p),
-                      _AmbStat(label: context.sL.focusMinutes, value: minutesLabel, p: p),
-                      _AmbStat(label: context.sL.focusStreak, value: '$streak', p: p),
+                      _AmbStat(
+                          label: context.sL.focusSessions,
+                          value: sessionsLabel,
+                          p: p),
+                      _AmbStat(
+                          label: context.sL.focusMinutes,
+                          value: minutesLabel,
+                          p: p),
+                      _AmbStat(
+                          label: context.sL.focusStreak,
+                          value: '$streak',
+                          p: p),
                     ],
                   ),
                 ] else ...[
                   Row(children: [
-                    Expanded(child: _StatCard(label: context.sL.focusSessions, value: sessionsLabel, p: p)),
+                    Expanded(
+                        child: _StatCard(
+                            label: context.sL.focusSessions,
+                            value: sessionsLabel,
+                            p: p)),
                     const SizedBox(width: 10),
-                    Expanded(child: _StatCard(label: context.sL.focusMinutes, value: minutesLabel, p: p)),
+                    Expanded(
+                        child: _StatCard(
+                            label: context.sL.focusMinutes,
+                            value: minutesLabel,
+                            p: p)),
                     const SizedBox(width: 10),
-                    Expanded(child: _StatCard(label: context.sL.focusStreak, value: '$streak gg', p: p)),
+                    Expanded(
+                        child: _StatCard(
+                            label: context.sL.focusStreak,
+                            value: '$streak ${streak == 1 ? context.sL.dayOne : context.sL.days}',
+                            p: p)),
                   ]),
                 ],
               ],
@@ -422,8 +519,7 @@ class _StatCard extends StatelessWidget {
               style: TextStyle(
                   fontSize: 18, fontWeight: FontWeight.w700, color: p.text)),
           const SizedBox(height: 3),
-          Text(label,
-              style: TextStyle(fontSize: 10, color: p.textSec)),
+          Text(label, style: TextStyle(fontSize: 10, color: p.textSec)),
         ],
       ),
     );
@@ -448,8 +544,7 @@ class _AmbStat extends StatelessWidget {
                 fontFamily: 'CormorantGaramond',
                 color: p.text,
               )),
-          Text(label,
-              style: TextStyle(fontSize: 10, color: p.textSec)),
+          Text(label, style: TextStyle(fontSize: 10, color: p.textSec)),
         ],
       ),
     );
@@ -476,7 +571,9 @@ class _RingPainter extends CustomPainter {
 
     // Track
     canvas.drawCircle(
-        center, radius, Paint()
+        center,
+        radius,
+        Paint()
           ..color = trackColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = stroke);
@@ -502,7 +599,9 @@ class _RingPainter extends CustomPainter {
       // Ripple rings
       for (final dr in [14.0, 26.0]) {
         canvas.drawCircle(
-            center, radius + dr, Paint()
+            center,
+            radius + dr,
+            Paint()
               ..color = progressColor.withValues(alpha: 0.05)
               ..style = PaintingStyle.stroke
               ..strokeWidth = 0.5);
@@ -529,7 +628,3 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(_RingPainter old) =>
       old.progress != progress || old.ambient != ambient;
 }
-
-
-
-

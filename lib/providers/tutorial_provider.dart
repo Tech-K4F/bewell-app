@@ -67,12 +67,13 @@ class TutorialProvider extends ChangeNotifier {
   /// SpotlightOverlay — accoda il nuovo evento invece di sovrapporlo.
   void trigger(String eventId, BuildContext context) {
     if (!_initialized) return;
-    if (!_onboardingDone) return; // Nessun tutorial prima del completamento onboarding
+    if (!_onboardingDone)
+      return; // Nessun tutorial prima del completamento onboarding
     if (_seen.contains(eventId)) return;
     if (TutorialScripts.get(eventId) == null) return;
 
     final ctrl = context.read<SpotlightController>();
-    if (_isShowing || ctrl.isActive) {
+    if (_isShowing || ctrl.isActive || ctrl.externalBusy) {
       if (!_queue.contains(eventId)) _queue.add(eventId);
       return;
     }
@@ -113,14 +114,17 @@ class TutorialProvider extends ChangeNotifier {
     );
   }
 
-  SpotlightStep _stepFromDialog(WellyDialog dialog, BwStrings s, BuildContext context) {
+  SpotlightStep _stepFromDialog(
+      WellyDialog dialog, BwStrings s, BuildContext context) {
     final localizedText = s.tutorialText(dialog.id);
     final displayText = localizedText.isNotEmpty ? localizedText : dialog.text;
     final localizedFact = s.tutorialFact(dialog.id);
 
     return SpotlightStep(
       text: displayText,
-      fact: (localizedFact != null && localizedFact.isNotEmpty) ? localizedFact : null,
+      fact: (localizedFact != null && localizedFact.isNotEmpty)
+          ? localizedFact
+          : null,
       moodEmoji: dialog.moodEmoji,
       celebrating: dialog.mood == TutorialMood.celebrating,
       actions: [
@@ -140,7 +144,8 @@ class TutorialProvider extends ChangeNotifier {
     _closeAndAdvanceQueue(context);
   }
 
-  void _handleAction(WellyDialog dialog, TutorialAction action, BuildContext context) {
+  void _handleAction(
+      WellyDialog dialog, TutorialAction action, BuildContext context) {
     _markSeen(dialog.id);
 
     if (!action.isDismiss && action.advance && dialog.nextDialogId != null) {
@@ -163,10 +168,14 @@ class TutorialProvider extends ChangeNotifier {
   /// Risolve il tasto di azione dalla chiave ('ok'/'more'/'skip') alla stringa localizzata.
   static String _resolveActionLabel(String key, BwStrings s) {
     switch (key) {
-      case 'ok':   return s.tutorialOk;
-      case 'more': return s.tutorialMore;
-      case 'skip': return s.tutorialSkip;
-      default:     return key;
+      case 'ok':
+        return s.tutorialOk;
+      case 'more':
+        return s.tutorialMore;
+      case 'skip':
+        return s.tutorialSkip;
+      default:
+        return key;
     }
   }
 
@@ -179,6 +188,18 @@ class TutorialProvider extends ChangeNotifier {
         if (context.mounted) _showNow(nextId, context);
       });
     }
+  }
+
+  /// Da chiamare quando un popup esterno (festa consolidamento, badge,
+  /// milestone, scelta abitudine) si chiude e libera lo schermo — senza
+  /// questo, un evento accodato mentre quel popup era aperto restava in
+  /// coda finché non arrivava per caso un altro trigger qualunque.
+  void retryQueueIfIdle(BuildContext context) {
+    if (_isShowing || _queue.isEmpty || !context.mounted) return;
+    final ctrl = context.read<SpotlightController>();
+    if (ctrl.isActive || ctrl.externalBusy) return;
+    final nextId = _queue.removeAt(0);
+    _showNow(nextId, context);
   }
 
   Future<void> _markSeen(String id) async {

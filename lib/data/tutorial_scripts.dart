@@ -27,10 +27,13 @@ abstract class TutorialScripts {
       return WellyDialog(
         id: id,
         mood: TutorialMood.celebrating,
-        // Il testo reale viene da sL.tutorialText(id) in ogni lingua.
-        // Questo è il fallback italiano usato se la localizzazione non copre l'id.
-        text: 'Molto bene! Oggi goditi il traguardo — inizieremo a lavorare '
-            'sulla nuova abitudine da domani.',
+        // Il testo reale viene da sL.tutorialText(id) → habitChosenIntro()
+        // in ogni lingua. Questo è il fallback italiano usato se la
+        // localizzazione non copre l'id.
+        text: 'Molto bene! Oggi goditi il traguardo — la nuova abitudine '
+            'comincia domani. Falla una volta, poi tienila viva: a 7 giorni '
+            'è assimilata, a 66 diventa automatica. Vedrai l\'obiettivo '
+            'direttamente sulla sua card, passo dopo passo.',
         actions: [TutorialAction.ok],
       );
     }
@@ -46,7 +49,6 @@ abstract class TutorialScripts {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const _dialogs = <WellyDialog>[
-
   // ── Home: prima apertura ──────────────────────────────────────────────────
   WellyDialog(
     id: 'home_first_open',
@@ -64,7 +66,8 @@ const _dialogs = <WellyDialog>[
     text: 'L\'acqua è la prima abitudine perché è la base biologica di tutto '
         'il resto. Senza idratazione, la concentrazione cala fino al 20% '
         'già dopo 90 minuti.',
-    scienceFact: 'Adan et al. (2012): dehydration reduces cognitive performance '
+    scienceFact:
+        'Adan et al. (2012): dehydration reduces cognitive performance '
         'significantly after just 90 min.',
     actions: [TutorialAction.ok],
   ),
@@ -75,7 +78,22 @@ const _dialogs = <WellyDialog>[
     mood: TutorialMood.happy,
     text: 'Il tracker conta i bicchieri da quando apri l\'app ogni mattina. '
         '8 al giorno è il target — ma anche arrivare a 5 è già meglio di ieri.',
-    scienceFact: 'EFSA: fabbisogno idrico giornaliero 2,0–2,5 L per adulti in condizioni normali.',
+    scienceFact:
+        'EFSA: fabbisogno idrico giornaliero 2,0–2,5 L per adulti in condizioni normali.',
+    actions: [TutorialAction.ok, TutorialAction.more],
+    nextDialogId: 'water_goal_intro',
+  ),
+
+  // ── Acqua: unica abitudine che parte senza il popup "habit_chosen_*",
+  // quindi senza questo dialogo il suo obiettivo a tappe non veniva mai
+  // annunciato — restava solo scritto sulla card, da scoprire da soli.
+  WellyDialog(
+    id: 'water_goal_intro',
+    mood: TutorialMood.excited,
+    text: 'Il tuo prossimo obiettivo: bevi tutti gli 8 bicchieri oggi per il '
+        'tuo primo giorno pieno. Ripetilo per 7 giorni totali e l\'abitudine '
+        'è assimilata, per 66 diventa automatica. Lo vedrai sempre scritto '
+        'sulla card, un passo alla volta.',
     actions: [TutorialAction.ok],
   ),
 
@@ -172,10 +190,12 @@ const _dialogs = <WellyDialog>[
   WellyDialog(
     id: 'growth_first_visit',
     mood: TutorialMood.gentle,
-    text: 'Questa scheda mostra chi stai diventando, non solo cosa stai facendo. '
+    text:
+        'Questa scheda mostra chi stai diventando, non solo cosa stai facendo. '
         'Le fasi non sono premi — sono descrizioni reali del tuo cambiamento '
         'neurologico. La scienza, non la motivazione, guida il percorso.',
-    scienceFact: 'Wood & Neal (2007): l\'identità cambia quando i comportamenti '
+    scienceFact:
+        'Wood & Neal (2007): l\'identità cambia quando i comportamenti '
         'diventano automatici. Identity precedes action.',
     actions: [TutorialAction.ok],
   ),
@@ -184,9 +204,10 @@ const _dialogs = <WellyDialog>[
   WellyDialog(
     id: 'phase2_reached',
     mood: TutorialMood.celebrating,
-    text: '🌱 Fase 2: Inizio! Hai consolidato la tua prima abitudine. '
-        'Il tuo cervello ha creato un automatismo reale. '
-        'Ora si sblocca la schermata Habits — esplorarla è il prossimo passo.',
+    text: '🌱 Fase 2: Inizio! Da qui in poi la sezione Crescita traccia il tuo '
+        'percorso, fase dopo fase. La prossima abitudine si sblocca solo '
+        'quando sarai pronto — senza fretta, senza pressione: decidi tu i '
+        'tempi, e va benissimo anche prendersi ancora un po\' di tempo.',
     scienceFact: 'Gardner (2012): automaticità = esecuzione senza intenzione '
         'conscia. Il primo automatismo è sempre il più difficile.',
     actions: [TutorialAction.ok],
@@ -245,10 +266,12 @@ const _dialogs = <WellyDialog>[
   WellyDialog(
     id: 'milestone_21_days',
     mood: TutorialMood.celebrating,
-    text: '21 giorni! Il vecchio mito diceva che bastano 3 settimane per formare '
+    text:
+        '21 giorni! Il vecchio mito diceva che bastano 3 settimane per formare '
         'un\'abitudine. La verità: 21 giorni costruiscono solo il groove iniziale. '
         'Ora inizia la parte in cui diventa davvero tua.',
-    scienceFact: 'Maltz (1960): il "21 giorni" era un\'osservazione chirurgica, '
+    scienceFact:
+        'Maltz (1960): il "21 giorni" era un\'osservazione chirurgica, '
         'non uno studio scientifico. Lally (2010) stima 66 gg in media.',
     actions: [TutorialAction.ok],
   ),
@@ -256,7 +279,8 @@ const _dialogs = <WellyDialog>[
   WellyDialog(
     id: 'milestone_66_days',
     mood: TutorialMood.celebrating,
-    text: '66 giorni! Questo è il numero magico dello studio di Phillippa Lally '
+    text:
+        '66 giorni! Questo è il numero magico dello studio di Phillippa Lally '
         'all\'UCL. Ufficialmente, secondo la scienza, hai formato un\'abitudine. '
         'Non la stai costruendo — la hai.',
     scienceFact: 'Lally et al. (2010), UCL: media di 66 giorni (range 18-254) '

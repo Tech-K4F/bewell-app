@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/auth_provider.dart' as bw;
+import '../../models/auth_result.dart';
+import '../../providers/progression_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/tutorial_provider.dart';
 import '../../widgets/bw_scaffold.dart';
 import '../settings/settings_screen.dart';
-import '../../widgets/locale_selector.dart';
 import '../../widgets/banner_ad_widget.dart';
 import '../../widgets/feedback_sheet.dart';
 import '../../l10n/app_localizations.dart';
@@ -23,7 +24,16 @@ class ProfileScreen extends StatelessWidget {
         final p = theme.paletteData;
         final isAmb = theme.isAmbient;
         final user = app.user;
-        if (user == null) return const SizedBox();
+        // Rete di sicurezza: se per qualunque motivo AppProvider.user non è
+        // ancora pronto, meglio uno spinner che uno schermo bianco muto —
+        // la causa nota (utente nuovo senza sync da Firebase) è già risolta
+        // a monte in login/register, ma questa schermata non deve più
+        // sparire silenziosamente se succede di nuovo per un altro motivo.
+        if (user == null) {
+          return BwScaffold(
+            body: Center(child: CircularProgressIndicator(color: p.primary)),
+          );
+        }
 
         return BwScaffold(
           bottomNavigationBar: const BannerAdWidget(),
@@ -32,9 +42,7 @@ class ProfileScreen extends StatelessWidget {
             elevation: 0,
             title: Text(context.sL.profileTitle,
                 style: TextStyle(
-                    color: p.text,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600)),
+                    color: p.text, fontSize: 17, fontWeight: FontWeight.w600)),
             actions: [
               IconButton(
                 icon: Icon(Icons.settings_outlined, color: p.text),
@@ -72,8 +80,7 @@ class ProfileScreen extends StatelessWidget {
                     Text(user.name,
                         style: TextStyle(
                           fontSize: isAmb ? 26 : 20,
-                          fontWeight:
-                              isAmb ? FontWeight.w300 : FontWeight.w700,
+                          fontWeight: isAmb ? FontWeight.w300 : FontWeight.w700,
                           fontFamily: isAmb ? 'CormorantGaramond' : null,
                           color: p.text,
                         )),
@@ -92,7 +99,7 @@ class ProfileScreen extends StatelessWidget {
                         color: p.primaryLight,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text(user.levelName,
+                      child: Text(_profilePhaseLabel(context),
                           style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -106,10 +113,13 @@ class ProfileScreen extends StatelessWidget {
 
               // ── Stats ──────────────────────────────────────────────────
               Row(children: [
-                _StatBox(label: context.sL.points, value: '${user.points}', p: p),
+                _StatBox(
+                    label: context.sL.points, value: '${user.points}', p: p),
                 const SizedBox(width: 10),
                 _StatBox(
-                    label: context.sL.daysStreak, value: '${app.liveStreak} gg', p: p),
+                    label: context.sL.daysStreak,
+                    value: '${app.liveStreak}',
+                    p: p),
                 const SizedBox(width: 10),
                 _StatBox(
                     label: context.sL.focusSessions,
@@ -135,13 +145,6 @@ class ProfileScreen extends StatelessWidget {
                   p: p,
                   onTap: () => _showChangePassword(context, p),
                 ),
-                _Tile(
-                  icon: Icons.email_outlined,
-                  label: user.email.isNotEmpty ? user.email : context.sL.emailAccountLabel,
-                  subtitle: context.sL.emailAccountLabel,
-                  p: p,
-                  onTap: null,
-                ),
               ]),
 
               const SizedBox(height: 20),
@@ -154,11 +157,12 @@ class ProfileScreen extends StatelessWidget {
                   icon: Icons.palette_outlined,
                   label: context.sL.appearance,
                   p: p,
-                  onTap: () => Navigator.push(context,
+                  onTap: () => Navigator.push(
+                      context,
                       MaterialPageRoute(
                           builder: (_) => const SettingsScreen())),
                 ),
-_Tile(
+                _Tile(
                   icon: Icons.notifications_outlined,
                   label: context.sL.notifications,
                   p: p,
@@ -202,6 +206,24 @@ _Tile(
                 ),
               ),
 
+              const SizedBox(height: 10),
+
+              // ── Elimina account ───────────────────────────────────────
+              // Richiesta obbligatoria da Google Play e App Store per ogni
+              // app con creazione account — prima esisteva solo il logout.
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => _confirmDeleteAccount(context, p),
+                  child: Text(context.sL.deleteAccount,
+                      style: TextStyle(
+                          color: p.textMut,
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                          decorationColor: p.textMut)),
+                ),
+              ),
+
               // ── Debug (solo in modalità debug) ────────────────────────
               if (kDebugMode) ...[
                 const SizedBox(height: 32),
@@ -223,8 +245,7 @@ _Tile(
     );
   }
 
-  void _showEditName(
-      BuildContext context, AppProvider app, BwPaletteData p) {
+  void _showEditName(BuildContext context, AppProvider app, BwPaletteData p) {
     final ctrl = TextEditingController(text: app.user?.name ?? '');
     showDialog(
       context: context,
@@ -240,23 +261,22 @@ _Tile(
             hintStyle: TextStyle(color: p.textMut),
             enabledBorder: UnderlineInputBorder(
                 borderSide: BorderSide(color: p.cardBorder)),
-            focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: p.primary)),
+            focusedBorder:
+                UnderlineInputBorder(borderSide: BorderSide(color: p.primary)),
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text(context.sL.cancel,
-                  style: TextStyle(color: p.textSec))),
+              child:
+                  Text(context.sL.cancel, style: TextStyle(color: p.textSec))),
           TextButton(
             onPressed: () async {
               final name = ctrl.text.trim();
               if (name.isNotEmpty) await app.updateDisplayName(name);
               if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: Text(context.sL.save,
-                style: TextStyle(color: p.primary)),
+            child: Text(context.sL.save, style: TextStyle(color: p.primary)),
           ),
         ],
       ),
@@ -268,7 +288,8 @@ _Tile(
     final isPassword =
         user?.providerData.any((d) => d.providerId == 'password') ?? false;
     if (!isPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.sL.loginWithGoogle)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.sL.loginWithGoogle)));
       return;
     }
     showDialog(
@@ -282,8 +303,7 @@ _Tile(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: p.card,
-        title: Text(context.sL.logoutConfirm,
-            style: TextStyle(color: p.text)),
+        title: Text(context.sL.logoutConfirm, style: TextStyle(color: p.text)),
         content: Text(context.sL.logoutConfirmSub,
             style: TextStyle(color: p.textSec)),
         actions: [
@@ -297,10 +317,51 @@ _Tile(
               await context.read<AppProvider>().resetOnLogout();
               await context.read<bw.AuthProvider>().logout();
               if (context.mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                Navigator.of(context)
+                    .pushNamedAndRemoveUntil('/login', (route) => false);
               }
             },
             child: Text(context.sL.logout,
+                style: const TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteAccount(BuildContext context, BwPaletteData p) {
+    final s = context.sL;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: p.card,
+        title:
+            Text(s.deleteAccountConfirmTitle, style: TextStyle(color: p.text)),
+        content: Text(s.deleteAccountConfirmBody,
+            style: TextStyle(color: p.textSec)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(s.cancel, style: TextStyle(color: p.textSec))),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final auth = context.read<bw.AuthProvider>();
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context);
+              final ok = await auth.deleteAccount();
+              if (!context.mounted) return;
+              if (ok) {
+                navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+                messenger
+                    .showSnackBar(SnackBar(content: Text(s.deleteAccountDone)));
+              } else {
+                messenger.showSnackBar(SnackBar(
+                    content: Text(auth.lastError?.localizedMessage(s) ??
+                        s.errorGeneral)));
+              }
+            },
+            child: Text(s.deleteAccountCta,
                 style: const TextStyle(color: Colors.redAccent)),
           ),
         ],
@@ -315,7 +376,8 @@ _Tile(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: p.card,
-        title: Text(context.sL.resetTutorialTitle, style: TextStyle(color: p.text)),
+        title: Text(context.sL.resetTutorialTitle,
+            style: TextStyle(color: p.text)),
         content: Text(
           context.sL.resetTutorialBody,
           style: TextStyle(color: p.textSec, fontSize: 13, height: 1.5),
@@ -344,8 +406,9 @@ _Tile(
                 );
               }
             },
-            child: Text(context.sL.resetTutorialCta, style: TextStyle(color: p.primary,
-                fontWeight: FontWeight.w700)),
+            child: Text(context.sL.resetTutorialCta,
+                style:
+                    TextStyle(color: p.primary, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -356,8 +419,7 @@ _Tile(
 class _StatBox extends StatelessWidget {
   final String label, value;
   final BwPaletteData p;
-  const _StatBox(
-      {required this.label, required this.value, required this.p});
+  const _StatBox({required this.label, required this.value, required this.p});
 
   @override
   Widget build(BuildContext context) {
@@ -373,12 +435,9 @@ class _StatBox extends StatelessWidget {
           children: [
             Text(value,
                 style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: p.text)),
+                    fontSize: 18, fontWeight: FontWeight.w700, color: p.text)),
             const SizedBox(height: 3),
-            Text(label,
-                style: TextStyle(fontSize: 10, color: p.textSec)),
+            Text(label, style: TextStyle(fontSize: 10, color: p.textSec)),
           ],
         ),
       ),
@@ -420,8 +479,8 @@ class _Card extends StatelessWidget {
           return Column(children: [
             e.value,
             if (e.key < children.length - 1)
-              Divider(height: 0.5, thickness: 0.5, color: p.cardBorder,
-                  indent: 52),
+              Divider(
+                  height: 0.5, thickness: 0.5, color: p.cardBorder, indent: 52),
           ]);
         }).toList(),
       ),
@@ -432,15 +491,10 @@ class _Card extends StatelessWidget {
 class _Tile extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String? subtitle;
   final BwPaletteData p;
   final VoidCallback? onTap;
   const _Tile(
-      {required this.icon,
-      required this.label,
-      this.subtitle,
-      required this.p,
-      this.onTap});
+      {required this.icon, required this.label, required this.p, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -449,23 +503,17 @@ class _Tile extends StatelessWidget {
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-            color: p.primaryLight,
-            borderRadius: BorderRadius.circular(8)),
+            color: p.primaryLight, borderRadius: BorderRadius.circular(8)),
         child: Icon(icon, color: p.primary, size: 17),
       ),
       title: Text(label,
           style: TextStyle(
               color: p.text, fontSize: 14, fontWeight: FontWeight.w500)),
-      subtitle: subtitle != null
-          ? Text(subtitle!,
-              style: TextStyle(color: p.textSec, fontSize: 11))
-          : null,
       trailing: onTap != null
           ? Icon(Icons.chevron_right, color: p.textMut, size: 18)
           : null,
       onTap: onTap,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
     );
   }
 }
@@ -475,8 +523,7 @@ class _ChangePasswordDialog extends StatefulWidget {
   const _ChangePasswordDialog({required this.p});
 
   @override
-  State<_ChangePasswordDialog> createState() =>
-      _ChangePasswordDialogState();
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
 }
 
 class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
@@ -504,17 +551,20 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       setState(() => _error = s.validationPasswordTooShort);
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final user = FirebaseAuth.instance.currentUser!;
-      final cred = EmailAuthProvider.credential(
-          email: user.email!, password: _cur.text);
+      final cred =
+          EmailAuthProvider.credential(email: user.email!, password: _cur.text);
       await user.reauthenticateWithCredential(cred);
       await user.updatePassword(_new.text);
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.sL.passwordUpdated)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(context.sL.passwordUpdated)));
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -544,16 +594,14 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!,
-                style: const TextStyle(
-                    color: Colors.redAccent, fontSize: 12)),
+                style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
           ],
         ],
       ),
       actions: [
         TextButton(
             onPressed: _loading ? null : () => Navigator.pop(context),
-            child: Text(context.sL.cancel,
-                style: TextStyle(color: p.textSec))),
+            child: Text(context.sL.cancel, style: TextStyle(color: p.textSec))),
         TextButton(
           onPressed: _loading ? null : _submit,
           child: _loading
@@ -572,8 +620,7 @@ class _PwdField extends StatefulWidget {
   final TextEditingController ctrl;
   final String label;
   final BwPaletteData p;
-  const _PwdField(
-      {required this.ctrl, required this.label, required this.p});
+  const _PwdField({required this.ctrl, required this.label, required this.p});
 
   @override
   State<_PwdField> createState() => _PwdFieldState();
@@ -596,18 +643,16 @@ class _PwdFieldState extends State<_PwdField> {
         focusedBorder: UnderlineInputBorder(
             borderSide: BorderSide(color: widget.p.primary)),
         suffixIcon: IconButton(
-          icon: Icon(_obs ? Icons.visibility_outlined
-              : Icons.visibility_off_outlined,
-              color: widget.p.textMut, size: 18),
+          icon: Icon(
+              _obs ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              color: widget.p.textMut,
+              size: 18),
           onPressed: () => setState(() => _obs = !_obs),
         ),
       ),
     );
   }
 }
-
-
-
 
 // ── Voce lingua ───────────────────────────────────────────────────────────────
 class _LocaleTile extends StatelessWidget {
@@ -621,10 +666,18 @@ class _LocaleTile extends StatelessWidget {
         final sorted = [...BwLocale.values]
           ..sort((a, b) => a.label.compareTo(b.label));
         return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-          leading: Icon(Icons.language_outlined, color: p.textSec, size: 20),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          leading: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+                color: p.primaryLight, borderRadius: BorderRadius.circular(8)),
+            child: Icon(Icons.language_outlined, color: p.primary, size: 17),
+          ),
           title: Text('Lingua / Language',
-              style: TextStyle(fontSize: 14, color: p.text)),
+              style: TextStyle(
+                  color: p.text, fontSize: 14, fontWeight: FontWeight.w500)),
           trailing: GestureDetector(
             onTap: () => _showPicker(context, localeProvider, sorted, p),
             child: Row(
@@ -657,28 +710,24 @@ class _LocaleTile extends StatelessWidget {
         children: [
           const SizedBox(height: 12),
           Container(
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             decoration: BoxDecoration(
-                color: p.cardBorder,
-                borderRadius: BorderRadius.circular(2)),
+                color: p.cardBorder, borderRadius: BorderRadius.circular(2)),
           ),
           const SizedBox(height: 16),
           ...sorted.map((locale) {
             final isSelected = localeProvider.locale == locale;
             return ListTile(
-              leading: Text(locale.flag,
-                  style: const TextStyle(fontSize: 22)),
+              leading: Text(locale.flag, style: const TextStyle(fontSize: 22)),
               title: Text(locale.label,
                   style: TextStyle(
                     fontSize: 15,
                     color: isSelected ? p.primary : p.text,
-                    fontWeight: isSelected
-                        ? FontWeight.w600
-                        : FontWeight.w400,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   )),
               trailing: isSelected
-                  ? Icon(Icons.check_circle_rounded,
-                      color: p.primary, size: 18)
+                  ? Icon(Icons.check_circle_rounded, color: p.primary, size: 18)
                   : null,
               onTap: () {
                 localeProvider.setLocale(locale);
@@ -693,10 +742,16 @@ class _LocaleTile extends StatelessWidget {
   }
 }
 
-
-
-
-
-
-
-
+/// "Fase 1 · Seme": lo stesso livello mostrato in Home, nella lingua scelta.
+String _profilePhaseLabel(BuildContext context) {
+  final s = context.sL;
+  final phase = context.watch<ProgressionProvider>().currentPhase;
+  final name = switch (phase) {
+    1 => s.phase1,
+    2 => s.phase2,
+    3 => s.phase3,
+    4 => s.phase4,
+    _ => s.phase5,
+  };
+  return '${s.phase} $phase · $name';
+}

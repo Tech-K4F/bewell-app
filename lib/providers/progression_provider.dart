@@ -15,24 +15,24 @@ import '../services/analytics_service.dart';
 
 // ── Stato di una singola abitudine ───────────────────────────────────────────
 enum HabitStatus {
-  locked,       // Non ancora sbloccata
-  available,    // Pronta per essere proposta (popup)
-  active,       // L'utente l'ha accettata e sta lavorandoci
-  sprouting,    // 🌱 1-3 giorni completati
-  growing,      // 🌿 4-6 giorni completati
+  locked, // Non ancora sbloccata
+  available, // Pronta per essere proposta (popup)
+  active, // L'utente l'ha accettata e sta lavorandoci
+  sprouting, // 🌱 1-3 giorni completati
+  growing, // 🌿 4-6 giorni completati
   consolidated, // 🌳 7-65 giorni completati
-  automatic,    // 💚 66+ giorni completati (Lally et al., 2010)
+  automatic, // 💚 66+ giorni completati (Lally et al., 2010)
 }
 
 class HabitState {
   final String habitId;
   HabitStatus status;
-  int daysCompleted;       // Giorni cumulativi completati
+  int daysCompleted; // Giorni cumulativi completati
   int daysWithoutReminder; // Per rilevare "automatica"
   DateTime? unlockedAt;
   DateTime? activatedAt;
   DateTime? lastCompletedAt;
-  bool isChoicePending;    // True = in attesa di scelta popup
+  bool isChoicePending; // True = in attesa di scelta popup
   List<String> completionDates; // 'YYYY-MM-DD' — ultimi 70 giorni
   /// Se impostato e nel futuro, questa proposta non va ripresentata prima
   /// di allora — l'utente ha risposto "non sono pronto".
@@ -52,66 +52,80 @@ class HabitState {
   }) : completionDates = completionDates ?? [];
 
   Map<String, dynamic> toJson() => {
-    'habitId': habitId,
-    'status': status.index,
-    'daysCompleted': daysCompleted,
-    'daysWithoutReminder': daysWithoutReminder,
-    'unlockedAt': unlockedAt?.toIso8601String(),
-    'activatedAt': activatedAt?.toIso8601String(),
-    'lastCompletedAt': lastCompletedAt?.toIso8601String(),
-    'isChoicePending': isChoicePending,
-    'completionDates': completionDates,
-    'notReadySnoozeUntil': notReadySnoozeUntil?.toIso8601String(),
-  };
+        'habitId': habitId,
+        'status': status.index,
+        'daysCompleted': daysCompleted,
+        'daysWithoutReminder': daysWithoutReminder,
+        'unlockedAt': unlockedAt?.toIso8601String(),
+        'activatedAt': activatedAt?.toIso8601String(),
+        'lastCompletedAt': lastCompletedAt?.toIso8601String(),
+        'isChoicePending': isChoicePending,
+        'completionDates': completionDates,
+        'notReadySnoozeUntil': notReadySnoozeUntil?.toIso8601String(),
+      };
 
   factory HabitState.fromJson(Map<String, dynamic> j) => HabitState(
-    habitId: j['habitId'] as String,
-    status: HabitStatus.values[j['status'] as int],
-    daysCompleted: j['daysCompleted'] as int,
-    daysWithoutReminder: j['daysWithoutReminder'] as int,
-    unlockedAt: j['unlockedAt'] != null
-        ? DateTime.parse(j['unlockedAt'] as String) : null,
-    activatedAt: j['activatedAt'] != null
-        ? DateTime.parse(j['activatedAt'] as String) : null,
-    lastCompletedAt: j['lastCompletedAt'] != null
-        ? DateTime.parse(j['lastCompletedAt'] as String) : null,
-    isChoicePending: j['isChoicePending'] as bool? ?? false,
-    completionDates: (j['completionDates'] as List<dynamic>?)
-        ?.cast<String>() ?? [],
-    notReadySnoozeUntil: j['notReadySnoozeUntil'] != null
-        ? DateTime.parse(j['notReadySnoozeUntil'] as String) : null,
-  );
+        habitId: j['habitId'] as String,
+        status: HabitStatus.values[j['status'] as int],
+        daysCompleted: j['daysCompleted'] as int,
+        daysWithoutReminder: j['daysWithoutReminder'] as int,
+        unlockedAt: j['unlockedAt'] != null
+            ? DateTime.parse(j['unlockedAt'] as String)
+            : null,
+        activatedAt: j['activatedAt'] != null
+            ? DateTime.parse(j['activatedAt'] as String)
+            : null,
+        lastCompletedAt: j['lastCompletedAt'] != null
+            ? DateTime.parse(j['lastCompletedAt'] as String)
+            : null,
+        isChoicePending: j['isChoicePending'] as bool? ?? false,
+        completionDates:
+            (j['completionDates'] as List<dynamic>?)?.cast<String>() ?? [],
+        notReadySnoozeUntil: j['notReadySnoozeUntil'] != null
+            ? DateTime.parse(j['notReadySnoozeUntil'] as String)
+            : null,
+      );
 
   // Helper per l'icona di stato
   String get statusEmoji {
     switch (status) {
-      case HabitStatus.locked:      return '🔒';
-      case HabitStatus.available:   return '✨';
-      case HabitStatus.active:      return '🌱';
-      case HabitStatus.sprouting:   return '🌱';
-      case HabitStatus.growing:     return '🌿';
-      case HabitStatus.consolidated:return '🌳';
-      case HabitStatus.automatic:   return '💚';
+      case HabitStatus.locked:
+        return '🔒';
+      case HabitStatus.available:
+        return '✨';
+      case HabitStatus.active:
+        return '🌱';
+      case HabitStatus.sprouting:
+        return '🌱';
+      case HabitStatus.growing:
+        return '🌿';
+      case HabitStatus.consolidated:
+        return '🌳';
+      case HabitStatus.automatic:
+        return '💚';
     }
   }
 }
-
 
 // ── ProgressionProvider ───────────────────────────────────────────────────────
 class ProgressionProvider extends ChangeNotifier {
   final Map<String, HabitState> _states = {};
   DateTime? _installDate;
-  DateTime? _lastUnlockDate;       // Anti-overload: data dell'ultimo sblocco
-  DateTime? _slowdownActiveUntil;  // Rallentamento attivo fino a questa data
-  DateTime? _lastEvaluateDate;     // Evita valutazioni multiple nello stesso giorno
+  DateTime? _lastUnlockDate; // Anti-overload: data dell'ultimo sblocco
+  DateTime? _slowdownActiveUntil; // Rallentamento attivo fino a questa data
+  DateTime? _lastEvaluateDate; // Evita valutazioni multiple nello stesso giorno
   int _debugDayOffset = 0;
   bool _initialized = false;
 
-  /// Coda di abitudini appena diventate "consolidate" (assimilate) in questa
-  /// sessione, in attesa che la UI mostri la celebrazione a schermo intero.
-  /// Consumata una alla volta con [consumeNextConsolidation].
-  final List<String> _pendingCelebrations = [];
-  String? get nextConsolidationToCelebrate =>
+  /// Coda di abitudini appena diventate "consolidate" (7gg) o "automatiche"
+  /// (66gg) in questa sessione, in attesa che la UI mostri la celebrazione
+  /// a schermo intero. Il secondo valore distingue il traguardo: prima
+  /// l'automaticità a 66 giorni non veniva mai festeggiata (la stessa
+  /// abitudine passava già per "consolidata" a 7, quindi il flag "appena
+  /// diventato" restava sempre falso alla seconda soglia) — nessun bonus,
+  /// nessuna festa, un traguardo grosso passava silenzioso.
+  final List<(String, bool)> _pendingCelebrations = [];
+  (String, bool)? get nextConsolidationToCelebrate =>
       _pendingCelebrations.isEmpty ? null : _pendingCelebrations.first;
   void consumeNextConsolidation() {
     if (_pendingCelebrations.isNotEmpty) _pendingCelebrations.removeAt(0);
@@ -152,8 +166,7 @@ class ProgressionProvider extends ChangeNotifier {
   HabitStatus statusOf(String habitId) =>
       _states[habitId]?.status ?? HabitStatus.locked;
 
-  int daysCompletedFor(String habitId) =>
-      _states[habitId]?.daysCompleted ?? 0;
+  int daysCompletedFor(String habitId) => _states[habitId]?.daysCompleted ?? 0;
 
   /// Abitudini attualmente attive (in corso)
   List<HabitDefinition> get activeHabits {
@@ -215,8 +228,7 @@ class ProgressionProvider extends ChangeNotifier {
     final installDateStr = prefs.getString('install_date');
     if (installDateStr == null) {
       _installDate = DateTime.now();
-      await prefs.setString(
-          'install_date', _installDate!.toIso8601String());
+      await prefs.setString('install_date', _installDate!.toIso8601String());
     } else {
       _installDate = DateTime.parse(installDateStr);
     }
@@ -263,7 +275,38 @@ class ProgressionProvider extends ChangeNotifier {
     // Calcola sblocchi
     await _evaluateUnlocks();
 
+    // Conteggio bicchieri di oggi: markCompleted('water') scatta solo a
+    // target raggiunto (8/8), quindi daysCompletedFor('water') resta 0
+    // finché non lo è — ma Home mostra già i bicchieri bevuti oggi.
+    // Senza questo, Habits mostrava "falla per la prima volta" anche con
+    // 2 bicchieri già bevuti in Home nella stessa giornata: due schermate
+    // che raccontavano due storie diverse sulla stessa abitudine.
+    await _loadTodayWaterCount(prefs);
+
     _initialized = true;
+    notifyListeners();
+  }
+
+  int _todayWaterCount = 0;
+  int get todayWaterCount => _todayWaterCount;
+  int _todayWaterTarget = 8;
+  int get todayWaterTarget => _todayWaterTarget;
+
+  Future<void> _loadTodayWaterCount(SharedPreferences prefs) async {
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month}-${now.day}';
+    final savedDate = prefs.getString('water_date') ?? '';
+    _todayWaterCount =
+        savedDate == todayStr ? (prefs.getInt('water_count') ?? 0) : 0;
+    _todayWaterTarget = prefs.getInt('water_target_n') ?? 8;
+  }
+
+  /// Chiamato da Home ad ogni bicchiere aggiunto, così Habits resta
+  /// sincronizzata senza dover rileggere SharedPreferences ogni volta che
+  /// l'utente cambia schermata.
+  void setTodayWaterCount(int count, {int? target}) {
+    _todayWaterCount = count;
+    if (target != null) _todayWaterTarget = target;
     notifyListeners();
   }
 
@@ -286,24 +329,33 @@ class ProgressionProvider extends ChangeNotifier {
 
     state.daysCompleted++;
     state.lastCompletedAt = now;
-    AnalyticsService.instance.logHabitCompleted(habitId, state.daysCompleted, currentPhase);
+    AnalyticsService.instance
+        .logHabitCompleted(habitId, state.daysCompleted, currentPhase);
     // Registra la data per la heatmap (max 70 giorni)
-    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     if (!state.completionDates.contains(dateStr)) {
       state.completionDates.add(dateStr);
       if (state.completionDates.length > 70) state.completionDates.removeAt(0);
     }
     final wasConsolidated = state.status == HabitStatus.consolidated ||
         state.status == HabitStatus.automatic;
+    final wasAutomatic = state.status == HabitStatus.automatic;
     _updateHabitStatus(state);
-    final justConsolidated = !wasConsolidated &&
-        (state.status == HabitStatus.consolidated || state.status == HabitStatus.automatic);
+    final justConsolidated =
+        !wasConsolidated && state.status == HabitStatus.consolidated;
+    final justAutomatic =
+        !wasAutomatic && state.status == HabitStatus.automatic;
 
-    if (justConsolidated) {
-      // Abitudine assimilata proprio ora: la UI mostra una celebrazione a
-      // schermo intero prima di proporre, se pronta, la prossima abitudine —
-      // il progresso deve sentirsi guadagnato, non un batch notturno silenzioso.
-      _pendingCelebrations.add(habitId);
+    if (justConsolidated || justAutomatic) {
+      // Abitudine assimilata (7gg) o diventata automatica (66gg) proprio
+      // ora: la UI mostra una celebrazione a schermo intero prima di
+      // proporre, se pronta, la prossima abitudine — il progresso deve
+      // sentirsi guadagnato, non un batch notturno silenzioso. Le due
+      // soglie sono eventi distinti: un'abitudine passa per "consolidata"
+      // a 7 giorni e resta tale fino a 66, quindi vanno tracciate separate
+      // per non perdere la seconda festa quando arriva.
+      _pendingCelebrations.add((habitId, justAutomatic));
       await _evaluateUnlocks();
     }
 
@@ -356,9 +408,10 @@ class ProgressionProvider extends ChangeNotifier {
 
     // Registra la scelta con l'alternativa scartata (prima di rimuoverla)
     final alternativeId = _states.entries
-        .where((e) => e.key != habitId && e.value.isChoicePending)
-        .map((e) => e.key)
-        .firstOrNull ?? 'none';
+            .where((e) => e.key != habitId && e.value.isChoicePending)
+            .map((e) => e.key)
+            .firstOrNull ??
+        'none';
     AnalyticsService.instance.logHabitChoiceMade(habitId, alternativeId);
 
     // Tutti gli altri habit rimasti "pending" nella stessa sessione tornano a
@@ -421,7 +474,8 @@ class ProgressionProvider extends ChangeNotifier {
       final prereqDays = daysCompletedFor(unlock.requiredHabitId!);
       final habitCond = prereqDays >= unlock.requiredDaysCompleted;
       final altCond = unlock.altRequiredHabitId != null
-          ? daysCompletedFor(unlock.altRequiredHabitId!) >= unlock.requiredDaysCompleted
+          ? daysCompletedFor(unlock.altRequiredHabitId!) >=
+              unlock.requiredDaysCompleted
           : false;
       final prereqMet = habitCond || altCond;
       conditionMet = unlock.requiredTotalDays != null
@@ -500,7 +554,8 @@ class ProgressionProvider extends ChangeNotifier {
   bool _ruleMatches(IfThenRule r, Map<String, Set<String>> answers) =>
       answers[r.questionId]?.contains(r.answerValue) ?? false;
 
-  bool _hasEffect(HabitDefinition h, Map<String, Set<String>> answers, String effect) =>
+  bool _hasEffect(
+          HabitDefinition h, Map<String, Set<String>> answers, String effect) =>
       h.ifThenRules.any((r) => r.effect == effect && _ruleMatches(r, answers));
 
   /// Valutazione dinamica: niente coppie fisse.
@@ -546,8 +601,8 @@ class ProgressionProvider extends ChangeNotifier {
     // rilevante per l'utente passa avanti (List.sort non è stabile in Dart,
     // quindi partizioniamo a mano per preservare l'ordine del catalogo
     // all'interno di ciascun gruppo).
-    bool isRelevant(HabitDefinition h) =>
-        h.ifThenRules.any((r) => r.effect != 'hide_habit' && _ruleMatches(r, answers));
+    bool isRelevant(HabitDefinition h) => h.ifThenRules
+        .any((r) => r.effect != 'hide_habit' && _ruleMatches(r, answers));
     final relevant = readyToUnlock.where(isRelevant).toList();
     final rest = readyToUnlock.where((h) => !isRelevant(h)).toList();
     readyToUnlock
@@ -574,11 +629,12 @@ class ProgressionProvider extends ChangeNotifier {
       // Notifica fuori app (solo se in background — gestito dal service).
       // Nome e messaggio localizzati nella lingua corrente dell'utente:
       // habit.name/coachIntro sono solo i testi grezzi italiani del catalogo.
-      currentBwStrings().then((s) => NotificationService.instance.showHabitUnlocked(
-            habitId: habit.id,
-            habitName: s.habitName(habit.id),
-            message: s.habitStartsTomorrow(s.habitName(habit.id)),
-          ));
+      currentBwStrings()
+          .then((s) => NotificationService.instance.showHabitUnlocked(
+                habitId: habit.id,
+                habitName: s.habitName(habit.id),
+                message: s.habitStartsTomorrow(s.habitName(habit.id)),
+              ));
     } else {
       // Due o più pronti → popup di scelta con i PRIMI DUE
       final toShow = readyToUnlock.take(2).toList();
@@ -588,11 +644,12 @@ class ProgressionProvider extends ChangeNotifier {
           ..status = HabitStatus.available;
         AnalyticsService.instance.logHabitUnlocked(habit.id);
       }
-      currentBwStrings().then((s) => NotificationService.instance.showNotification(
-            id: 99998,
-            title: s.notifHabitChoiceTitle,
-            body: s.notifHabitChoiceBody,
-          ));
+      currentBwStrings()
+          .then((s) => NotificationService.instance.showNotification(
+                id: 99998,
+                title: s.notifHabitChoiceTitle,
+                body: s.notifHabitChoiceBody,
+              ));
     }
 
     _lastUnlockDate = DateTime.now();
@@ -610,21 +667,23 @@ class ProgressionProvider extends ChangeNotifier {
   Future<void> _saveStates() async {
     final prefs = await SharedPreferences.getInstance();
     final map = {
-      for (final entry in _states.entries)
-        entry.key: entry.value.toJson()
+      for (final entry in _states.entries) entry.key: entry.value.toJson()
     };
     await prefs.setString('habit_states', jsonEncode(map));
     await prefs.setInt('debug_day_offset', _debugDayOffset);
     if (_lastUnlockDate != null) {
-      await prefs.setString('last_unlock_date', _lastUnlockDate!.toIso8601String());
+      await prefs.setString(
+          'last_unlock_date', _lastUnlockDate!.toIso8601String());
     }
     if (_lastEvaluateDate != null) {
-      await prefs.setString('last_evaluate_date', _lastEvaluateDate!.toIso8601String());
+      await prefs.setString(
+          'last_evaluate_date', _lastEvaluateDate!.toIso8601String());
     } else {
       await prefs.remove('last_evaluate_date');
     }
     if (_slowdownActiveUntil != null) {
-      await prefs.setString('slowdown_active_until', _slowdownActiveUntil!.toIso8601String());
+      await prefs.setString(
+          'slowdown_active_until', _slowdownActiveUntil!.toIso8601String());
     }
   }
 
@@ -634,7 +693,6 @@ class ProgressionProvider extends ChangeNotifier {
     await _saveStates();
     notifyListeners();
   }
-
 
   // -- Debug methods --------------------------------------------------------
   Future<void> debugSimulateDays(int days) async {
@@ -703,6 +761,7 @@ class ProgressionProvider extends ChangeNotifier {
     await _saveStates();
     notifyListeners();
   }
+
   Future<void> forceEvaluate() async {
     await _evaluateUnlocks();
     await _saveStates();
@@ -735,12 +794,13 @@ class ProgressionProvider extends ChangeNotifier {
 
 // ── Metodi aggiuntivi per GrowthScreen ───────────────────────────────────────
 extension ProgressionProviderUI on ProgressionProvider {
-
   /// Numero di abitudini consolidate (≥7 giorni completati) o automatiche.
   /// È il metro principale per le fasi di crescita del companion.
-  int get consolidatedHabitsCount => _states.values.where((s) =>
-      s.status == HabitStatus.consolidated ||
-      s.status == HabitStatus.automatic).length;
+  int get consolidatedHabitsCount => _states.values
+      .where((s) =>
+          s.status == HabitStatus.consolidated ||
+          s.status == HabitStatus.automatic)
+      .length;
 
   /// Fase corrente 1-5 basata sulle abitudini assimilate (consolidate/automatiche).
   ///   Fase 2 →  1 abitudine assimilata  (la prima routine è nata)
@@ -750,9 +810,9 @@ extension ProgressionProviderUI on ProgressionProvider {
   int get currentPhase {
     final n = consolidatedHabitsCount;
     if (n >= 12) return 5;
-    if (n >=  7) return 4;
-    if (n >=  3) return 3;
-    if (n >=  1) return 2;
+    if (n >= 7) return 4;
+    if (n >= 3) return 3;
+    if (n >= 1) return 2;
     return 1;
   }
 
@@ -771,9 +831,9 @@ extension ProgressionProviderUI on ProgressionProvider {
     const thresholds = [0, 1, 3, 7, 12];
     final phase = currentPhase;
     if (phase >= 5) return 1.0;
-    final n    = consolidatedHabitsCount;
+    final n = consolidatedHabitsCount;
     final from = thresholds[phase - 1];
-    final to   = thresholds[phase];
+    final to = thresholds[phase];
     return ((n - from) / (to - from)).clamp(0.0, 1.0);
   }
 
@@ -785,41 +845,6 @@ extension ProgressionProviderUI on ProgressionProvider {
     return null;
   }
 
-  /// Giorni mancanti allo sblocco di una specifica abitudine.
-  /// Un'abitudine può avere più condizioni contemporaneamente — vedi
-  /// [_conditionMet], che le combina in AND — quindi il tempo mancante
-  /// reale è quello della condizione più lenta a soddisfarsi, non solo
-  /// la prima trovata (in precedenza `requiredTotalDays` non era gestito
-  /// affatto, e per le abitudini gated solo da quello tornava sempre 0
-  /// anche a settimane di distanza dallo sblocco reale).
-  int daysUntilUnlock(String habitId) {
-    final habit = HabitLibrary.findById(habitId);
-    if (habit == null) return 0;
-    final unlock = habit.unlock;
-    final remaining = <int>[];
-
-    if (unlock.requiredTotalDays != null) {
-      remaining.add((unlock.requiredTotalDays! - appDayNumber).clamp(0, 999));
-    }
-    if (unlock.requiredHabitId != null) {
-      // altRequiredHabitId è un OR in _conditionMet: basta il più vicino dei due.
-      final mainRemaining =
-          (unlock.requiredDaysCompleted - daysCompletedFor(unlock.requiredHabitId!))
-              .clamp(0, 999);
-      final altRemaining = unlock.altRequiredHabitId != null
-          ? (unlock.requiredDaysCompleted - daysCompletedFor(unlock.altRequiredHabitId!))
-              .clamp(0, 999)
-          : mainRemaining;
-      remaining.add(mainRemaining < altRemaining ? mainRemaining : altRemaining);
-    }
-    if (unlock.appDayMin != null) {
-      remaining.add((unlock.appDayMin! - appDayNumber).clamp(0, 999));
-    }
-
-    if (remaining.isEmpty) return 0;
-    return remaining.reduce((a, b) => a > b ? a : b);
-  }
-
   /// Tutti i badge (guadagnati + prossimo obiettivo da sbloccare per ogni
   /// famiglia a livelli) — sempre la stessa lista di tile, alcune piene,
   /// altre col traguardo successivo mostrato esplicitamente.
@@ -828,34 +853,102 @@ extension ProgressionProviderUI on ProgressionProvider {
     final activeCount = activeHabits.length;
     final rooted = consolidatedHabitsCount;
 
+    const badgesDir = 'assets/images/badges/';
+
     return [
       // ── Costanza: bronzo 7g / argento 21g / oro 42g ────────────────────
       _tierBadge(key: 'consistency', progress: total, tiers: [
-        (7,  '🥉', s.badgeOneWeek,    s.badgeOneWeekDesc),
-        (21, '🥈', s.badgeThreeWeeks, s.badgeThreeWeeksDesc),
-        (42, '🥇', s.badgeSixWeeks,   s.badgeSixWeeksDesc),
+        (
+          7,
+          '🥉',
+          s.badgeOneWeek,
+          s.badgeOneWeekDesc,
+          '${badgesDir}badge_medal_bronze.jpg'
+        ),
+        (
+          21,
+          '🥈',
+          s.badgeThreeWeeks,
+          s.badgeThreeWeeksDesc,
+          '${badgesDir}badge_medal_silver.jpg'
+        ),
+        (
+          42,
+          '🥇',
+          s.badgeSixWeeks,
+          s.badgeSixWeeksDesc,
+          '${badgesDir}badge_medal_gold.jpg'
+        ),
       ]),
       // ── Abitudini attive in parallelo: bronzo 2 / oro 4 ────────────────
       _tierBadge(key: 'activeHabits', progress: activeCount, tiers: [
-        (2, '🥉', s.badgeInSync,     s.badgeInSyncDesc),
-        (4, '🥇', s.badgeMultihabit, s.badgeMultihabitDesc),
+        (
+          2,
+          '🥉',
+          s.badgeInSync,
+          s.badgeInSyncDesc,
+          '${badgesDir}badge_linked_rings.jpg'
+        ),
+        (
+          4,
+          '🥇',
+          s.badgeMultihabit,
+          s.badgeMultihabitDesc,
+          '${badgesDir}badge_trophy.jpg'
+        ),
       ]),
       // ── Abitudini radicate (soglie di fase 2/3/4): bronzo 1 / argento 3 / oro 7
       _tierBadge(key: 'rooted', progress: rooted, tiers: [
-        (1, '🥉', '${s.badgeRootedName} · ${s.badgeTierBronze}', s.badgeRootedDesc),
-        (3, '🥈', '${s.badgeRootedName} · ${s.badgeTierSilver}', s.badgeRootedDesc),
-        (7, '🥇', '${s.badgeRootedName} · ${s.badgeTierGold}',   s.badgeRootedDesc),
+        (
+          1,
+          '🥉',
+          '${s.badgeRootedName} · ${s.badgeTierBronze}',
+          s.badgeRootedDesc,
+          '${badgesDir}badge_tree_growth.jpg'
+        ),
+        (
+          3,
+          '🥈',
+          '${s.badgeRootedName} · ${s.badgeTierSilver}',
+          s.badgeRootedDesc,
+          '${badgesDir}badge_tree_roots.jpg'
+        ),
+        (
+          7,
+          '🥇',
+          '${s.badgeRootedName} · ${s.badgeTierGold}',
+          s.badgeRootedDesc,
+          '${badgesDir}badge_forest.jpg'
+        ),
       ]),
       // ── Traguardi unici ─────────────────────────────────────────────────
-      BadgeInfo(key: 'firstStep', emoji: '🌱', name: s.badgeFirstStep, description: s.badgeFirstStepDesc,
-          earned: total >= 1, progress: total.clamp(0, 1), target: 1),
-      BadgeInfo(key: 'veteran', emoji: '✨', name: s.badgeThreeMonths, description: s.badgeThreeMonthsDesc,
-          earned: total >= 90, progress: total.clamp(0, 90), target: 90),
+      BadgeInfo(
+          key: 'firstStep',
+          emoji: '🌱',
+          name: s.badgeFirstStep,
+          description: s.badgeFirstStepDesc,
+          earned: total >= 1,
+          progress: total.clamp(0, 1),
+          target: 1,
+          imageAsset: '${badgesDir}badge_sprout.jpg'),
+      BadgeInfo(
+          key: 'veteran',
+          emoji: '✨',
+          name: s.badgeThreeMonths,
+          description: s.badgeThreeMonthsDesc,
+          earned: total >= 90,
+          progress: total.clamp(0, 90),
+          target: 90,
+          imageAsset: '${badgesDir}badge_sparkle.jpg'),
       // ── Specialità per abitudine ─────────────────────────────────────────
-      _specialtyBadge('hydrated', '💧', s.badgeHydrated, s.badgeHydratedDesc, statusOf('water')),
-      _specialtyBadge('focused', '🎯', s.badgeFocused, s.badgeFocusedDesc, statusOf('focus_25')),
-      _specialtyBadge('walker', '🚶', s.badgeWalker, s.badgeWalkerDesc, statusOf('walk_lunch')),
-      _specialtyBadge('breath', '🧘', s.badgeBreath, s.badgeBreathDesc, statusOf('breathing_box')),
+      _specialtyBadge('hydrated', '💧', s.badgeHydrated, s.badgeHydratedDesc,
+          statusOf('water'), '${badgesDir}badge_water_drop.jpg'),
+      _specialtyBadge('focused', '🎯', s.badgeFocused, s.badgeFocusedDesc,
+          statusOf('focus_25'), '${badgesDir}badge_target.jpg'),
+      _specialtyBadge('walker', '🚶', s.badgeWalker, s.badgeWalkerDesc,
+          statusOf('walk_lunch'), '${badgesDir}badge_footprints.jpg'),
+      _specialtyBadge('breath', '🧘', s.badgeBreath, s.badgeBreathDesc,
+          statusOf('breathing_box'), '${badgesDir}badge_lotus.jpg'),
     ];
   }
 
@@ -866,7 +959,9 @@ extension ProgressionProviderUI on ProgressionProvider {
   BadgeInfo _tierBadge({
     required String key,
     required int progress,
-    required List<(int target, String emoji, String name, String desc)> tiers,
+    required List<
+            (int target, String emoji, String name, String desc, String icon)>
+        tiers,
   }) {
     var highestEarnedIdx = -1;
     for (var i = 0; i < tiers.length; i++) {
@@ -884,14 +979,23 @@ extension ProgressionProviderUI on ProgressionProvider {
       earned: earned,
       progress: progress.clamp(0, tier.$1),
       target: tier.$1,
+      imageAsset: tier.$5,
     );
   }
 
-  BadgeInfo _specialtyBadge(String key, String emoji, String name, String desc, HabitStatus? status) {
-    final earned = status == HabitStatus.consolidated || status == HabitStatus.automatic;
+  BadgeInfo _specialtyBadge(String key, String emoji, String name, String desc,
+      HabitStatus? status, String icon) {
+    final earned =
+        status == HabitStatus.consolidated || status == HabitStatus.automatic;
     return BadgeInfo(
-      key: key, emoji: emoji, name: name, description: desc,
-      earned: earned, progress: earned ? 1 : 0, target: 1,
+      key: key,
+      emoji: emoji,
+      name: name,
+      description: desc,
+      earned: earned,
+      progress: earned ? 1 : 0,
+      target: 1,
+      imageAsset: icon,
     );
   }
 
@@ -904,7 +1008,8 @@ extension ProgressionProviderUI on ProgressionProvider {
     final data = <int>[];
     for (int i = 34; i >= 0; i--) {
       final day = today.subtract(Duration(days: i));
-      final dateStr = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+      final dateStr =
+          '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
       if (filterHabitId != null) {
         final state = _states[filterHabitId];
         data.add(_habitCompletedOn(state, dateStr) ? 1 : 0);
@@ -927,7 +1032,8 @@ extension ProgressionProviderUI on ProgressionProvider {
     // Fallback: usa lastCompletedAt per dati migrati senza completionDates
     final last = state.lastCompletedAt;
     if (last == null) return false;
-    final lastStr = '${last.year}-${last.month.toString().padLeft(2, '0')}-${last.day.toString().padLeft(2, '0')}';
+    final lastStr =
+        '${last.year}-${last.month.toString().padLeft(2, '0')}-${last.day.toString().padLeft(2, '0')}';
     return lastStr == dateStr;
   }
 
@@ -984,18 +1090,18 @@ extension ProgressionProviderUI on ProgressionProvider {
         // coachIntro/coachDaily sono solo in italiano e non vanno mai mostrati direttamente.
         if (minDays == 0) {
           if (def.id == 'water') return s.firstHabitBody2;
-          return s.habitDesc(def.id); // Primo giorno: descrizione abitudine localizzata
+          return s.habitDesc(
+              def.id); // Primo giorno: descrizione abitudine localizzata
         }
-        if (minDays == 1)  return s.coachDay1;
-        if (minDays == 3)  return s.coachDay3;
-        if (minDays == 7)  return s.coachDay7;
+        if (minDays == 1) return s.coachDay1;
+        if (minDays == 3) return s.coachDay3;
+        if (minDays == 7) return s.coachDay7;
         if (minDays == 14) return s.coachDay14;
         return s.habitDesc(def.id); // Default: descrizione localizzata
       }
     }
     return s.coachGeneral;
   }
-
 }
 
 /// Un badge (guadagnato o prossimo obiettivo) mostrato nella schermata Growth.
@@ -1007,12 +1113,21 @@ class BadgeInfo {
   final String emoji;
   final String name;
   final String description;
+
   /// True se almeno il primo livello della famiglia è stato raggiunto.
   final bool earned;
+
   /// Valore corrente della metrica (es. giorni, abitudini attive).
   final int progress;
+
   /// Soglia del livello mostrato (raggiunto se maxato, prossimo altrimenti).
   final int target;
+
+  /// Percorso opzionale di un'illustrazione (assets/images/badges/...) da
+  /// mostrare al posto dell'emoji, senza toccare la UI quando arriverà: se
+  /// null la UI resta sull'emoji, com'è oggi per tutti i badge.
+  final String? imageAsset;
+
   const BadgeInfo({
     required this.key,
     required this.emoji,
@@ -1021,6 +1136,7 @@ class BadgeInfo {
     required this.earned,
     required this.progress,
     required this.target,
+    this.imageAsset,
   });
 
   /// True se questa tile è al livello massimo della sua famiglia (piena),
@@ -1028,21 +1144,45 @@ class BadgeInfo {
   bool get isMaxed => progress >= target;
 }
 
+/// Bonus assegnato quando UNA SPECIFICA abitudine si assimila (7 giorni) —
+/// distinto dai punti giornalieri per il completamento e dal badge globale
+/// "costanza" (che conta i giorni su TUTTE le abitudini insieme): questo è
+/// il traguardo personale di quella singola abitudine.
+const int pointsForConsolidation = 80;
 
+/// Bonus assegnato quando UNA SPECIFICA abitudine diventa automatica (66
+/// giorni, Lally et al. 2010) — il traguardo più grande legato a una sola
+/// abitudine, per questo vale più del bonus di assimilazione a 7 giorni.
+const int pointsForAutomatic = 250;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/// Punti assegnati allo sblocco di un badge — i tier (🥉🥈🥇) derivano
+/// dall'emoji già mostrata all'utente, così la ricompensa numerica rispecchia
+/// esattamente la rarità che l'utente vede, senza una seconda tabella di
+/// pesi da tenere sincronizzata a mano con [ProgressionProvider.allBadges].
+/// I badge di specialità (💧🎯🚶🧘) invece NON sono tutti uguali: tutti
+/// richiedono la stessa cosa (7 giorni di quella specifica abitudine), ma
+/// 'hydrated'/'focused' si ottengono su abitudini starter (disponibili dal
+/// giorno 1), mentre 'walker'/'breath' richiedono aver prima sbloccato
+/// walk_lunch/breathing_box — settimane di percorso in più prima di poter
+/// anche solo iniziare. Stesso "costo" al momento del badge, ma percorso
+/// molto più lungo per arrivarci: pagarli uguale premierebbe di meno chi ha
+/// fatto più strada.
+int pointsForBadge(BadgeInfo badge) {
+  switch (badge.emoji) {
+    case '🥉':
+      return 30;
+    case '🥈':
+      return 60;
+    case '🥇':
+      return 120;
+    case '✨': // veteran: 90 giorni, il traguardo più raro
+      return 200;
+    case '🌱': // firstStep: primo giorno in assoluto
+      return 20;
+    case '💧': // hydrated: water, starter, accessibile da subito
+    case '🎯': // focused: focus_25, starter, accessibile da subito
+      return 40;
+    default: // walker (🚶) e breath (🧘): richiedono sblocchi a monte
+      return 60;
+  }
+}

@@ -35,6 +35,7 @@ enum AuthError {
   serverError,
   cancelled,
   accountDisabled,
+  requiresRecentLogin,
 }
 
 extension AuthErrorMessage on AuthError {
@@ -42,14 +43,24 @@ extension AuthErrorMessage on AuthError {
   /// l'enum stesso non ha accesso al BuildContext/locale corrente.
   String localizedMessage(BwStrings s) {
     switch (this) {
-      case AuthError.invalidCredentials: return s.errorInvalidCredentials;
-      case AuthError.tooManyAttempts:    return s.errorTooManyAttempts;
-      case AuthError.emailAlreadyExists: return s.errorEmailInUse;
-      case AuthError.offline:            return s.errorNetwork;
-      case AuthError.timeout:            return s.errorTimeout;
-      case AuthError.serverError:        return s.errorGeneral;
-      case AuthError.cancelled:          return s.errorCancelled;
-      case AuthError.accountDisabled:    return s.errorAccountDisabled;
+      case AuthError.invalidCredentials:
+        return s.errorInvalidCredentials;
+      case AuthError.tooManyAttempts:
+        return s.errorTooManyAttempts;
+      case AuthError.emailAlreadyExists:
+        return s.errorEmailInUse;
+      case AuthError.offline:
+        return s.errorNetwork;
+      case AuthError.timeout:
+        return s.errorTimeout;
+      case AuthError.serverError:
+        return s.errorGeneral;
+      case AuthError.cancelled:
+        return s.errorCancelled;
+      case AuthError.accountDisabled:
+        return s.errorAccountDisabled;
+      case AuthError.requiresRecentLogin:
+        return s.errorRequiresRecentLogin;
     }
   }
 }

@@ -1,7 +1,13 @@
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'services/consent_service.dart';
+import 'services/schema_version_service.dart';
+import 'services/remote_flags_service.dart';
 
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
@@ -29,11 +35,32 @@ import 'widgets/bw_scaffold.dart';
 import 'services/notification_service.dart';
 
 void main() async {
+  // runZonedGuarded + gli handler sotto: prima un'eccezione non intercettata
+  // (framework o asincrona) crashava senza lasciare nessuna traccia — zero
+  // telemetria per sapere che fosse successo in produzione.
+  runZonedGuarded(_bootstrap, (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+  });
+}
+
+Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+
+  // Un campo "versione schema" sui dati locali: non fa nulla di attivo
+  // oggi, ma il giorno in cui la forma di una chiave SharedPreferences
+  // cambierà, distingue un'installazione con dati vecchi da una pulita
+  // invece di scoprirlo a tentoni.
+  await SchemaVersionService.markCurrent();
 
   await SystemChrome.setPreferredOrientations(
       [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
@@ -47,8 +74,24 @@ void main() async {
   // LocaleProvider.init() (rescheduleBwReminders in app_localizations.dart),
   // in base a lingua, frequenza scelta e pausa attiva.
 
-  // AdMob — inizializzazione prima di runApp
+  // Consenso ads (UMP/GDPR per l'UE, ATT per iOS) PRIMA di inizializzare
+  // AdMob — prima gli ad si caricavano incondizionatamente, senza chiedere
+  // nulla, rischio concreto di violazione policy Play Store per il
+  // traffico UE (l'app è italiana).
+  await ConsentService.instance.requestConsent();
   await MobileAds.instance.initialize();
+  // Non bloccante: usa i default sicuri (tutto spento) finché non arriva.
+  unawaited(RemoteFlagsService.instance.load());
+
+  // LocaleProvider va inizializzato PRIMA di runApp, non con create+cascata:
+  // prima partiva con la lingua di default (inglese) mentre leggeva quella
+  // salvata da SharedPreferences in background — nella finestra tra il primo
+  // frame e il completamento di quella lettura, qualunque tutorial/dialogo
+  // triggerato subito (navigazione ad Abitudini appena aperta l'app, reset
+  // del tutorial seguito da riavvio per ritestarlo) veniva risolto in
+  // inglese, per poi "scattare" nella lingua giusta al termine della lettura.
+  final localeProvider = LocaleProvider();
+  await localeProvider.init();
 
   runApp(
     MultiProvider(
@@ -58,7 +101,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AppProvider()..init()),
         ChangeNotifierProvider(create: (_) => OnboardingProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()..init()),
-        ChangeNotifierProvider(create: (_) => LocaleProvider()..init()),
+        ChangeNotifierProvider.value(value: localeProvider),
         ChangeNotifierProvider(create: (_) => ProgressionProvider()..init()),
         ChangeNotifierProvider(create: (_) => ScheduleProvider()..init()),
         ChangeNotifierProvider(create: (_) => TutorialProvider()..init()),
@@ -93,7 +136,10 @@ class BewellApp extends StatelessWidget {
                 return Stack(
                   children: [
                     Positioned(
-                      top: 0, left: 0, right: 0, height: 100,
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 100,
                       child: CustomPaint(
                         painter: HorizonPainter(
                           dark: theme.paletteData.isDark,
@@ -156,18 +202,11 @@ class BewellApp extends StatelessWidget {
         final offset = Tween<Offset>(
           begin: const Offset(1.0, 0.0),
           end: Offset.zero,
-        ).animate(CurvedAnimation(
-            parent: animation, curve: Curves.easeOutCubic));
+        ).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
         return SlideTransition(position: offset, child: child);
       },
       transitionDuration: const Duration(milliseconds: 280),
     );
   }
 }
-
-
-
-
-
-
-

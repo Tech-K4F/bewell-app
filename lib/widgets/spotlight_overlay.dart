@@ -16,10 +16,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/theme_provider.dart';
+import 'companion/companion_widget.dart';
 
 // ── Forma del faro ────────────────────────────────────────────────────────────
 enum SpotlightShape { circle, roundedRect }
@@ -112,6 +114,21 @@ class SpotlightController extends ChangeNotifier {
   String _tutorialId = '';
   bool _persistOnFinish = true;
 
+  /// True mentre un popup a schermo intero ESTERNO a questo motore (festa
+  /// consolidamento, sblocco badge, milestone streak, scelta abitudine) è
+  /// visibile. Senza questo flag, TutorialProvider.trigger() e queste
+  /// schermate potevano aprirsi entrambe nello stesso istante — es. il
+  /// primo giorno d'acqua completato fa scattare sia il dialog Welly
+  /// "first_completion" sia il badge "primo passo" nello stesso tick,
+  /// e i due motori non si vedevano a vicenda.
+  bool _externalBusy = false;
+  bool get externalBusy => _externalBusy;
+  void setExternalBusy(bool busy) {
+    if (_externalBusy == busy) return;
+    _externalBusy = busy;
+    notifyListeners();
+  }
+
   /// Nome scelto dall'utente per il companion in onboarding — salvato ma
   /// mai davvero usato: la bolla del tutorial diceva sempre "Welly" a
   /// prescindere. Caricato una volta (vedi [loadCompanionName]).
@@ -181,7 +198,8 @@ class SpotlightController extends ChangeNotifier {
   /// [persist] = false per i dialoghi contestuali, la cui persistenza "già
   /// visto" è gestita da TutorialProvider con una propria chiave — evita
   /// una doppia fonte di verità sullo stesso concetto.
-  void startTutorial(String id, List<SpotlightStep> steps, {bool persist = true}) {
+  void startTutorial(String id, List<SpotlightStep> steps,
+      {bool persist = true}) {
     _tutorialId = id;
     _steps = steps;
     _index = 0;
@@ -198,6 +216,14 @@ class SpotlightController extends ChangeNotifier {
     } else {
       _finish();
     }
+  }
+
+  bool get canGoBack => _isActive && _index > 0;
+
+  void previous() {
+    if (!canGoBack) return;
+    _index--;
+    notifyListeners();
   }
 
   void skip() => _finish();
@@ -281,6 +307,7 @@ class _SpotlightOverlayState extends State<SpotlightOverlay>
 
   @override
   Widget build(BuildContext context) {
+    final p = context.watch<ThemeProvider>().paletteData;
     return Consumer<SpotlightController>(
       builder: (context, ctrl, _) {
         // Fade in all'attivazione, fade out alla fine
@@ -306,24 +333,31 @@ class _SpotlightOverlayState extends State<SpotlightOverlay>
                   builder: (ctx, _) {
                     if (_fadeCtrl.value == 0) return const SizedBox.shrink();
 
-                    final Rect? targetRaw = step != null
-                        ? ctrl.targetRect(step.targetId)
-                        : null;
+                    final Rect? targetRaw =
+                        step != null ? ctrl.targetRect(step.targetId) : null;
                     final Rect? targetRect = targetRaw?.inflate(step!.padding);
-                    final shape =
-                        step?.shape ?? SpotlightShape.roundedRect;
+                    final shape = step?.shape ?? SpotlightShape.roundedRect;
 
                     return Stack(
                       children: [
-                        // 1. Overlay scuro + buco spotlight (se c'è un target)
-                        CustomPaint(
-                          painter: _SpotlightPainter(
-                            spotlightRect: targetRect,
-                            overlayOpacity: _fadeAnim.value,
-                            pulseValue: _pulseAnim.value,
-                            shape: shape,
+                        // 1. Overlay scuro + buco spotlight (se c'è un target).
+                        // Avvolto in un GestureDetector opaco: prima non
+                        // assorbiva i tap fuori dal buco/bolla, lasciandoli
+                        // passare alla UI reale sottostante mentre il
+                        // tutorial era ancora aperto.
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {},
+                          child: CustomPaint(
+                            painter: _SpotlightPainter(
+                              spotlightRect: targetRect,
+                              overlayOpacity: _fadeAnim.value,
+                              pulseValue: _pulseAnim.value,
+                              shape: shape,
+                              accent: p.primary,
+                            ),
+                            size: MediaQuery.of(ctx).size,
                           ),
-                          size: MediaQuery.of(ctx).size,
                         ),
                         // 1b. Hotspot cliccabile sul buco, se lo step lo richiede:
                         // il faro è già visivamente sopra il pulsante reale, questo
@@ -371,18 +405,26 @@ class _SpotlightPainter extends CustomPainter {
   final double pulseValue;
   final SpotlightShape shape;
 
+  /// Colore primario del tema attivo — usato per tingere leggermente lo
+  /// scrim e l'anello del faro invece di nero/bianco puri, così il
+  /// tutorial porta l'identità della palette scelta invece di sembrare
+  /// un overlay generico da videogioco.
+  final Color accent;
+
   const _SpotlightPainter({
     required this.spotlightRect,
     required this.overlayOpacity,
     required this.pulseValue,
     required this.shape,
+    required this.accent,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final fullRect = Offset.zero & size;
+    final scrimBase = Color.lerp(Colors.black, accent, 0.12)!;
     final overlayPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.80 * overlayOpacity);
+      ..color = scrimBase.withValues(alpha: 0.78 * overlayOpacity);
 
     if (spotlightRect == null) {
       // Dialogo contestuale / step intro-outro: overlay pieno senza buco
@@ -404,19 +446,21 @@ class _SpotlightPainter extends CustomPainter {
       canvas,
       spotlightRect!.inflate(2),
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.60 * overlayOpacity)
+        ..color = Color.lerp(Colors.white, accent, 0.35)!
+            .withValues(alpha: 0.70 * overlayOpacity)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5,
     );
 
-    // Anello pulsante (effetto videogame)
+    // Anello pulsante (effetto app, non reticolo da videogioco: colore
+    // di brand invece di bianco neutro)
     final pulseExpand = 4.0 + 12.0 * pulseValue;
     _drawShapeBorder(
       canvas,
       spotlightRect!.inflate(pulseExpand),
       Paint()
-        ..color = Colors.white
-            .withValues(alpha: (0.45 - 0.45 * pulseValue) * overlayOpacity)
+        ..color =
+            accent.withValues(alpha: (0.5 - 0.5 * pulseValue) * overlayOpacity)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0,
     );
@@ -473,10 +517,19 @@ class _SpotlightBubble extends StatelessWidget {
     final isAmb = theme.isAmbient;
     final s = context.sL;
     final size = MediaQuery.of(context).size;
+    // L'app disegna sotto la barra di sistema (tasti/gesti): lo spazio
+    // davvero utilizzabile finisce sopra di essa, altrimenti il pulsante
+    // "Avanti" della bolla resta nascosto sotto i tasti.
+    final usableHeight =
+        size.height - MediaQuery.of(context).viewPadding.bottom;
 
     final displayText = step.text ?? s.spotlightText(step.textId!);
 
+    // Key sul testo: forza un nuovo State (quindi _factExpanded resettato)
+    // ad ogni cambio di step/dialogo — altrimenti un fact espanso su uno
+    // step restava espanso anche su quello successivo con testo diverso.
     final card = _BubbleCard(
+      key: ValueKey(displayText),
       text: displayText,
       fact: step.fact,
       moodEmoji: step.moodEmoji,
@@ -502,26 +555,38 @@ class _SpotlightBubble extends StatelessWidget {
     }
 
     // ── Con target: sopra o sotto, in base allo spazio disponibile ────────
-    const double estimatedBubbleHeight = 220.0;
+    // Una stima fissa dell'altezza bolla poteva far uscire dallo schermo
+    // testi lunghi (fact scientifico presente, lingue più prolisse come il
+    // tedesco): ora si passa lo spazio realmente disponibile e la bolla
+    // diventa scrollabile al suo interno se il contenuto lo supera, invece
+    // di rischiare il clipping.
+    const double minBubbleHeight = 300.0;
     const double gap = 20.0;
     const double hPad = 20.0;
+    const double safeMargin = 24.0;
 
     double? top;
     double? bottom;
+    final double maxHeight;
 
-    final spaceBelow = size.height - targetRect!.bottom;
+    final spaceBelow = usableHeight - targetRect!.bottom;
     final spaceAbove = targetRect!.top;
-    if (spaceBelow >= estimatedBubbleHeight + gap) {
+    if (spaceBelow >= minBubbleHeight + gap) {
       top = targetRect!.bottom + gap;
-    } else if (spaceAbove >= estimatedBubbleHeight + gap) {
+      maxHeight = spaceBelow - gap - safeMargin;
+    } else if (spaceAbove >= minBubbleHeight + gap) {
       bottom = size.height - targetRect!.top + gap;
+      maxHeight = spaceAbove - gap - safeMargin;
     } else {
       top = (targetRect!.bottom + gap)
-          .clamp(0.0, size.height - estimatedBubbleHeight - 8);
+          .clamp(0.0, usableHeight - minBubbleHeight - 8);
+      maxHeight = (usableHeight - top - safeMargin)
+          .clamp(minBubbleHeight, usableHeight);
     }
 
     final positioned = Container(
       margin: const EdgeInsets.symmetric(horizontal: hPad),
+      constraints: BoxConstraints(maxHeight: maxHeight),
       child: card,
     );
 
@@ -536,7 +601,7 @@ class _SpotlightBubble extends StatelessWidget {
 // ── BubbleCard ────────────────────────────────────────────────────────────────
 /// Il corpo visivo della bolla: avatar Welly, testo, fatto opzionale,
 /// footer di navigazione (default per i tour) o azioni custom (dialoghi).
-class _BubbleCard extends StatelessWidget {
+class _BubbleCard extends StatefulWidget {
   final String text;
   final String? fact;
   final String? moodEmoji;
@@ -549,6 +614,7 @@ class _BubbleCard extends StatelessWidget {
   final VoidCallback? onClose;
 
   const _BubbleCard({
+    super.key,
     required this.text,
     required this.fact,
     required this.moodEmoji,
@@ -562,193 +628,376 @@ class _BubbleCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final accent = p.primary;
+  State<_BubbleCard> createState() => _BubbleCardState();
+}
 
-    return Container(
-      decoration: BoxDecoration(
-        color: celebrating ? Color.lerp(p.bg, p.primaryLight, 0.4) : p.bg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: celebrating ? accent.withValues(alpha: 0.55) : p.cardBorder,
-          width: celebrating ? 1.5 : 1,
-        ),
-        boxShadow: [
-          if (celebrating)
-            BoxShadow(
-              color: accent.withValues(alpha: 0.30),
-              blurRadius: 36,
-              spreadRadius: 4,
-              offset: const Offset(0, 8),
-            ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+class _BubbleCardState extends State<_BubbleCard> {
+  bool _factExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.p;
+    final isAmb = widget.isAmb;
+    final s = widget.s;
+    final controller = widget.controller;
+    final celebrating = widget.celebrating;
+    final accent = p.primary;
+    final hasFact = widget.fact != null && widget.fact!.isNotEmpty;
+
+    // Welly "peeking" sopra la bolla — non più un'iconcina in un header
+    // insieme a nome/mood/chiudi/indietro, come se fosse la barra di
+    // un'app: ora è un personaggio che sporge da sopra la bolla e parla,
+    // col nome come didascalia sotto di lui.
+    const double avatarSize = 68.0;
+    const double avatarOverlap = 34.0; // quanto sporge dentro la bolla
+    const double topReserve = 46.0; // spazio riservato dentro la bolla
+
+    // La bolla vive in un overlay disegnato a mano (Positioned.fill fuori
+    // da Scaffold/Dialog), senza un Material come antenato diretto: senza
+    // questo, Flutter applica lo stile di testo di debug "manca Material"
+    // — sottolineatura gialla doppia su ogni Text, bottoni inclusi. Gli
+    // altri popup dell'app (AlertDialog, bottom sheet) non ne soffrono
+    // perché quei widget avvolgono già il contenuto in un Material.
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          // ── Header: avatar + nome + mood + chiudi ──────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 12, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: p.primaryLight,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: accent.withValues(alpha: 0.35), width: 1.5),
+          Container(
+            margin: const EdgeInsets.only(top: avatarSize - avatarOverlap),
+            decoration: BoxDecoration(
+              // p.card (non p.bg) e bordo sottile 0.5px, come le altre
+              // finestre dell'app (AlertDialog, foglio premi): prima la
+              // bolla usava lo stesso colore dello sfondo pagina con un
+              // bordo pesante per simulare il rilievo, invece di leggersi
+              // come una vera card sollevata.
+              color: celebrating
+                  ? Color.lerp(p.card, p.primaryLight, 0.4)
+                  : p.card,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color:
+                    celebrating ? accent.withValues(alpha: 0.55) : p.cardBorder,
+                width: celebrating ? 1 : 0.5,
+              ),
+              boxShadow: [
+                if (celebrating)
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.30),
+                    blurRadius: 36,
+                    spreadRadius: 4,
+                    offset: const Offset(0, 8),
                   ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/images/companion/companion_base.png',
-                      width: 44,
-                      height: 44,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Center(
-                        child: Text(moodEmoji ?? '🌿', style: const TextStyle(fontSize: 20)),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Text(
-                        controller.companionName,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: isAmb ? 'CormorantGaramond' : null,
-                          color: accent,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      if (moodEmoji != null) ...[
-                        const SizedBox(width: 6),
-                        Text(moodEmoji!, style: const TextStyle(fontSize: 12)),
-                      ],
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: onClose ?? controller.skip,
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.close_rounded, size: 18, color: p.textMut),
-                  ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
-          ),
-
-          // ── Testo principale ────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: isAmb ? 15.5 : 14.5,
-                fontFamily: isAmb ? 'CormorantGaramond' : null,
-                color: p.text,
-                height: 1.55,
-              ),
-            ),
-          ),
-
-          // ── Fatto scientifico ────────────────────────────────────────────────
-          if (fact != null && fact!.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: p.accent.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: p.accent.withValues(alpha: 0.15), width: 0.5),
+            // Scrollabile: se il contenuto (testo lungo, fact scientifico,
+            // lingue più prolisse) supera lo spazio disponibile calcolato in
+            // _SpotlightBubble, scorre invece di uscire dallo schermo.
+            child: SingleChildScrollView(
+              child: AnimatedSwitcher(
+                // Piccola dissolvenza tra uno step e l'altro dei tour guidati —
+                // prima il contenuto cambiava di scatto, un cambio isolato non
+                // si sentiva come un vero passo avanti.
+                duration: const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOut,
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                            begin: const Offset(0, 0.03), end: Offset.zero)
+                        .animate(anim),
+                    child: child,
+                  ),
                 ),
-                child: Row(
+                child: Column(
+                  key: ValueKey(
+                      '${controller.currentIndex}-${widget.text.hashCode}'),
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('🔬', style: TextStyle(fontSize: 11)),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        fact!,
-                        style: TextStyle(fontSize: 11, color: p.textSec, height: 1.45),
+                    const SizedBox(height: topReserve),
+                    // ── Didascalia: nome + mood, sotto Welly che sporge ──────
+                    Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            controller.companionName,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: isAmb ? 'CormorantGaramond' : null,
+                              color: accent,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          if (widget.moodEmoji != null) ...[
+                            const SizedBox(width: 6),
+                            Text(widget.moodEmoji!,
+                                style: const TextStyle(fontSize: 12)),
+                          ],
+                        ],
                       ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // ── Testo principale — bordo d'accento a sinistra, come
+                    // una battuta di dialogo, non una didascalia informativa.
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        padding: const EdgeInsets.only(left: 10),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(
+                                color: accent.withValues(alpha: 0.4),
+                                width: 2.5),
+                          ),
+                        ),
+                        child: Text(
+                          widget.text,
+                          style: TextStyle(
+                            fontSize: isAmb ? 15.5 : 14.5,
+                            fontFamily: isAmb ? 'CormorantGaramond' : null,
+                            // p.textSec, come il corpo testo di AlertDialog
+                            // altrove nell'app — p.text (colore pieno) è
+                            // uno dei motivi per cui sembrava più marcato
+                            // del resto.
+                            color: p.textSec,
+                            height: 1.55,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // ── Fatto scientifico — collassato di default: un tour rapido
+                    // non deve sembrare un articolo scientifico da leggere ad ogni
+                    // passo, ma chi vuole la fonte la trova con un tap.
+                    if (hasFact) ...[
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: GestureDetector(
+                          onTap: () =>
+                              setState(() => _factExpanded = !_factExpanded),
+                          child: AnimatedSize(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                            alignment: Alignment.topCenter,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: p.accent.withValues(alpha: 0.07),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color: p.accent.withValues(alpha: 0.15),
+                                    width: 0.5),
+                              ),
+                              child: _factExpanded
+                                  ? Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('🔬',
+                                            style: TextStyle(fontSize: 11)),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            widget.fact!,
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: p.textSec,
+                                                height: 1.45),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Row(
+                                      children: [
+                                        const Text('🔬',
+                                            style: TextStyle(fontSize: 11)),
+                                        const SizedBox(width: 6),
+                                        Text(s.tutorialShowSource,
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: p.textSec,
+                                                fontWeight: FontWeight.w600)),
+                                        const Spacer(),
+                                        Icon(Icons.expand_more_rounded,
+                                            size: 15, color: p.textMut),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 14),
+
+                    // ── Footer: step dots (solo tour) + azioni ──────────────────────
+                    if (widget.actions == null && controller.totalSteps > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(controller.totalSteps, (i) {
+                            final isActive = i == controller.currentIndex;
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              width: isActive ? 18 : 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? p.primary
+                                    : p.textMut.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                      child: widget.actions != null
+                          ? Row(
+                              children: [
+                                for (int i = 0;
+                                    i < widget.actions!.length;
+                                    i++) ...[
+                                  if (i > 0) const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _ActionButton(
+                                      label: widget.actions![i].label,
+                                      isPrimary: widget.actions![i].isPrimary,
+                                      p: p,
+                                      accent: accent,
+                                      isAmb: isAmb,
+                                      onTap: () {
+                                        HapticFeedback.selectionClick();
+                                        widget.actions![i].onTap();
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            )
+                          : Align(
+                              alignment: Alignment.centerRight,
+                              child: _ActionButton(
+                                label: controller.isLastStep
+                                    ? s.tutorialOk
+                                    : s.tutorialNext,
+                                isPrimary: true,
+                                p: p,
+                                accent: accent,
+                                isAmb: isAmb,
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  controller.next();
+                                },
+                                compact: true,
+                              ),
+                            ),
                     ),
                   ],
                 ),
               ),
             ),
-          ],
+          ),
 
-          const SizedBox(height: 14),
-
-          // ── Footer: step dots (solo tour) + azioni ──────────────────────────
-          if (actions == null && controller.totalSteps > 1)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(controller.totalSteps, (i) {
-                  final isActive = i == controller.currentIndex;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    width: isActive ? 18 : 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: isActive ? p.primary : p.textMut.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(3),
+          // ── Welly, sopra la bolla ────────────────────────────────────────
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: avatarSize,
+                height: avatarSize,
+                decoration: BoxDecoration(
+                  color: p.primaryLight,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: accent.withValues(alpha: 0.4), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.25),
+                      blurRadius: 18,
+                      spreadRadius: 1,
                     ),
-                  );
-                }),
+                  ],
+                ),
+                child: ClipOval(
+                  child: CompanionWidget(
+                    size: avatarSize,
+                    mood: celebrating ? WellyMood.radiant : WellyMood.calm,
+                  ),
+                ),
               ),
             ),
+          ),
 
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            child: actions != null
-                ? Row(
-                    children: [
-                      for (int i = 0; i < actions!.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 8),
-                        Expanded(
-                          child: _ActionButton(
-                            label: actions![i].label,
-                            isPrimary: actions![i].isPrimary,
-                            p: p,
-                            accent: accent,
-                            isAmb: isAmb,
-                            onTap: actions![i].onTap,
-                          ),
-                        ),
-                      ],
-                    ],
-                  )
-                : Align(
-                    alignment: Alignment.centerRight,
-                    child: _ActionButton(
-                      label: controller.isLastStep ? s.tutorialOk : s.tutorialNext,
-                      isPrimary: true,
-                      p: p,
-                      accent: accent,
-                      isAmb: isAmb,
-                      onTap: controller.next,
-                      compact: true,
+          // ── Controlli — indietro/salta, in alto a destra sulla bolla ────
+          Positioned(
+            top: avatarSize - avatarOverlap + 10,
+            right: 10,
+            child: Row(
+              children: [
+                // Indietro — solo nei tour multi-step, se non siamo già al
+                // primo passo. Prima non c'era alcun modo di rileggere lo
+                // step precedente dopo aver toccato "Avanti" troppo in fretta.
+                if (controller.totalSteps > 1 && controller.canGoBack) ...[
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      controller.previous();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(Icons.arrow_back_ios_new_rounded,
+                          size: 15, color: p.textMut),
                     ),
                   ),
+                  const SizedBox(width: 4),
+                ],
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    (widget.onClose ?? controller.skip)();
+                  },
+                  // Nei tour multi-step la X chiude l'INTERO tour, non solo
+                  // questo passo: un'icona nuda lo lasciava ambiguo — con
+                  // un tour ancora in corso mostriamo l'etichetta "Salta"
+                  // esplicita, invece della sola X.
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: controller.totalSteps > 1 && !controller.isLastStep
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(s.tutorialSkip,
+                                  style: TextStyle(
+                                      fontSize: 12, color: p.textMut)),
+                              const SizedBox(width: 3),
+                              Icon(Icons.close_rounded,
+                                  size: 15, color: p.textMut),
+                            ],
+                          )
+                        : Icon(Icons.close_rounded, size: 18, color: p.textMut),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

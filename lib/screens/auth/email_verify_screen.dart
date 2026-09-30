@@ -49,7 +49,7 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
       await user?.reload();
       if (user?.emailVerified == true && mounted) {
         _pollTimer?.cancel();
-        Navigator.of(context).pushReplacementNamed('/onboarding');
+        Navigator.of(context).pushReplacementNamed('/welly-welcome');
       }
     } finally {
       _checking = false;
