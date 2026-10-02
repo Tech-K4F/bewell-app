@@ -882,6 +882,7 @@ abstract class BwStrings {
   String get focusMinRemaining;
   String get focusBlockOf4;
   String get focusThenBreak;
+  String get containerSize;
   String focusTimerSpoken(int m, int s);
   String waterGlassAnnounce(int n, int t);
   String habitRingSpoken(int n);
@@ -1162,6 +1163,7 @@ class _En extends BwStrings {
   String get focusMinRemaining => 'min left';
   String get focusBlockOf4 => 'of 4';
   String get focusThenBreak => 'then a 5-minute break';
+  String get containerSize => 'Size';
   String focusTimerSpoken(int m, int s) => '$m minutes $s seconds remaining';
   String waterGlassAnnounce(int n, int t) => 'Glass $n of $t logged';
   String habitRingSpoken(int n) => '$n days completed in total';
@@ -2325,6 +2327,7 @@ class _It extends BwStrings {
   String get focusMinRemaining => 'min rimasti';
   String get focusBlockOf4 => 'di 4';
   String get focusThenBreak => 'poi una pausa di 5 minuti';
+  String get containerSize => 'Dimensione';
   String focusTimerSpoken(int m, int s) => '$m minuti $s secondi rimanenti';
   String waterGlassAnnounce(int n, int t) => 'Bicchiere $n di $t registrato';
   String habitRingSpoken(int n) => '$n giorni completati in totale';
@@ -3497,6 +3500,7 @@ class _Fr extends BwStrings {
   String get focusMinRemaining => 'min restantes';
   String get focusBlockOf4 => 'sur 4';
   String get focusThenBreak => 'puis une pause de 5 minutes';
+  String get containerSize => 'Taille';
   String focusTimerSpoken(int m, int s) => '$m minutes $s secondes restantes';
   String waterGlassAnnounce(int n, int t) => 'Verre $n sur $t enregistré';
   String habitRingSpoken(int n) => '$n jours accomplis au total';
@@ -4685,6 +4689,7 @@ class _De extends BwStrings {
   String get focusMinRemaining => 'Min verbleibend';
   String get focusBlockOf4 => 'von 4';
   String get focusThenBreak => 'danach 5 Minuten Pause';
+  String get containerSize => 'Größe';
   String focusTimerSpoken(int m, int s) => 'Noch $m Minuten $s Sekunden';
   String waterGlassAnnounce(int n, int t) => 'Glas $n von $t erfasst';
   String habitRingSpoken(int n) => '$n Tage insgesamt abgeschlossen';
@@ -5872,6 +5877,7 @@ class _Es extends BwStrings {
   String get focusMinRemaining => 'min restantes';
   String get focusBlockOf4 => 'de 4';
   String get focusThenBreak => 'luego una pausa de 5 minutos';
+  String get containerSize => 'Tamaño';
   String focusTimerSpoken(int m, int s) => 'Quedan $m minutos $s segundos';
   String waterGlassAnnounce(int n, int t) => 'Vaso $n de $t registrado';
   String habitRingSpoken(int n) => '$n días completados en total';

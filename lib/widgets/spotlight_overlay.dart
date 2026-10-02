@@ -1047,9 +1047,10 @@ class _ActionButton extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 44,
-            padding:
-                compact ? const EdgeInsets.symmetric(horizontal: 22) : null,
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: compact
+                ? const EdgeInsets.symmetric(horizontal: 22)
+                : const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
               color: isPrimary ? p.btn : Colors.transparent,
               borderRadius: BorderRadius.circular(14),
@@ -1058,6 +1059,7 @@ class _ActionButton extends StatelessWidget {
             child: Center(
               child: Text(
                 label,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isPrimary ? FontWeight.w700 : FontWeight.w500,

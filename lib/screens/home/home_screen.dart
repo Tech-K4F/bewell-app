@@ -1364,14 +1364,17 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
         left: 20,
         right: 20,
         top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+        bottom: MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).viewPadding.bottom +
+            32,
       ),
       decoration: BoxDecoration(
         color: p.bg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         border: Border.all(color: p.cardBorder, width: 0.5),
       ),
-      child: Column(
+      child: SingleChildScrollView(
+          child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1427,7 +1430,7 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
           if (_type == 'glass') ...[
             // Slider bicchiere 150-400ml step 50
             Text(
-              'Dimensione: ${_ml}ml',
+              '${context.sL.containerSize}: ${_ml}ml',
               style: TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
             ),
@@ -1451,7 +1454,7 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
           ] else ...[
             // Scelta borraccia
             Text(
-              'Dimensione',
+              context.sL.containerSize,
               style: TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
             ),
@@ -1538,7 +1541,7 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
                 ),
               )),
         ],
-      ),
+      )),
     );
   }
 }

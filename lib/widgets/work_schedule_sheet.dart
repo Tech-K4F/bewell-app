@@ -261,8 +261,13 @@ class _WorkScheduleSheetState extends State<WorkScheduleSheet> {
                       }
                     }),
                     child: Container(
-                      width: 42,
-                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      constraints: BoxConstraints(
+                          minWidth: 42 *
+                              MediaQuery.textScalerOf(context)
+                                  .scale(1)
+                                  .clamp(1.0, 2.0)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 9),
                       decoration: BoxDecoration(
                         color: _days.contains(d) ? p.primaryLight : p.card,
                         borderRadius: BorderRadius.circular(10),
