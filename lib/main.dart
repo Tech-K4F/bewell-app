@@ -127,7 +127,7 @@ class BewellApp extends StatelessWidget {
           title: 'Be Well',
           // Il MaterialTheme viene generato dalla palette attiva
           theme: theme.buildMaterialTheme(
-            largeText: settings.largeText,
+            largeText: false,
             highContrast: settings.highContrast,
           ),
           debugShowCheckedModeBanner: false,
@@ -135,8 +135,18 @@ class BewellApp extends StatelessWidget {
             // Movimento ridotto: scelta nell'app o nel telefono.
             final mq = MediaQuery.of(context);
             Motion.reduced = settings.reduceMotion || mq.disableAnimations;
+            // Testo: dimensione scelta nel telefono × "Testo grande" dell'app,
+            // fino a 2×. Vale anche per i testi con dimensione esplicita.
+            final sysScale = mq.textScaler.scale(16) / 16;
+            final textScale = (sysScale *
+                    (settings.largeText ? 1.25 : 1.0) *
+                    settings.debugTextScale)
+                .clamp(1.0, settings.debugTextScale > 1.0 ? 3.0 : 2.0);
             child = MediaQuery(
-              data: mq.copyWith(disableAnimations: Motion.reduced),
+              data: mq.copyWith(
+                disableAnimations: Motion.reduced,
+                textScaler: TextScaler.linear(textScale),
+              ),
               child: child ?? const SizedBox(),
             );
             return Consumer<ThemeProvider>(

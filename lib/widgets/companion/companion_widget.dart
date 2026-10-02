@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import '../../providers/settings_provider.dart' show Motion;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
@@ -128,7 +129,8 @@ class _CompanionWidgetState extends State<CompanionWidget> {
       if (!mounted) return;
       controller.setLooping(_isLooping(widget.mood));
       controller.setVolume(0);
-      controller.play();
+      // Movimento ridotto: resta il primo fotogramma, fermo.
+      if (!Motion.reduced) controller.play();
       setState(() => _isInitialized = true);
     } catch (e) {
       debugPrint('CompanionWidget video error: $e');
@@ -136,6 +138,7 @@ class _CompanionWidgetState extends State<CompanionWidget> {
   }
 
   void _startIdleRotation() {
+    if (Motion.reduced) return;
     // Cambia video idle ogni 25-45 secondi casualmente
     final rng = Random();
     final delay = Duration(seconds: 25 + rng.nextInt(20));

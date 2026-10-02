@@ -423,6 +423,9 @@ class _ThemedFieldState extends State<_ThemedField> {
                         size: 18,
                       ),
                       onPressed: () => setState(() => _obscure = !_obscure),
+                      tooltip: _obscure
+                          ? context.sL.passwordShow
+                          : context.sL.passwordHide,
                     )
                   : null,
             ),
@@ -511,6 +514,7 @@ class _ErrorBanner extends StatelessWidget {
           ),
           IconButton(
             onPressed: onDismiss,
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
             icon: Icon(Icons.close,
                 size: 16, color: Colors.redAccent.withValues(alpha: 0.6)),
             padding: EdgeInsets.zero,

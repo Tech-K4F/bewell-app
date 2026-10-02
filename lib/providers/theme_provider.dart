@@ -40,6 +40,21 @@ class BwPaletteData {
   final Color btn;
   final Color btnText;
 
+  /// Colore del testo da usare SOPRA [primary]: bianco o quasi nero, quello
+  /// con più contrasto.
+  Color get onPrimary {
+    double ratio(Color a, Color b) {
+      final la = a.computeLuminance();
+      final lb = b.computeLuminance();
+      return ((la > lb ? la : lb) + 0.05) / ((la > lb ? lb : la) + 0.05);
+    }
+
+    const dark = Color(0xFF0B1220);
+    return ratio(Colors.white, primary) >= ratio(dark, primary)
+        ? Colors.white
+        : dark;
+  }
+
   const BwPaletteData({
     required this.name,
     required this.bg,
@@ -73,10 +88,10 @@ const Map<BwPalette, BwPaletteData> kPalettes = {
     primary: Color(0xFF4A7C59),
     primaryLight: Color(0xFFE5EFE8),
     primaryText: Color(0xFF2A5038),
-    accent: Color(0xFFC47E3A),
+    accent: Color(0xFF97612D),
     text: Color(0xFF1A291A),
-    textSec: Color(0xFF6B7A6B),
-    textMut: Color(0xFFA0ACA0),
+    textSec: Color(0xFF566556),
+    textMut: Color(0xFF647164),
     nav: Color(0xFFFFFFFF),
     navBorder: Color(0xFFDDD8CC),
     ring: Color(0xFF4A7C59),
@@ -93,10 +108,10 @@ const Map<BwPalette, BwPaletteData> kPalettes = {
     primary: Color(0xFF2B5EA7),
     primaryLight: Color(0xFFE4EEF9),
     primaryText: Color(0xFF0C3470),
-    accent: Color(0xFFC47A0A),
+    accent: Color(0xFF9B6008),
     text: Color(0xFF18223A),
     textSec: Color(0xFF556070),
-    textMut: Color(0xFF8898AA),
+    textMut: Color(0xFF616F83),
     nav: Color(0xFFFFFFFF),
     navBorder: Color(0xFFD4DEEC),
     ring: Color(0xFF2B5EA7),
@@ -113,17 +128,17 @@ const Map<BwPalette, BwPaletteData> kPalettes = {
     primary: Color(0xFF1D9E75),
     primaryLight: Color(0xFF172E28),
     primaryText: Color(0xFF5DCAA5),
-    accent: Color(0xFFB87333),
+    accent: Color(0xFFC1854E),
     text: Color(0xFFEAF0F8),
-    textSec: Color(0xFF7090AA),
-    textMut: Color(0xFF405870),
+    textSec: Color(0xFF8BA5BB),
+    textMut: Color(0xFF8293A5),
     nav: Color(0xFF192433),
     navBorder: Color(0xFF253548),
     isDark: true,
     ring: Color(0xFF1D9E75),
     ringTrack: Color(0x2E1D9E75),
     btn: Color(0xFF1D9E75),
-    btnText: Color(0xFFFFFFFF),
+    btnText: Color(0xFF0B1220),
   ),
   BwPalette.ambientaleAlba: BwPaletteData(
     name: 'Ambientale Alba',
@@ -134,10 +149,10 @@ const Map<BwPalette, BwPaletteData> kPalettes = {
     primary: Color(0xFF5C5044),
     primaryLight: Color(0x1A5C5044),
     primaryText: Color(0xFF3A2E22),
-    accent: Color(0xFF9C6E3A),
+    accent: Color(0xFF8C6334),
     text: Color(0xFF1E1810),
     textSec: Color(0xFF5C4E3A),
-    textMut: Color(0x595C4E3A),
+    textMut: Color(0xB13B3124),
     nav: Color(0xF7F2EDE4),
     navBorder: Color(0x1A5C5044),
     ring: Color(0xFF9C6E3A),
@@ -157,7 +172,7 @@ const Map<BwPalette, BwPaletteData> kPalettes = {
     accent: Color(0xFF6AAAA8),
     text: Color(0xFFE8F2EE),
     textSec: Color(0xFF9ABCB4),
-    textMut: Color(0x599ABCB4),
+    textMut: Color(0x9FBBD3CC),
     nav: Color(0xFA0B121C),
     navBorder: Color(0x1A6AAAA8),
     isDark: true,

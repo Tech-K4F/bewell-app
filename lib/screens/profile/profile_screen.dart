@@ -50,6 +50,7 @@ class ProfileScreen extends StatelessWidget {
             actions: [
               IconButton(
                 icon: Icon(Icons.settings_outlined, color: p.text),
+                tooltip: context.sL.settings,
                 onPressed: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const SettingsScreen())),
               ),
@@ -509,12 +510,14 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(label.toUpperCase(),
-        style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.2,
-            color: p.textSec));
+    return Semantics(
+        header: true,
+        child: Text(label.toUpperCase(),
+            style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+                color: p.textSec)));
   }
 }
 
@@ -705,6 +708,7 @@ class _PwdFieldState extends State<_PwdField> {
               color: widget.p.textMut,
               size: 18),
           onPressed: () => setState(() => _obs = !_obs),
+          tooltip: _obs ? context.sL.passwordShow : context.sL.passwordHide,
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/semantics.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/app_provider.dart';
@@ -325,6 +326,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _lastGlassPoints = pts;
     });
     AnalyticsService.instance.logWaterAdded(newCount, _waterTargetN);
+    SemanticsService.announce(
+        context.sL.waterGlassAnnounce(newCount, _waterTargetN),
+        Directionality.of(context));
     AnalyticsService.instance.logWellyMoodShown('drinking');
     // Salva su prefs: cooldown, conta bicchieri, info undo
     await prefs.setInt('water_count', newCount);
@@ -713,7 +717,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 if (isWaterDone)
                   Container(
                     width: double.infinity,
-                    height: 46,
+                    height: 48,
                     decoration: BoxDecoration(
                       color: p.primaryLight,
                       borderRadius: BorderRadius.circular(14),
@@ -749,7 +753,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             duration: const Duration(milliseconds: 200),
                             child: Container(
                               width: double.infinity,
-                              height: 46,
+                              constraints: const BoxConstraints(minHeight: 48),
                               decoration: BoxDecoration(
                                 color: p.btn,
                                 borderRadius: BorderRadius.circular(14),
@@ -787,6 +791,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               !isWaterDone;
                           return Semantics(
                               button: true,
+                              enabled: canUndo,
                               container: true,
                               child: GestureDetector(
                                 onTap: canUndo ? _undoGlass : null,
@@ -794,7 +799,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   opacity: canUndo ? 1.0 : 0.35,
                                   duration: const Duration(milliseconds: 200),
                                   child: Container(
-                                    height: 36,
+                                    constraints:
+                                        const BoxConstraints(minHeight: 48),
                                     decoration: BoxDecoration(
                                       color: Colors.transparent,
                                       borderRadius: BorderRadius.circular(10),
@@ -827,7 +833,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             child: GestureDetector(
                               onTap: () => _openWaterSettings(context, p),
                               child: Container(
-                                height: 36,
+                                constraints:
+                                    const BoxConstraints(minHeight: 48),
                                 decoration: BoxDecoration(
                                   color: Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
@@ -1513,7 +1520,7 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
                 },
                 child: Container(
                   width: double.infinity,
-                  height: 48,
+                  constraints: const BoxConstraints(minHeight: 48),
                   decoration: BoxDecoration(
                     color: p.btn,
                     borderRadius: BorderRadius.circular(14),

@@ -639,100 +639,107 @@ class _ProgressiveNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: p.nav,
-        border: Border(top: BorderSide(color: p.navBorder, width: 0.5)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            children: tabs.asMap().entries.map((entry) {
-              final i = entry.key;
-              final tab = entry.value;
-              final isActive = i == currentIndex;
-              final isAvailable = tab.available;
+    return MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(
+              MediaQuery.of(context).textScaler.scale(1).clamp(1.0, 1.3)),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: p.nav,
+            border: Border(top: BorderSide(color: p.navBorder, width: 0.5)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 60),
+              child: Row(
+                children: tabs.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final tab = entry.value;
+                  final isActive = i == currentIndex;
+                  final isAvailable = tab.available;
 
-              return Expanded(
-                child: Semantics(
-                    button: true,
-                    selected: isActive,
-                    container: true,
-                    child: GestureDetector(
-                      onTap: () {
-                        if (isAvailable) {
-                          onTap(i);
-                        } else {
-                          _showUnlockHint(context, tab);
-                        }
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedOpacity(
-                        opacity: isAvailable ? 1.0 : 0.6,
-                        duration: const Duration(milliseconds: 300),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Stack(
-                              clipBehavior: Clip.none,
+                  return Expanded(
+                    child: Semantics(
+                        button: true,
+                        selected: isActive,
+                        container: true,
+                        child: GestureDetector(
+                          onTap: () {
+                            if (isAvailable) {
+                              onTap(i);
+                            } else {
+                              _showUnlockHint(context, tab);
+                            }
+                          },
+                          behavior: HitTestBehavior.opaque,
+                          child: AnimatedOpacity(
+                            opacity: isAvailable ? 1.0 : 0.6,
+                            duration: const Duration(milliseconds: 300),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  isActive ? tab.activeIcon : tab.icon,
-                                  size: 22,
-                                  color: isActive ? p.primary : p.textMut,
-                                ),
-                                if (!isAvailable)
-                                  Positioned(
-                                    right: -6,
-                                    top: -6,
-                                    child: Container(
-                                      width: 16,
-                                      height: 16,
-                                      decoration: BoxDecoration(
-                                        color: p.bg2,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                            color: p.cardBorder, width: 0.5),
-                                      ),
-                                      child: Icon(Icons.lock_outline,
-                                          size: 10, color: p.textSec),
+                                Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Icon(
+                                      isActive ? tab.activeIcon : tab.icon,
+                                      size: 22,
+                                      color: isActive ? p.primary : p.textMut,
                                     ),
+                                    if (!isAvailable)
+                                      Positioned(
+                                        right: -6,
+                                        top: -6,
+                                        child: Container(
+                                          width: 16,
+                                          height: 16,
+                                          decoration: BoxDecoration(
+                                            color: p.bg2,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                                color: p.cardBorder,
+                                                width: 0.5),
+                                          ),
+                                          child: Icon(Icons.lock_outline,
+                                              size: 10, color: p.textSec),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  _translateLabel(context, tab.item),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: isActive ? p.primary : p.textMut,
+                                    fontWeight: isActive
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
                                   ),
+                                ),
+                                const SizedBox(height: 2),
+                                Container(
+                                  width: 3,
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isActive
+                                        ? p.primary
+                                        : Colors.transparent,
+                                  ),
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              _translateLabel(context, tab.item),
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: isActive ? p.primary : p.textMut,
-                                fontWeight: isActive
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Container(
-                              width: 3,
-                              height: 3,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color:
-                                    isActive ? p.primary : Colors.transparent,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )),
-              );
-            }).toList(),
+                          ),
+                        )),
+                  );
+                }).toList(),
+              ),
+            ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 
   String _translateLabel(BuildContext context, NavItem item) {

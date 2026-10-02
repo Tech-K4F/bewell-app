@@ -26,6 +26,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _largeText = false;
   bool _highContrast = false;
   bool _reduceMotion = false;
+  double _debugTextScale = 1.0; // solo debug, non salvato
 
   // ── Notifiche ───────────────────────────────────────────────────────────
   NotificationFrequency _frequency = NotificationFrequency.normal;
@@ -35,6 +36,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get largeText => _largeText;
   bool get highContrast => _highContrast;
   bool get reduceMotion => _reduceMotion;
+  double get debugTextScale => _debugTextScale;
   NotificationFrequency get frequency => _frequency;
   DateTime? get snoozeUntil => _snoozeUntil;
   bool get isSnoozed =>
@@ -63,6 +65,11 @@ class SettingsProvider extends ChangeNotifier {
     final p = await SharedPreferences.getInstance();
     await p.setBool('setting_large_text', v);
     notifyListeners(); // ← ricostruisce MaterialApp → tema ricalcolato
+  }
+
+  void setDebugTextScale(double v) {
+    _debugTextScale = v;
+    notifyListeners();
   }
 
   Future<void> setReduceMotion(bool v) async {

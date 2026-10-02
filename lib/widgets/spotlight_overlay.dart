@@ -334,7 +334,8 @@ class _SpotlightOverlayState extends State<SpotlightOverlay>
             widget.child,
             if (showLayer)
               Positioned.fill(
-                child: AnimatedBuilder(
+                child: BlockSemantics(
+                    child: AnimatedBuilder(
                   animation: Listenable.merge([_fadeAnim, _pulseAnim]),
                   builder: (ctx, _) {
                     if (_fadeCtrl.value == 0) return const SizedBox.shrink();
@@ -389,7 +390,7 @@ class _SpotlightOverlayState extends State<SpotlightOverlay>
                       ],
                     );
                   },
-                ),
+                )),
               ),
           ],
         );
@@ -765,19 +766,21 @@ class _BubbleCardState extends State<_BubbleCard> {
                                 width: 2.5),
                           ),
                         ),
-                        child: Text(
-                          widget.text,
-                          style: TextStyle(
-                            fontSize: isAmb ? 15.5 : 14.5,
-                            fontFamily: isAmb ? 'CormorantGaramond' : null,
-                            // p.textSec, come il corpo testo di AlertDialog
-                            // altrove nell'app — p.text (colore pieno) è
-                            // uno dei motivi per cui sembrava più marcato
-                            // del resto.
-                            color: p.textSec,
-                            height: 1.55,
-                          ),
-                        ),
+                        child: Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              widget.text,
+                              style: TextStyle(
+                                fontSize: isAmb ? 15.5 : 14.5,
+                                fontFamily: isAmb ? 'CormorantGaramond' : null,
+                                // p.textSec, come il corpo testo di AlertDialog
+                                // altrove nell'app — p.text (colore pieno) è
+                                // uno dei motivi per cui sembrava più marcato
+                                // del resto.
+                                color: p.textSec,
+                                height: 1.55,
+                              ),
+                            )),
                       ),
                     ),
 

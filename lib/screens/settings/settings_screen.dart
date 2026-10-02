@@ -45,6 +45,7 @@ class SettingsScreen extends StatelessWidget {
             leading: IconButton(
               icon: Icon(Icons.arrow_back_ios, color: p.text, size: 18),
               onPressed: () => Navigator.pop(context),
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
             ),
             title: Text(s.settingsTitle,
                 style: TextStyle(
@@ -157,15 +158,17 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          color: p.textSec,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 1.2,
-        ),
-      ),
+      child: Semantics(
+          header: true,
+          child: Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: p.textSec,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+            ),
+          )),
     );
   }
 }
@@ -287,7 +290,8 @@ class _ToggleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return MergeSemantics(
+        child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
@@ -322,7 +326,7 @@ class _ToggleRow extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 

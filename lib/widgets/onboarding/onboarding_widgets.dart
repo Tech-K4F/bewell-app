@@ -287,7 +287,11 @@ class ResourceToggle extends StatelessWidget {
     final p = context.read<ThemeProvider>().paletteData;
     return Semantics(
         button: true,
+        toggled: value,
         container: true,
+        excludeSemantics: true,
+        label: '$label. $sublabel',
+        onTap: () => onChanged(!value),
         child: GestureDetector(
           onTap: () => onChanged(!value),
           child: Container(

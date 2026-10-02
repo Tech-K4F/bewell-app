@@ -49,7 +49,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     context.read<AuthProvider>().sendPasswordReset(_emailCtrl.text.trim());
 
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) { t.cancel(); return; }
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
       setState(() => _resendCooldown--);
       if (_resendCooldown <= 0) t.cancel();
     });
@@ -71,6 +74,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             leading: IconButton(
               icon: Icon(Icons.arrow_back_ios, color: p.text, size: 20),
               onPressed: () => Navigator.of(context).pop(),
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
             ),
           ),
           body: SafeArea(
@@ -87,7 +91,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildRequestState(AuthProvider auth, bool isLoading, BwPaletteData p, BwStrings s) {
+  Widget _buildRequestState(
+      AuthProvider auth, bool isLoading, BwPaletteData p, BwStrings s) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -124,7 +129,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
         const SizedBox(height: 32),
-
         BwEmailField(
           controller: _emailCtrl,
           errorText: _emailError,
@@ -132,7 +136,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onEditingComplete: _submit,
         ),
         const SizedBox(height: 24),
-
         BwAuthButton(
           label: s.sendResetEmail,
           isLoading: isLoading,
@@ -201,9 +204,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ? s.forgotResendIn(_resendCooldown)
                       : s.resendEmail,
               style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: p.btnText),
+                  fontSize: 15, fontWeight: FontWeight.w600, color: p.btnText),
             ),
           ),
         ),

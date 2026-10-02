@@ -114,6 +114,8 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
                         icon: Icon(Icons.arrow_back_ios_new,
                             size: 18, color: p.textMut),
                         onPressed: _back,
+                        tooltip:
+                            MaterialLocalizations.of(context).backButtonTooltip,
                       ),
                     )
                   : null,

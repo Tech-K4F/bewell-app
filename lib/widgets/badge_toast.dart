@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:math' show pi;
+import 'package:flutter/semantics.dart';
+import '../providers/settings_provider.dart' show Motion;
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -138,10 +140,19 @@ class _BwBannerWidgetState extends State<_BwBannerWidget>
         : Tween<double>(begin: 1.0, end: 1.0).animate(_ctrl);
 
     _ctrl.forward();
+    // Con un lettore di schermo l'avviso viene letto ad alta voce e resta più
+    // a lungo: 4 secondi non bastano per ascoltarlo.
+    final reader = WidgetsBinding
+        .instance.platformDispatcher.accessibilityFeatures.accessibleNavigation;
     _timer = Timer(
-      Duration(seconds: widget.isHabitUnlock ? 5 : 4),
+      Duration(seconds: (widget.isHabitUnlock ? 5 : 4) * (reader ? 3 : 1)),
       _dismiss,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      SemanticsService.announce(
+          '${widget.title}. ${widget.subtitle}', Directionality.of(context));
+    });
   }
 
   void _dismiss() {
@@ -169,7 +180,7 @@ class _BwBannerWidgetState extends State<_BwBannerWidget>
     return Material(
       type: MaterialType.transparency,
       child: Stack(children: [
-        if (!isUnlock)
+        if (!isUnlock && !Motion.reduced)
           Positioned(
             top: top - 10,
             left: 0,

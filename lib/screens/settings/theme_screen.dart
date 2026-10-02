@@ -20,6 +20,7 @@ class ThemeScreen extends StatelessWidget {
             leading: IconButton(
               icon: Icon(Icons.arrow_back_ios, color: p.text, size: 18),
               onPressed: () => Navigator.pop(context),
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
             ),
             title: Text(
               s.appearance,

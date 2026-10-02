@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import '../../providers/settings_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -130,6 +131,8 @@ class _FocusScreenState extends State<FocusScreen>
       _remaining = 0;
       _state = _TimerState.done;
       _timer?.cancel();
+      SemanticsService.announce(
+          context.sL.focusDone, Directionality.of(context));
       SmartReminders.cancelFocusTimer();
       FocusRecovery.clear();
       AnalyticsService.instance.logFocusSessionCompleted(_totalSeconds ~/ 60);
@@ -221,6 +224,10 @@ class _FocusScreenState extends State<FocusScreen>
     });
   }
 
+  /// Il tempo letto per esteso ("24 minuti 46 secondi"), non "24:46".
+  String _timeSpoken(BuildContext context) =>
+      context.sL.focusTimerSpoken(_remaining ~/ 60, _remaining % 60);
+
   String get _timeLabel {
     final m = _remaining ~/ 60;
     final s = _remaining % 60;
@@ -308,36 +315,39 @@ class _FocusScreenState extends State<FocusScreen>
                             ambient: isAmb,
                           ),
                           child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _timeLabel,
-                                  style: TextStyle(
-                                    fontSize: isAmb ? 52 : 44,
-                                    fontWeight: isAmb
-                                        ? FontWeight.w300
-                                        : FontWeight.w600,
-                                    fontFamily:
-                                        isAmb ? 'CormorantGaramond' : null,
-                                    color: p.text,
-                                  ),
-                                ),
-                                Text(
-                                  context.sL.focusRemaining,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: p.textSec,
-                                    fontFamily:
-                                        isAmb ? 'CormorantGaramond' : null,
-                                    fontStyle: isAmb
-                                        ? FontStyle.italic
-                                        : FontStyle.normal,
-                                    letterSpacing: isAmb ? 1.5 : 0,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            child: Semantics(
+                                label: _timeSpoken(context),
+                                excludeSemantics: true,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _timeLabel,
+                                      style: TextStyle(
+                                        fontSize: isAmb ? 52 : 44,
+                                        fontWeight: isAmb
+                                            ? FontWeight.w300
+                                            : FontWeight.w600,
+                                        fontFamily:
+                                            isAmb ? 'CormorantGaramond' : null,
+                                        color: p.text,
+                                      ),
+                                    ),
+                                    Text(
+                                      context.sL.focusRemaining,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: p.textSec,
+                                        fontFamily:
+                                            isAmb ? 'CormorantGaramond' : null,
+                                        fontStyle: isAmb
+                                            ? FontStyle.italic
+                                            : FontStyle.normal,
+                                        letterSpacing: isAmb ? 1.5 : 0,
+                                      ),
+                                    ),
+                                  ],
+                                )),
                           ),
                         ),
                       ),

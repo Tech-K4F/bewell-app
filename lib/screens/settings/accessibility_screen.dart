@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
@@ -79,6 +80,17 @@ class AccessibilityScreen extends StatelessWidget {
             value: settings.reduceMotion,
             onChanged: settings.setReduceMotion,
           ),
+          if (kDebugMode) ...[
+            Wrap(spacing: 8, children: [
+              for (final v in const [1.0, 1.5, 2.0])
+                ChoiceChip(
+                  label: Text('Debug testo ×$v'),
+                  selected: settings.debugTextScale == v,
+                  onSelected: (_) => settings.setDebugTextScale(v),
+                ),
+            ]),
+            const SizedBox(height: 12),
+          ],
           const SizedBox(height: 4),
           Text(s.accessibilityHint,
               style: TextStyle(color: p.textMut, fontSize: 12, height: 1.45)),

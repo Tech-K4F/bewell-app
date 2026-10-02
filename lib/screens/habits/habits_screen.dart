@@ -278,16 +278,18 @@ class _HabitsScreenState extends State<HabitsScreen> {
               padding: EdgeInsets.fromLTRB(20, isAmb ? 72 : 24, 20, 40),
               children: [
                 // ── Titolo dinamico ───────────────────────────────────────
-                Text(
-                  _habitsTitle(s, hour),
-                  style: TextStyle(
-                    fontSize: isAmb ? 28 : 22,
-                    fontWeight: isAmb ? FontWeight.w300 : FontWeight.w700,
-                    fontFamily: isAmb ? 'CormorantGaramond' : null,
-                    color: p.text,
-                    letterSpacing: isAmb ? 1 : 0,
-                  ),
-                ),
+                Semantics(
+                    header: true,
+                    child: Text(
+                      _habitsTitle(s, hour),
+                      style: TextStyle(
+                        fontSize: isAmb ? 28 : 22,
+                        fontWeight: isAmb ? FontWeight.w300 : FontWeight.w700,
+                        fontFamily: isAmb ? 'CormorantGaramond' : null,
+                        color: p.text,
+                        letterSpacing: isAmb ? 1 : 0,
+                      ),
+                    )),
                 const SizedBox(height: 6),
                 Text(
                   '${habits.length} ${s.activeHabits.toLowerCase()} · $completedToday ${s.completedToday}',
@@ -911,6 +913,9 @@ class _NowCard extends StatelessWidget {
                     child: GestureDetector(
                       onTap: onStartTimer,
                       child: Container(
+                        constraints:
+                            const BoxConstraints(minHeight: 48, minWidth: 48),
+                        alignment: Alignment.center,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
@@ -919,10 +924,10 @@ class _NowCard extends StatelessWidget {
                         ),
                         child: Text(
                           _timerLabel(habit.id, s),
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white),
+                              color: p.onPrimary),
                         ),
                       ),
                     ))
@@ -933,6 +938,9 @@ class _NowCard extends StatelessWidget {
                     child: GestureDetector(
                       onTap: onComplete,
                       child: Container(
+                        constraints:
+                            const BoxConstraints(minHeight: 48, minWidth: 48),
+                        alignment: Alignment.center,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
@@ -941,10 +949,10 @@ class _NowCard extends StatelessWidget {
                         ),
                         child: Text(
                           s.habitMarkDone,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white),
+                              color: p.onPrimary),
                         ),
                       ),
                     )),
@@ -1170,6 +1178,9 @@ class _HabitCard extends StatelessWidget {
                         child: GestureDetector(
                           onTap: onStartTimer,
                           child: Container(
+                            constraints: const BoxConstraints(
+                                minHeight: 48, minWidth: 48),
+                            alignment: Alignment.center,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
@@ -1188,25 +1199,35 @@ class _HabitCard extends StatelessWidget {
                   else if (onStartTimer != null && done)
                     Icon(Icons.check_circle_rounded, color: p.primary, size: 28)
                   else
-                    GestureDetector(
-                      onTap: done ? null : onComplete,
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: done ? p.primary : Colors.transparent,
-                          border: Border.all(
-                            color: done ? p.primary : p.textMut,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: done
-                            ? const Icon(Icons.check,
-                                color: Colors.white, size: 18)
-                            : null,
-                      ),
-                    ),
+                    Semantics(
+                        button: true,
+                        checked: done,
+                        enabled: !done,
+                        label: s.habitMarkDone,
+                        excludeSemantics: true,
+                        onTap: done ? null : onComplete,
+                        child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: done ? null : onComplete,
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: done ? p.primary : Colors.transparent,
+                                  border: Border.all(
+                                    color: done ? p.primary : p.textMut,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: done
+                                    ? const Icon(Icons.check,
+                                        color: Colors.white, size: 18)
+                                    : null,
+                              ),
+                            ))),
                 ],
               ),
             ),
@@ -1424,19 +1445,22 @@ class _HabitArc extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (from, to) = _milestone(daysCompleted);
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(
-        painter: _ArcPainter(
-          days: daysCompleted,
-          fromMilestone: from,
-          toMilestone: to,
-          color: color,
-          label: label,
-        ),
-      ),
-    );
+    return Semantics(
+        label: context.sL.habitRingSpoken(daysCompleted),
+        excludeSemantics: true,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: CustomPaint(
+            painter: _ArcPainter(
+              days: daysCompleted,
+              fromMilestone: from,
+              toMilestone: to,
+              color: color,
+              label: label,
+            ),
+          ),
+        ));
   }
 }
 

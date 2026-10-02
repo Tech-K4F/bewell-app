@@ -218,6 +218,8 @@ class _BwPasswordFieldState extends State<BwPasswordField> {
               size: 20,
             ),
             onPressed: () => setState(() => _obscure = !_obscure),
+            tooltip:
+                _obscure ? context.sL.passwordShow : context.sL.passwordHide,
           ),
           onChanged: widget.showStrengthBar ? (_) => setState(() {}) : null,
         ),
