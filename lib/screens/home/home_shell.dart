@@ -678,6 +678,9 @@ class _ProgressiveNavBar extends StatelessWidget {
                             opacity: isAvailable ? 1.0 : 0.6,
                             duration: const Duration(milliseconds: 300),
                             child: Column(
+                              // min: con l'altezza minima (non più fissa) la
+                              // colonna non deve riempire tutto lo schermo.
+                              mainAxisSize: MainAxisSize.min,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Stack(
