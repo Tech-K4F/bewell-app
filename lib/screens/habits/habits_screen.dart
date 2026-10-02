@@ -21,6 +21,8 @@ import '../../providers/tutorial_provider.dart';
 import '../../services/analytics_service.dart';
 import '../../widgets/banner_ad_widget.dart';
 import '../../widgets/habit_progress_calendar.dart';
+import '../../widgets/notification_invite_card.dart';
+import '../../widgets/work_schedule_sheet.dart';
 
 /// Etichetta del pulsante "avvia timer" per le abitudini con sessione guidata.
 String _timerLabel(String habitId, BwStrings s) {
@@ -72,6 +74,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       await _checkHabitsSpotlight();
+      // Invito (una volta) a impostare giorni e orari, se non c'è altro a
+      // schermo.
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (mounted && !context.read<SpotlightController>().isActive) {
+        await WorkScheduleInvite.maybeShowOnce(context);
+      }
     });
     _loadPersonalizedPlanState();
   }
@@ -264,7 +272,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
             .toList();
 
         return BwScaffold(
-          bottomNavigationBar: const BannerAdWidget(),
+          bottomNavigationBar: const BannerAdWidget(screenKey: 'habits'),
           body: SafeArea(
             child: ListView(
               padding: EdgeInsets.fromLTRB(20, isAmb ? 72 : 24, 20, 40),
@@ -287,6 +295,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
                 ),
 
                 const SizedBox(height: 20),
+
+                // ── Invito a riattivare i promemoria (solo se spenti) ─────
+                NotificationInviteCard(p: p),
 
                 // ── Card "Adesso" ─────────────────────────────────────────
                 if (habitForNow != null) ...[
@@ -458,6 +469,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     return const SizedBox.shrink();
                   }),
                 ],
+
+                // ── Giorni e orari di lavoro/studio (dal secondo giorno) ──
+                WorkScheduleSection(p: p),
 
                 // ── Configuratore facoltativo (dal primo sblocco reale) ─────
                 // Non più un passaggio obbligato dell'onboarding: appare qui,
@@ -634,26 +648,29 @@ class _HabitsScreenState extends State<HabitsScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                width: double.infinity,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: p.btn,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Center(
-                  child: Text(
-                    'Ok',
-                    style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: p.btnText),
+            Semantics(
+                button: true,
+                container: true,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: double.infinity,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: p.btn,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Ok',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: p.btnText),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
+                )),
           ],
         ),
       ),
@@ -888,43 +905,49 @@ class _NowCard extends StatelessWidget {
               if (_isWater)
                 Icon(Icons.water_drop_outlined, color: p.primary, size: 26)
               else if (onStartTimer != null)
-                GestureDetector(
-                  onTap: onStartTimer,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: p.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _timerLabel(habit.id, s),
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white),
-                    ),
-                  ),
-                )
+                Semantics(
+                    button: true,
+                    container: true,
+                    child: GestureDetector(
+                      onTap: onStartTimer,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: p.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _timerLabel(habit.id, s),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white),
+                        ),
+                      ),
+                    ))
               else
-                GestureDetector(
-                  onTap: onComplete,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: p.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      s.habitMarkDone,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white),
-                    ),
-                  ),
-                ),
+                Semantics(
+                    button: true,
+                    container: true,
+                    child: GestureDetector(
+                      onTap: onComplete,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: p.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          s.habitMarkDone,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white),
+                        ),
+                      ),
+                    )),
             ],
           ),
         ],
@@ -1067,7 +1090,7 @@ class _HabitCard extends StatelessWidget {
                       _Badge(text: '$slotEmoji $slotText'),
                       if (_isWater) ...[
                         const SizedBox(height: 4),
-                        _Badge(text: '💧 ${s.waterTrackedInHome}'),
+                        _Badge(text: s.waterTrackedInHome),
                       ],
                     ],
                   ),
@@ -1141,24 +1164,27 @@ class _HabitCard extends StatelessWidget {
                     Icon(done ? Icons.water_drop : Icons.water_drop_outlined,
                         color: p.primary, size: 24)
                   else if (onStartTimer != null && !done)
-                    GestureDetector(
-                      onTap: onStartTimer,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: p.btn,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          _timerLabel(habit.id, s),
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: p.btnText),
-                        ),
-                      ),
-                    )
+                    Semantics(
+                        button: true,
+                        container: true,
+                        child: GestureDetector(
+                          onTap: onStartTimer,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: p.btn,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _timerLabel(habit.id, s),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: p.btnText),
+                            ),
+                          ),
+                        ))
                   else if (onStartTimer != null && done)
                     Icon(Icons.check_circle_rounded, color: p.primary, size: 28)
                   else
@@ -1257,13 +1283,16 @@ class _SlowdownMenuSheet extends StatelessWidget {
             onTap: onSlowdown,
           ),
           const SizedBox(height: 16),
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Text(
-              s.cancel,
-              style: TextStyle(fontSize: 14, color: p.textMut),
-            ),
-          ),
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Text(
+                  s.cancel,
+                  style: TextStyle(fontSize: 14, color: p.textMut),
+                ),
+              )),
         ],
       ),
     );
@@ -1285,31 +1314,36 @@ class _SlowdownOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: p.card,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: p.cardBorder, width: 0.5),
-        ),
-        child: Row(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 20)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w500, color: p.text),
-              ),
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: p.card,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: p.cardBorder, width: 0.5),
             ),
-          ],
-        ),
-      ),
-    );
+            child: Row(
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: p.text),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ));
   }
 }
 
@@ -1511,60 +1545,66 @@ class _ConfiguratorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: p.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: completed ? p.cardBorder : p.accent.withValues(alpha: 0.35),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: p.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
                 color:
-                    (completed ? p.primary : p.accent).withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                completed ? Icons.tune_rounded : Icons.auto_awesome_rounded,
-                color: completed ? p.primary : p.accent,
-                size: 22,
+                    completed ? p.cardBorder : p.accent.withValues(alpha: 0.35),
               ),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    completed ? s.configuratorDoneTitle : s.configuratorTitle,
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: p.text),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: (completed ? p.primary : p.accent)
+                        .withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    completed
-                        ? s.configuratorDoneSubtitle
-                        : s.configuratorSubtitle,
-                    style: TextStyle(fontSize: 12, color: p.textSec),
+                  child: Icon(
+                    completed ? Icons.tune_rounded : Icons.auto_awesome_rounded,
+                    color: completed ? p.primary : p.accent,
+                    size: 22,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        completed
+                            ? s.configuratorDoneTitle
+                            : s.configuratorTitle,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: p.text),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        completed
+                            ? s.configuratorDoneSubtitle
+                            : s.configuratorSubtitle,
+                        style: TextStyle(fontSize: 12, color: p.textSec),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: p.textMut, size: 20),
+              ],
             ),
-            Icon(Icons.chevron_right_rounded, color: p.textMut, size: 20),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
   }
 }
 

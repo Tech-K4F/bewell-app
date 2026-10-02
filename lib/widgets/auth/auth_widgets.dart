@@ -35,7 +35,9 @@ class SsoButtonRow extends StatelessWidget {
         Expanded(
           child: _SsoButton(
             label: 'Apple',
-            icon: Icon(Icons.apple, color: context.read<ThemeProvider>().paletteData.text, size: 20),
+            icon: Icon(Icons.apple,
+                color: context.read<ThemeProvider>().paletteData.text,
+                size: 20),
             onTap: enabled ? onApple : null,
           ),
         ),
@@ -57,36 +59,39 @@ class _SsoButton extends StatelessWidget {
     final textColor = p.text;
     final bgColor = p.card;
     final borderColor = p.cardBorder;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedOpacity(
-        opacity: onTap == null ? 0.4 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(width: 20, height: 20, child: icon),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedOpacity(
+            opacity: onTap == null ? 0.4 : 1.0,
+            duration: const Duration(milliseconds: 200),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderColor),
               ),
-            ],
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(width: 20, height: 20, child: icon),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }
 
@@ -206,7 +211,9 @@ class _BwPasswordFieldState extends State<BwPasswordField> {
           prefixIcon: Icons.lock_outline,
           suffixIcon: IconButton(
             icon: Icon(
-              _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              _obscure
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
               color: p.textMut,
               size: 20,
             ),
@@ -241,9 +248,7 @@ class _PasswordStrengthBar extends StatelessWidget {
                 margin: EdgeInsets.only(right: i < 3 ? 4 : 0),
                 height: 3,
                 decoration: BoxDecoration(
-                  color: i < strength.score
-                      ? color
-                      : p.cardBorder,
+                  color: i < strength.score ? color : p.cardBorder,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -369,9 +374,7 @@ class _BwTextField extends StatelessWidget {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: hasError
-                    ? _error.withValues(alpha: 0.6)
-                    : p.cardBorder,
+                color: hasError ? _error.withValues(alpha: 0.6) : p.cardBorder,
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -391,12 +394,13 @@ class _BwTextField extends StatelessWidget {
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: p.cardBorder.withValues(alpha: 0.3)),
+              borderSide:
+                  BorderSide(color: p.cardBorder.withValues(alpha: 0.3)),
             ),
             filled: true,
             fillColor: p.card,
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 16),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
         ),
         if (hasError) ...[
@@ -647,5 +651,3 @@ class _GooglePainter extends CustomPainter {
   @override
   bool shouldRepaint(_) => false;
 }
-
-

@@ -33,7 +33,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _waterTargetN = 8;
   int _containerMl = 250;
   String _containerType = 'glass'; // 'glass' | 'bottle'
-  bool _showWorkBanner = false;
   bool _slowdownDismissed = false;
   // Persistito in prefs come 'never_miss_twice_dismissed_date' (YYYY-M-D)
   // così sopravvive alle ricreazioni del widget quando si cambia tab.
@@ -47,15 +46,58 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   DateTime?
       _lastGlassAddedAt; // null se non sono stati aggiunti bicchieri (o dopo undo)
   int? _lastGlassPoints; // punti dell'ultimo bicchiere (per rimuoverli in undo)
-  // 2 minuti: abbastanza per evitare tap accidentali rapidi,
-  // non così lungo da bloccare chi vuole davvero aggiungere un bicchiere.
-  static const _cooldownDuration = Duration(minutes: 2);
+  // 1 minuto: abbastanza per evitare tap accidentali rapidi, non così lungo
+  // da bloccare chi vuole davvero aggiungere un bicchiere. Il tempo che manca
+  // è sempre visibile sul pulsante.
+  static const _cooldownDuration = Duration(minutes: 1);
+  DateTime? _cooldownUntil;
+  Timer? _dayTimer;
+  String _loadedDay = '';
+
+  void _startCooldownTicker(DateTime until) {
+    _cooldownUntil = until;
+    _waterCooldownTimer?.cancel();
+    _waterCooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      if (!DateTime.now().isBefore(until)) {
+        t.cancel();
+        setState(() => _waterCooldownActive = false);
+      } else {
+        setState(() {});
+      }
+    });
+  }
+
+  String _cooldownLabel(BwStrings s) {
+    final left = _cooldownUntil?.difference(DateTime.now()).inSeconds ?? 0;
+    final sec = left < 0 ? 0 : left + 1;
+    final m = sec ~/ 60;
+    final ss = (sec % 60).toString().padLeft(2, '0');
+    return s.waterNextGlassIn('$m:$ss');
+  }
+
+  /// Se l'app resta aperta oltre la mezzanotte, azzera il conteggio dell'acqua
+  /// e rivaluta la giornata senza aspettare il rientro in app.
+  void _checkDayRollover() {
+    final t = DateTime.now();
+    final today = '${t.year}-${t.month}-${t.day}';
+    if (!mounted || _loadedDay.isEmpty || today == _loadedDay) return;
+    _loadData();
+    final progression = context.read<ProgressionProvider>();
+    progression.setTodayWaterCount(0);
+    progression.evaluateIfNewDay();
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadData();
+    _dayTimer =
+        Timer.periodic(const Duration(seconds: 30), (_) => _checkDayRollover());
     // Ascolta ProgressionProvider per ricaricare quando debug simulate/reset
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -73,6 +115,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     _drinkTimer?.cancel();
     _waterCooldownTimer?.cancel();
+    _dayTimer?.cancel();
     _progressionRef?.removeListener(_loadData);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -142,6 +185,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final today = DateTime.now();
     final savedDate = prefs.getString('water_date') ?? '';
     final todayStr = '${today.year}-${today.month}-${today.day}';
+    _loadedDay = todayStr;
     if (savedDate != todayStr) {
       await prefs.setString('water_date', todayStr);
       await prefs.setInt('water_count', 0);
@@ -150,18 +194,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!prefs.containsKey('app_first_launch_date')) {
       await prefs.setString('app_first_launch_date', todayStr);
     }
-    final firstLaunchStr = prefs.getString('app_first_launch_date') ?? todayStr;
-    final firstLaunch =
-        DateTime.tryParse(firstLaunchStr.replaceAll('-', '/')) ?? today;
-    final appDay = today
-            .difference(
-                DateTime(firstLaunch.year, firstLaunch.month, firstLaunch.day))
-            .inDays +
-        1;
-
-    final userType = prefs.getString('user_type') ?? 'worker';
-    final scheduleConfirmed = prefs.getBool('work_schedule_confirmed') ?? false;
-
     // ── Ripristino cooldown acqua ─────────────────────────────────────────
     final cooldownUntilMs = prefs.getInt('water_cooldown_until') ?? 0;
     final cooldownUntil = DateTime.fromMillisecondsSinceEpoch(cooldownUntilMs);
@@ -188,22 +220,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         // qui il banner per confermarli veniva mostrato solo a 'worker',
         // lasciando gli utenti 'both' bloccati sugli orari di default senza
         // mai poterli modificare.
-        _showWorkBanner = (userType == 'worker' || userType == 'both') &&
-            !scheduleConfirmed &&
-            appDay >= 2;
         _waterCooldownActive = cooldownActive;
         _lastGlassAddedAt = lastGlassAt;
         _lastGlassPoints = lastGlassPts;
       });
 
       // Avvia timer per la parte di cooldown rimasta (se ancora attivo)
-      if (cooldownActive) {
-        _waterCooldownTimer?.cancel();
-        final remaining = cooldownUntil.difference(DateTime.now());
-        _waterCooldownTimer = Timer(remaining, () {
-          if (mounted) setState(() => _waterCooldownActive = false);
-        });
-      }
+      if (cooldownActive) _startCooldownTicker(cooldownUntil);
     }
   }
 
@@ -215,20 +238,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// "finto" e l'utente è costretto a usare "Avanti" invece di provare.
   List<SpotlightStep> _buildHomeSpotlightSteps() => [
         const SpotlightStep(textId: 'home_welcome'), // intro a schermo intero
-        const SpotlightStep(
-            textId: 'home_water',
-            targetId: 'spot_water_section'), // tracker acqua
         SpotlightStep(
             textId: 'home_add_glass',
             targetId: 'spot_add_glass',
             onTargetTap: _addWater), // pulsante bicchiere — davvero cliccabile
-        const SpotlightStep(
-            textId: 'home_welly',
-            targetId: 'spot_welly', // companion
-            shape: SpotlightShape.circle,
-            padding: 20),
-        const SpotlightStep(
-            textId: 'home_phase', targetId: 'spot_phase'), // badge fase
         const SpotlightStep(
             textId: 'home_nav', targetId: 'spot_nav'), // nav bar
       ];
@@ -288,29 +301,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _dismissWorkBanner() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('work_schedule_confirmed', true);
-    setState(() => _showWorkBanner = false);
-  }
-
-  void _openWorkScheduleSheet(BuildContext ctx, BwPaletteData p) {
-    final schedule = context.read<ScheduleProvider>().schedule;
-    showModalBottomSheet(
-      context: ctx,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _WorkScheduleSheet(
-        p: p,
-        initial: schedule,
-        onSave: (s) async {
-          await context.read<ScheduleProvider>().setSchedule(s);
-          await _dismissWorkBanner();
-        },
-      ),
-    );
-  }
-
   Future<void> _addWater() async {
     if (_waterCount >= _waterTargetN) return;
     if (_waterCooldownActive) return; // cooldown attivo
@@ -353,11 +343,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           .setTodayWaterCount(newCount, target: _waterTargetN);
     }
 
-    // Timer che aggiorna l'UI quando scade il cooldown
-    _waterCooldownTimer?.cancel();
-    _waterCooldownTimer = Timer(_cooldownDuration, () {
-      if (mounted) setState(() => _waterCooldownActive = false);
-    });
+    // Conto alla rovescia sul pulsante, fino alla fine del cooldown
+    _startCooldownTicker(cooldownUntil);
 
     // Dopo 2s torna al mood normale
     _drinkTimer?.cancel();
@@ -453,10 +440,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _waterContextualText(BwStrings s) {
     if (_waterCount == 0) return s.waterZero;
     final fraction = _waterTargetN > 0 ? _waterCount / _waterTargetN : 0.0;
-    if (fraction < 0.31) return s.waterLow;
-    if (fraction < 0.61) return s.waterMid;
-    if (fraction < 1.0)
-      return s.waterMid; // "Quasi — ancora poco." verrà da TASK 2
+    if (fraction <= 0.5) return s.waterLow;
+    if (fraction < 0.85) return s.waterMid;
+    if (fraction < 1.0) return s.waterAlmost;
     return s.waterDone;
   }
 
@@ -536,7 +522,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
 
         return BwScaffold(
-          bottomNavigationBar: const BannerAdWidget(),
+          bottomNavigationBar: const BannerAdWidget(screenKey: 'home'),
           body: SafeArea(
             child: ListView(
               padding: EdgeInsets.fromLTRB(20, isAmb ? 80 : 24, 20, 32),
@@ -671,17 +657,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _Divider(p: p),
                 const SizedBox(height: 20),
 
-                // ── Banner orario (solo worker, giorno 2) ────────────
-                if (_showWorkBanner) ...[
-                  _WorkScheduleBanner(
-                    p: p,
-                    s: s,
-                    onConfirm: _dismissWorkBanner,
-                    onEdit: () => _openWorkScheduleSheet(context, p),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
                 // ── Tracker acqua ────────────────────────────────────
                 SpotlightTarget(
                   id: 'spot_water_section',
@@ -764,33 +739,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 else
                   SpotlightTarget(
                     id: 'spot_add_glass',
-                    child: GestureDetector(
-                      onTap: _waterCooldownActive ? null : _addWater,
-                      child: AnimatedOpacity(
-                        opacity: _waterCooldownActive ? 0.55 : 1.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: Container(
-                          width: double.infinity,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: p.btn,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Center(
-                            child: Text(
-                              _waterCooldownActive
-                                  ? s.waterCooldown
-                                  : s.addGlass,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: p.btnText,
+                    child: Semantics(
+                        button: true,
+                        container: true,
+                        child: GestureDetector(
+                          onTap: _waterCooldownActive ? null : _addWater,
+                          child: AnimatedOpacity(
+                            opacity: _waterCooldownActive ? 0.55 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: Container(
+                              width: double.infinity,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: p.btn,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  _waterCooldownActive
+                                      ? _cooldownLabel(s)
+                                      : s.addGlass,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: p.btnText,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
+                        )),
                   ),
 
                 // ── Pulsanti secondari: annulla + contenitore ─────────────
@@ -807,11 +785,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                       .inMinutes <
                                   2 &&
                               !isWaterDone;
-                          return GestureDetector(
-                            onTap: canUndo ? _undoGlass : null,
-                            child: AnimatedOpacity(
-                              opacity: canUndo ? 1.0 : 0.35,
-                              duration: const Duration(milliseconds: 200),
+                          return Semantics(
+                              button: true,
+                              container: true,
+                              child: GestureDetector(
+                                onTap: canUndo ? _undoGlass : null,
+                                child: AnimatedOpacity(
+                                  opacity: canUndo ? 1.0 : 0.35,
+                                  duration: const Duration(milliseconds: 200),
+                                  child: Container(
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: Colors.transparent,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                          color:
+                                              p.textMut.withValues(alpha: 0.4),
+                                          width: 1),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        s.waterUndo,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: p.textSec,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ));
+                        }),
+                      ),
+                      const SizedBox(width: 8),
+                      // Impostazioni contenitore
+                      Expanded(
+                        child: Semantics(
+                            button: true,
+                            container: true,
+                            child: GestureDetector(
+                              onTap: () => _openWaterSettings(context, p),
                               child: Container(
                                 height: 36,
                                 decoration: BoxDecoration(
@@ -823,7 +837,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    s.waterUndo,
+                                    '${s.waterContainerBtn} · ${_containerMl}ml',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: p.textSec,
@@ -832,36 +846,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        }),
-                      ),
-                      const SizedBox(width: 8),
-                      // Impostazioni contenitore
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _openWaterSettings(context, p),
-                          child: Container(
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: p.textMut.withValues(alpha: 0.4),
-                                  width: 1),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '${s.waterContainerBtn} · ${_containerMl}ml',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: p.textSec,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                            )),
                       ),
                     ],
                   ),
@@ -1267,62 +1252,65 @@ class _PendingChoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => HabitIntroSheet.show(
-        context,
-        habitA: pair.$1,
-        habitB: pair.$2,
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: p.primaryLight,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: p.primary.withValues(alpha: 0.35),
-            width: 1,
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: () => HabitIntroSheet.show(
+            context,
+            habitA: pair.$1,
+            habitB: pair.$2,
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: p.primary.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child:
-                  Icon(Icons.auto_awesome_outlined, color: p.primary, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    s.habitChoiceOpen,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: p.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${s.habitName(pair.$1.id)}  ·  ${s.habitName(pair.$2.id)}',
-                    style: TextStyle(fontSize: 11, color: p.textSec),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: p.primaryLight,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: p.primary.withValues(alpha: 0.35),
+                width: 1,
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: p.primary, size: 20),
-          ],
-        ),
-      ),
-    );
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: p.primary.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.auto_awesome_outlined,
+                      color: p.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.habitChoiceOpen,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: p.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${s.habitName(pair.$1.id)}  ·  ${s.habitName(pair.$2.id)}',
+                        style: TextStyle(fontSize: 11, color: p.textSec),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: p.primary, size: 20),
+              ],
+            ),
+          ),
+        ));
   }
 }
 
@@ -1463,32 +1451,38 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
             Row(
               children: _bottleSizes
                   .map((size) => Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _ml = size),
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _ml == size ? p.primaryLight : p.card,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: _ml == size ? p.primary : p.cardBorder,
-                                width: _ml == size ? 1.5 : 0.5,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                size >= 1000 ? '1L' : '${size}ml',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color:
-                                      _ml == size ? p.primaryText : p.textSec,
+                        child: Semantics(
+                            button: true,
+                            container: true,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _ml = size),
+                              child: Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: _ml == size ? p.primaryLight : p.card,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color:
+                                        _ml == size ? p.primary : p.cardBorder,
+                                    width: _ml == size ? 1.5 : 0.5,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    size >= 1000 ? '1L' : '${size}ml',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: _ml == size
+                                          ? p.primaryText
+                                          : p.textSec,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                        ),
+                            )),
                       ))
                   .toList(),
             ),
@@ -1509,29 +1503,32 @@ class _WaterSettingsSheetState extends State<_WaterSettingsSheet> {
           ),
 
           const SizedBox(height: 20),
-          GestureDetector(
-            onTap: () async {
-              await widget.onSave(_type, _ml);
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: Container(
-              width: double.infinity,
-              height: 48,
-              decoration: BoxDecoration(
-                color: p.btn,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Center(
-                child: Text(
-                  context.sL.workScheduleSave,
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: p.btnText),
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: () async {
+                  await widget.onSave(_type, _ml);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: Container(
+                  width: double.infinity,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: p.btn,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      context.sL.workScheduleSave,
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: p.btnText),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
+              )),
         ],
       ),
     );
@@ -1572,44 +1569,50 @@ class _SlowdownBanner extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              GestureDetector(
-                onTap: onNo,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: p.card,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: p.cardBorder, width: 0.5),
-                  ),
-                  child: Text(
-                    s.slowdownNo,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: p.text),
-                  ),
-                ),
-              ),
+              Semantics(
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: onNo,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: p.card,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: p.cardBorder, width: 0.5),
+                      ),
+                      child: Text(
+                        s.slowdownNo,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: p.text),
+                      ),
+                    ),
+                  )),
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onYes,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: p.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    s.slowdownYes,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white),
-                  ),
-                ),
-              ),
+              Semantics(
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: onYes,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: p.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        s.slowdownYes,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white),
+                      ),
+                    ),
+                  )),
             ],
           ),
         ],
@@ -1619,420 +1622,6 @@ class _SlowdownBanner extends StatelessWidget {
 }
 
 // ── Banner orario ─────────────────────────────────────────────────────────────
-class _WorkScheduleBanner extends StatelessWidget {
-  final BwPaletteData p;
-  final BwStrings s;
-  final VoidCallback onConfirm;
-  final VoidCallback onEdit;
-
-  const _WorkScheduleBanner({
-    required this.p,
-    required this.s,
-    required this.onConfirm,
-    required this.onEdit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: p.bg2,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: p.cardBorder, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text('💼', style: TextStyle(fontSize: 14)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  s.workScheduleBanner,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: p.text,
-                    height: 1.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              GestureDetector(
-                onTap: onEdit,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: p.card,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: p.cardBorder, width: 0.5),
-                  ),
-                  child: Text(
-                    s.workScheduleEdit,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: p.text),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onConfirm,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: p.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    s.workScheduleConfirm,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Work Schedule Sheet ───────────────────────────────────────────────────────
-class _WorkScheduleSheet extends StatefulWidget {
-  final BwPaletteData p;
-  final WorkSchedule initial;
-  final Future<void> Function(WorkSchedule) onSave;
-
-  const _WorkScheduleSheet({
-    required this.p,
-    required this.initial,
-    required this.onSave,
-  });
-
-  @override
-  State<_WorkScheduleSheet> createState() => _WorkScheduleSheetState();
-}
-
-class _WorkScheduleSheetState extends State<_WorkScheduleSheet> {
-  late int _startMorning;
-  late int _endMorning;
-  late int _startAfternoon;
-  late int _endAfternoon;
-  late int _lunchHour;
-  late int _lunchDuration;
-  bool _hasLunch = true;
-
-  @override
-  void initState() {
-    super.initState();
-    final s = widget.initial;
-    _startMorning = s.startMorning;
-    _endMorning = s.endMorning;
-    _startAfternoon = s.startAfternoon;
-    _endAfternoon = s.endAfternoon;
-    _lunchHour = s.lunchHour;
-    _lunchDuration = s.lunchDurationMin;
-  }
-
-  Future<void> _pickHour(
-      BuildContext ctx, int current, ValueChanged<int> onPicked) async {
-    final result = await showTimePicker(
-      context: ctx,
-      initialTime: TimeOfDay(hour: current, minute: 0),
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
-      ),
-    );
-    if (result != null) onPicked(result.hour);
-  }
-
-  String _fmt(int h) => '${h.toString().padLeft(2, '0')}:00';
-
-  @override
-  Widget build(BuildContext context) {
-    final p = widget.p;
-    final s = context.sL;
-
-    return Container(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
-      ),
-      decoration: BoxDecoration(
-        color: p.bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(color: p.cardBorder, width: 0.5),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Handle
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: p.textMut,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-
-          Text(
-            s.workScheduleTitle,
-            style: TextStyle(
-                fontSize: 17, fontWeight: FontWeight.w700, color: p.text),
-          ),
-          const SizedBox(height: 20),
-
-          // Mattina
-          Text(
-            s.workScheduleMorning,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: p.textSec,
-                letterSpacing: 0.5),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _TimeButton(
-                  label: 'Inizio',
-                  time: _fmt(_startMorning),
-                  p: p,
-                  onTap: () => _pickHour(context, _startMorning,
-                      (h) => setState(() => _startMorning = h)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _TimeButton(
-                  label: 'Fine',
-                  time: _fmt(_endMorning),
-                  p: p,
-                  onTap: () => _pickHour(context, _endMorning,
-                      (h) => setState(() => _endMorning = h)),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // Pomeriggio
-          Text(
-            s.workScheduleAfternoon,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: p.textSec,
-                letterSpacing: 0.5),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _TimeButton(
-                  label: 'Inizio',
-                  time: _fmt(_startAfternoon),
-                  p: p,
-                  onTap: () => _pickHour(context, _startAfternoon,
-                      (h) => setState(() => _startAfternoon = h)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _TimeButton(
-                  label: 'Fine',
-                  time: _fmt(_endAfternoon),
-                  p: p,
-                  onTap: () => _pickHour(context, _endAfternoon,
-                      (h) => setState(() => _endAfternoon = h)),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // Pausa pranzo
-          GestureDetector(
-            onTap: () => setState(() => _hasLunch = !_hasLunch),
-            child: Row(
-              children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: _hasLunch ? p.primary : p.card,
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(
-                      color: _hasLunch ? p.primary : p.cardBorder,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: _hasLunch
-                      ? const Icon(Icons.check, color: Colors.white, size: 13)
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  s.workScheduleLunch,
-                  style: TextStyle(
-                      fontSize: 13, color: p.text, fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          ),
-
-          if (_hasLunch) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _TimeButton(
-                    label: 'Orario',
-                    time: _fmt(_lunchHour),
-                    p: p,
-                    onTap: () => _pickHour(context, _lunchHour,
-                        (h) => setState(() => _lunchHour = h)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: p.card,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: p.cardBorder, width: 0.5),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<int>(
-                        value: _lunchDuration,
-                        isExpanded: true,
-                        style: TextStyle(fontSize: 13, color: p.text),
-                        dropdownColor: p.card,
-                        items: [30, 45, 60, 90]
-                            .map((d) => DropdownMenuItem(
-                                  value: d,
-                                  child: Text('${d} min'),
-                                ))
-                            .toList(),
-                        onChanged: (v) =>
-                            setState(() => _lunchDuration = v ?? 30),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-
-          const SizedBox(height: 24),
-
-          GestureDetector(
-            onTap: () async {
-              final schedule = WorkSchedule(
-                startMorning: _startMorning,
-                endMorning: _endMorning,
-                startAfternoon: _startAfternoon,
-                endAfternoon: _endAfternoon,
-                lunchHour: _lunchHour,
-                lunchDurationMin: _hasLunch ? _lunchDuration : 0,
-              );
-              await widget.onSave(schedule);
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: Container(
-              width: double.infinity,
-              height: 48,
-              decoration: BoxDecoration(
-                color: p.btn,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Center(
-                child: Text(
-                  s.workScheduleSave,
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: p.btnText),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TimeButton extends StatelessWidget {
-  final String label;
-  final String time;
-  final BwPaletteData p;
-  final VoidCallback onTap;
-
-  const _TimeButton({
-    required this.label,
-    required this.time,
-    required this.p,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: p.card,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: p.cardBorder, width: 0.5),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style: TextStyle(
-                    fontSize: 10,
-                    color: p.textMut,
-                    fontWeight: FontWeight.w500)),
-            const SizedBox(height: 2),
-            Text(
-              time,
-              style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w700, color: p.text),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ── Banner "never miss twice" ─────────────────────────────────────────────────
 /// Mostrato quando l'utente non ha completato nulla né ieri né oggi.
@@ -2086,27 +1675,30 @@ class _NeverMissTwiceBanner extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: p.textSec, height: 1.4),
           ),
           const SizedBox(height: 12),
-          GestureDetector(
-            onTap: onAddWater,
-            child: Container(
-              width: double.infinity,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF9800),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  context.sL.neverMissTwiceCta,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: onAddWater,
+                child: Container(
+                  width: double.infinity,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF9800),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: Text(
+                      context.sL.neverMissTwiceCta,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ),
+              )),
         ],
       ),
     );
@@ -2131,35 +1723,38 @@ class _TypeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: selected ? p.primaryLight : p.card,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? p.primary : p.cardBorder,
-              width: selected ? 1.5 : 0.5,
-            ),
-          ),
-          child: Column(
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 24)),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: selected ? p.primaryText : p.textSec,
+      child: Semantics(
+          button: true,
+          container: true,
+          child: GestureDetector(
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: selected ? p.primaryLight : p.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: selected ? p.primary : p.cardBorder,
+                  width: selected ? 1.5 : 0.5,
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+              child: Column(
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 24)),
+                  const SizedBox(height: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? p.primaryText : p.textSec,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )),
     );
   }
 }

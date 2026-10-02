@@ -6,10 +6,14 @@ import '../l10n/app_localizations.dart';
 
 String _categoryLabel(BwStrings s, FeedbackCategory c) {
   switch (c) {
-    case FeedbackCategory.bug:     return s.feedbackCategoryBug;
-    case FeedbackCategory.idea:    return s.feedbackCategoryIdea;
-    case FeedbackCategory.feature: return s.feedbackCategoryFeature;
-    case FeedbackCategory.other:   return s.feedbackCategoryOther;
+    case FeedbackCategory.bug:
+      return s.feedbackCategoryBug;
+    case FeedbackCategory.idea:
+      return s.feedbackCategoryIdea;
+    case FeedbackCategory.feature:
+      return s.feedbackCategoryFeature;
+    case FeedbackCategory.other:
+      return s.feedbackCategoryOther;
   }
 }
 
@@ -49,7 +53,11 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
     final s = context.sL;
     try {
       await FeedbackService.instance.submit(category: _category, text: text);
-      if (mounted) setState(() { _sending = false; _sent = true; });
+      if (mounted)
+        setState(() {
+          _sending = false;
+          _sent = true;
+        });
       await Future.delayed(const Duration(milliseconds: 1400));
       if (mounted) Navigator.pop(context);
     } catch (_) {
@@ -71,7 +79,8 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
     final s = context.sL;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: BoxDecoration(
           color: p.bg,
@@ -85,7 +94,8 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
           children: [
             Center(
               child: Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
                   color: p.textMut.withValues(alpha: 0.3),
@@ -93,7 +103,6 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
                 ),
               ),
             ),
-
             if (_sent)
               _SentState(p: p, isAmb: isAmb, s: s)
             else ...[
@@ -112,38 +121,40 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
                 style: TextStyle(fontSize: 13, color: p.textSec),
               ),
               const SizedBox(height: 18),
-
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: FeedbackCategory.values.map((c) {
                   final selected = c == _category;
-                  return GestureDetector(
-                    onTap: () => setState(() => _category = c),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                      decoration: BoxDecoration(
-                        color: selected ? p.primary : p.card,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: selected ? p.primary : p.cardBorder,
-                          width: 1,
+                  return Semantics(
+                      button: true,
+                      container: true,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _category = c),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: selected ? p.primary : p.card,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected ? p.primary : p.cardBorder,
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            '${c.emoji} ${_categoryLabel(s, c)}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: selected ? p.btnText : p.textSec,
+                            ),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        '${c.emoji} ${_categoryLabel(s, c)}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: selected ? p.btnText : p.textSec,
-                        ),
-                      ),
-                    ),
-                  );
+                      ));
                 }).toList(),
               ),
               const SizedBox(height: 16),
-
               TextField(
                 controller: _textCtrl,
                 maxLines: 5,
@@ -171,34 +182,38 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-
               SizedBox(
                 width: double.infinity,
-                child: GestureDetector(
-                  onTap: _submit,
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: p.btn,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Center(
-                      child: _sending
-                          ? SizedBox(
-                              width: 18, height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: p.btnText),
-                            )
-                          : Text(
-                              s.feedbackSubmit,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: p.btnText,
-                              ),
-                            ),
-                    ),
-                  ),
-                ),
+                child: Semantics(
+                    button: true,
+                    container: true,
+                    child: GestureDetector(
+                      onTap: _submit,
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: p.btn,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Center(
+                          child: _sending
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: p.btnText),
+                                )
+                              : Text(
+                                  s.feedbackSubmit,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.btnText,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    )),
               ),
             ],
           ],

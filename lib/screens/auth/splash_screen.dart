@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/auth_service.dart';
+import '../../providers/app_provider.dart';
+import 'package:provider/provider.dart';
+import '../../services/cloud_sync_service.dart';
+import '../../widgets/restart_widget.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -36,12 +40,23 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
+    // Sessione valida ma profilo locale assente (reset, dati cancellati):
+    // lo ricrea dall'account Firebase.
+    if (prefs.getString('user_profile') == null) {
+      await context.read<AppProvider>().onLoginComplete();
+      if (!mounted) return;
+    }
+
     // Il configuratore a 5 fasi (questionario) NON è più un passaggio
     // obbligato: è facoltativo, raggiungibile dalla sezione Abitudini dopo
     // il primo sblocco. L'unico prerequisito per Home è aver visto il
     // carosello di benvenuto "Be Well".
     final wellyWelcomed = prefs.getBool('welly_welcomed') ?? false;
     if (!wellyWelcomed) {
+      if (await CloudSyncService.instance.restoreIfFresh()) {
+        if (mounted) RestartWidget.restart(context);
+        return;
+      }
       Navigator.pushReplacementNamed(context, '/welly-welcome');
       return;
     }
@@ -81,5 +96,3 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
-
-

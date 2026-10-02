@@ -26,6 +26,8 @@ class DailyObjectivesDialog {
     if (ctrl.isActive || ctrl.externalBusy) return;
     final progression = context.read<ProgressionProvider>();
     if (progression.activeHabits.isEmpty) return;
+    // Il primo giorno ci sono già le missioni: l'elenco ripeterebbe lo stesso.
+    if (progression.calendarDayNumber < 1) return;
 
     final prefs = await SharedPreferences.getInstance();
     final todayKey = _dateKey(DateTime.now());

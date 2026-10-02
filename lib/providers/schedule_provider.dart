@@ -21,16 +21,26 @@ enum TimeSlot { morning, midday, lunch, afternoon, evening }
 class WorkSchedule {
   /// Ore inizio mattina (default 9)
   final int startMorning;
+
   /// Ore fine mattina (default 13)
   final int endMorning;
+
   /// Ore inizio pomeriggio (default 14)
   final int startAfternoon;
+
   /// Ore fine pomeriggio (default 18)
   final int endAfternoon;
+
   /// Ora pausa pranzo (default 13)
   final int lunchHour;
+
   /// Durata pausa pranzo in minuti (default 30)
   final int lunchDurationMin;
+
+  /// Giorni di lavoro/studio (1 = lunedì … 7 = domenica). Default lun–ven.
+  final Set<int> workDays;
+
+  bool isWorkDay(DateTime d) => workDays.contains(d.weekday);
 
   const WorkSchedule({
     this.startMorning = 9,
@@ -39,6 +49,7 @@ class WorkSchedule {
     this.endAfternoon = 18,
     this.lunchHour = 13,
     this.lunchDurationMin = 30,
+    this.workDays = const {1, 2, 3, 4, 5},
   });
 
   WorkSchedule copyWith({
@@ -48,6 +59,7 @@ class WorkSchedule {
     int? endAfternoon,
     int? lunchHour,
     int? lunchDurationMin,
+    Set<int>? workDays,
   }) {
     return WorkSchedule(
       startMorning: startMorning ?? this.startMorning,
@@ -56,6 +68,7 @@ class WorkSchedule {
       endAfternoon: endAfternoon ?? this.endAfternoon,
       lunchHour: lunchHour ?? this.lunchHour,
       lunchDurationMin: lunchDurationMin ?? this.lunchDurationMin,
+      workDays: workDays ?? this.workDays,
     );
   }
 }
@@ -82,12 +95,21 @@ class ScheduleProvider extends ChangeNotifier {
     };
 
     _schedule = WorkSchedule(
-      startMorning:   _parseHour(prefs.getString('work_start_morning')   ?? '09:00'),
-      endMorning:     _parseHour(prefs.getString('work_end_morning')     ?? '13:00'),
-      startAfternoon: _parseHour(prefs.getString('work_start_afternoon') ?? '14:00'),
-      endAfternoon:   _parseHour(prefs.getString('work_end_afternoon')   ?? '18:00'),
-      lunchHour:      _parseHour(prefs.getString('lunch_time')           ?? '13:00'),
+      startMorning:
+          _parseHour(prefs.getString('work_start_morning') ?? '09:00'),
+      endMorning: _parseHour(prefs.getString('work_end_morning') ?? '13:00'),
+      startAfternoon:
+          _parseHour(prefs.getString('work_start_afternoon') ?? '14:00'),
+      endAfternoon:
+          _parseHour(prefs.getString('work_end_afternoon') ?? '18:00'),
+      lunchHour: _parseHour(prefs.getString('lunch_time') ?? '13:00'),
       lunchDurationMin: prefs.getInt('lunch_duration_min') ?? 30,
+      workDays:
+          (prefs.getStringList('work_days') ?? const ['1', '2', '3', '4', '5'])
+              .map(int.tryParse)
+              .whereType<int>()
+              .where((d) => d >= 1 && d <= 7)
+              .toSet(),
     );
 
     notifyListeners();
@@ -98,23 +120,32 @@ class ScheduleProvider extends ChangeNotifier {
   Future<void> setUserType(UserType type) async {
     _userType = type;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_type', switch (type) {
-      UserType.student => 'student',
-      UserType.both => 'both',
-      UserType.worker => 'worker',
-    });
+    await prefs.setString(
+        'user_type',
+        switch (type) {
+          UserType.student => 'student',
+          UserType.both => 'both',
+          UserType.worker => 'worker',
+        });
     notifyListeners();
   }
 
   Future<void> setSchedule(WorkSchedule s) async {
     _schedule = s;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('work_start_morning',   '${s.startMorning.toString().padLeft(2,'0')}:00');
-    await prefs.setString('work_end_morning',     '${s.endMorning.toString().padLeft(2,'0')}:00');
-    await prefs.setString('work_start_afternoon', '${s.startAfternoon.toString().padLeft(2,'0')}:00');
-    await prefs.setString('work_end_afternoon',   '${s.endAfternoon.toString().padLeft(2,'0')}:00');
-    await prefs.setString('lunch_time',           '${s.lunchHour.toString().padLeft(2,'0')}:00');
+    await prefs.setString('work_start_morning',
+        '${s.startMorning.toString().padLeft(2, '0')}:00');
+    await prefs.setString(
+        'work_end_morning', '${s.endMorning.toString().padLeft(2, '0')}:00');
+    await prefs.setString('work_start_afternoon',
+        '${s.startAfternoon.toString().padLeft(2, '0')}:00');
+    await prefs.setString('work_end_afternoon',
+        '${s.endAfternoon.toString().padLeft(2, '0')}:00');
+    await prefs.setString(
+        'lunch_time', '${s.lunchHour.toString().padLeft(2, '0')}:00');
     await prefs.setInt('lunch_duration_min', s.lunchDurationMin);
+    await prefs.setStringList(
+        'work_days', (s.workDays.toList()..sort()).map((d) => '$d').toList());
     notifyListeners();
   }
 
@@ -177,8 +208,7 @@ class ScheduleProvider extends ChangeNotifier {
   /// Restituisce l'abitudine più adatta da fare in questo momento.
   /// [active] = lista delle abitudini attive (non completate oggi).
   /// [hour]   = ora corrente (0-23).
-  HabitDefinition? getHabitForNow(
-      List<HabitDefinition> active, int hour) {
+  HabitDefinition? getHabitForNow(List<HabitDefinition> active, int hour) {
     if (active.isEmpty) return null;
 
     // "Entrambe" usa la logica worker: si basa sugli orari di lavoro/studio
@@ -199,7 +229,8 @@ class ScheduleProvider extends ChangeNotifier {
 
     // Prima dell'inizio lavoro — attività mattutine
     if (hour < s.startMorning) {
-      return _pickFirst(active, ['water_morning', 'water', 'stretching_active']);
+      return _pickFirst(
+          active, ['water_morning', 'water', 'stretching_active']);
     }
 
     // Inizio lavoro — primo blocco focus (picco cognitivo)
@@ -209,7 +240,8 @@ class ScheduleProvider extends ChangeNotifier {
 
     // Metà mattina (startMorning + 2h) — pausa vera
     if (hour == s.startMorning + 2) {
-      return _pickFirst(active, ['stretching_active', 'neck_stretch', 'breathing_box', 'water']);
+      return _pickFirst(active,
+          ['stretching_active', 'neck_stretch', 'breathing_box', 'water']);
     }
 
     // Fine mattina (endMorning - 1h) — snack + acqua
@@ -219,12 +251,14 @@ class ScheduleProvider extends ChangeNotifier {
 
     // Blocco mattutino — micro-break ogni ora
     if (hour > s.startMorning && hour < s.endMorning) {
-      return _pickFirst(active, ['eyes_20_20_20', 'neck_stretch', 'posture', 'water']);
+      return _pickFirst(
+          active, ['eyes_20_20_20', 'neck_stretch', 'posture', 'water']);
     }
 
     // Pausa pranzo
     if (hour >= s.lunchHour && hour < s.startAfternoon) {
-      return _pickFirst(active, ['walk_lunch', 'lunch_no_screen', 'lunch_park', 'water']);
+      return _pickFirst(
+          active, ['walk_lunch', 'lunch_no_screen', 'lunch_park', 'water']);
     }
 
     // Inizio pomeriggio — recovery + focus
@@ -242,7 +276,8 @@ class ScheduleProvider extends ChangeNotifier {
 
     // Metà pomeriggio (startAfternoon + 2h) — pausa vera
     if (hour == s.startAfternoon + 2) {
-      return _pickFirst(active, ['desk_exercise', 'stretching_active', 'breathing_box']);
+      return _pickFirst(
+          active, ['desk_exercise', 'stretching_active', 'breathing_box']);
     }
 
     // Blocco pomeriggio — micro-break
@@ -275,7 +310,8 @@ class ScheduleProvider extends ChangeNotifier {
       if (hour == 10) {
         return _pickFirst(active, ['water', 'snack']);
       }
-      return _pickFirst(active, ['focus_25', 'focus_50', 'water_morning', 'water']);
+      return _pickFirst(
+          active, ['focus_25', 'focus_50', 'water_morning', 'water']);
     }
 
     // Pranzo 12-14
@@ -285,7 +321,8 @@ class ScheduleProvider extends ChangeNotifier {
 
     // Primo pomeriggio 14-17: flessibile
     if (hour >= 14 && hour < 17) {
-      return _pickFirst(active, ['breathing_box', 'meditation', 'focus_25', 'breathing_478']);
+      return _pickFirst(
+          active, ['breathing_box', 'meditation', 'focus_25', 'breathing_478']);
     }
 
     // Sera 17+

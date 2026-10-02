@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import '../../providers/settings_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../l10n/app_localizations.dart';
@@ -13,6 +14,8 @@ import '../../widgets/habit_hero_band.dart';
 import '../../services/analytics_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/smart_reminders.dart';
+import '../../services/focus_recovery.dart';
+import '../../widgets/leave_session_guard.dart';
 
 enum _TimerState { idle, running, paused, done }
 
@@ -78,6 +81,11 @@ class _FocusScreenState extends State<FocusScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+    // Movimento ridotto: nessuna pulsazione continua.
+    if (Motion.reduced) {
+      _pulseCtrl.value = 0.5;
+      _pulseCtrl.stop();
+    }
   }
 
   @override
@@ -86,6 +94,7 @@ class _FocusScreenState extends State<FocusScreen>
     _timer?.cancel();
     SmartReminders.cancelFocusEnd();
     SmartReminders.cancelFocusTimer();
+    FocusRecovery.clear();
     _pulseCtrl.dispose();
     super.dispose();
   }
@@ -95,6 +104,7 @@ class _FocusScreenState extends State<FocusScreen>
       AnalyticsService.instance.logFocusSessionStarted(_totalSeconds ~/ 60);
     }
     _endsAt = DateTime.now().add(Duration(seconds: _remaining));
+    FocusRecovery.save(_habitId, _endsAt!);
     setState(() => _state = _TimerState.running);
     _scheduleEndNotification();
     SmartReminders.showFocusRunning(_endsAt!);
@@ -121,6 +131,7 @@ class _FocusScreenState extends State<FocusScreen>
       _state = _TimerState.done;
       _timer?.cancel();
       SmartReminders.cancelFocusTimer();
+      FocusRecovery.clear();
       AnalyticsService.instance.logFocusSessionCompleted(_totalSeconds ~/ 60);
       _sessionsCompletedThisVisit++;
       _markHabitCompleted();
@@ -191,6 +202,7 @@ class _FocusScreenState extends State<FocusScreen>
     if (_state != _TimerState.running) return;
     _timer?.cancel();
     SmartReminders.cancelFocusEnd();
+    FocusRecovery.clear();
     SmartReminders.showFocusPaused();
     setState(() => _state = _TimerState.paused);
   }
@@ -201,6 +213,7 @@ class _FocusScreenState extends State<FocusScreen>
     _timer?.cancel();
     SmartReminders.cancelFocusEnd();
     SmartReminders.cancelFocusTimer();
+    FocusRecovery.clear();
     setState(() {
       _state = _TimerState.idle;
       _remaining = _totalSeconds;
@@ -227,238 +240,246 @@ class _FocusScreenState extends State<FocusScreen>
         final minutesLabel =
             '${_sessionsCompletedThisVisit * widget.durationMinutes}';
 
-        return BwScaffold(
-          body: SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-              children: [
-                SizedBox(height: isAmb ? 80 : 0),
-
-                // ── Header ──────────────────────────────────────────────
-                Row(
+        return LeaveSessionGuard(
+            active:
+                _state == _TimerState.running || _state == _TimerState.paused,
+            child: BwScaffold(
+              body: SafeArea(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                   children: [
-                    IconButton(
-                      onPressed: () => Navigator.maybePop(context),
-                      icon: Icon(Icons.arrow_back_rounded, color: p.text),
-                      tooltip:
-                          MaterialLocalizations.of(context).backButtonTooltip,
+                    SizedBox(height: isAmb ? 80 : 0),
+
+                    // ── Header ──────────────────────────────────────────────
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.maybePop(context),
+                          icon: Icon(Icons.arrow_back_rounded, color: p.text),
+                          tooltip: MaterialLocalizations.of(context)
+                              .backButtonTooltip,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            isAmb
+                                ? context.sL.focusTitle.toLowerCase()
+                                : context.sL.focusTitle,
+                            style: TextStyle(
+                              fontSize: isAmb ? 28 : 22,
+                              fontWeight:
+                                  isAmb ? FontWeight.w300 : FontWeight.w600,
+                              fontFamily: isAmb ? 'CormorantGaramond' : null,
+                              fontStyle: isAmb ? FontStyle.normal : null,
+                              color: p.text,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: p.primaryLight,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(context.sL.focusPomodoro,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: p.primaryText)),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        isAmb
-                            ? context.sL.focusTitle.toLowerCase()
-                            : context.sL.focusTitle,
-                        style: TextStyle(
-                          fontSize: isAmb ? 28 : 22,
-                          fontWeight: isAmb ? FontWeight.w300 : FontWeight.w600,
-                          fontFamily: isAmb ? 'CormorantGaramond' : null,
-                          fontStyle: isAmb ? FontStyle.normal : null,
-                          color: p.text,
+
+                    const SizedBox(height: 16),
+                    HabitHeroBand(habitId: _habitId),
+                    const SizedBox(height: 24),
+
+                    // ── Ring timer ──────────────────────────────────────────
+                    Center(
+                      child: SizedBox(
+                        width: 220,
+                        height: 220,
+                        child: CustomPaint(
+                          painter: _RingPainter(
+                            progress: _progress,
+                            trackColor: p.ringTrack,
+                            progressColor: p.ring,
+                            ambient: isAmb,
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _timeLabel,
+                                  style: TextStyle(
+                                    fontSize: isAmb ? 52 : 44,
+                                    fontWeight: isAmb
+                                        ? FontWeight.w300
+                                        : FontWeight.w600,
+                                    fontFamily:
+                                        isAmb ? 'CormorantGaramond' : null,
+                                    color: p.text,
+                                  ),
+                                ),
+                                Text(
+                                  context.sL.focusRemaining,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: p.textSec,
+                                    fontFamily:
+                                        isAmb ? 'CormorantGaramond' : null,
+                                    fontStyle: isAmb
+                                        ? FontStyle.italic
+                                        : FontStyle.normal,
+                                    letterSpacing: isAmb ? 1.5 : 0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: p.primaryLight,
-                        borderRadius: BorderRadius.circular(20),
+
+                    const SizedBox(height: 12),
+
+                    // Info sessione (blocco Pomodoro o Deep Work)
+                    Text(
+                      _sessionInfoText(context),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: p.textSec,
+                        fontFamily: isAmb ? 'CormorantGaramond' : null,
                       ),
-                      child: Text(context.sL.focusPomodoro,
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: p.primaryText)),
                     ),
+
+                    const SizedBox(height: 28),
+
+                    // ── Bottoni ──────────────────────────────────────────────
+                    if (_state == _TimerState.idle) ...[
+                      _BigButton(
+                        label: _sessionsCompletedThisVisit == 0
+                            ? context.sL.focusStartSession
+                            : context.sL.focusNewSession,
+                        color: p.btn,
+                        textColor: p.btnText,
+                        onTap: _start,
+                        ambient: isAmb,
+                      ),
+                    ] else if (_state == _TimerState.running) ...[
+                      Row(children: [
+                        Expanded(
+                          child: _BigButton(
+                            label: context.sL.focusPause,
+                            color: p.bg2,
+                            textColor: p.textSec,
+                            onTap: _pause,
+                            ambient: isAmb,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _BigButton(
+                            label: context.sL.focusStop,
+                            color: p.btn,
+                            textColor: p.btnText,
+                            onTap: _stop,
+                            ambient: isAmb,
+                          ),
+                        ),
+                      ]),
+                    ] else if (_state == _TimerState.paused) ...[
+                      Row(children: [
+                        Expanded(
+                          child: _BigButton(
+                            label: context.sL.focusResume,
+                            color: p.btn,
+                            textColor: p.btnText,
+                            onTap: _resume,
+                            ambient: isAmb,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _BigButton(
+                            label: context.sL.focusStop,
+                            color: p.bg2,
+                            textColor: p.textSec,
+                            onTap: _stop,
+                            ambient: isAmb,
+                          ),
+                        ),
+                      ]),
+                    ] else ...[
+                      _BigButton(
+                        label: context.sL.focusNewSession,
+                        color: p.btn,
+                        textColor: p.btnText,
+                        onTap: _stop,
+                        ambient: isAmb,
+                      ),
+                    ],
+
+                    const SizedBox(height: 32),
+
+                    // ── Stats ────────────────────────────────────────────────
+                    if (isAmb) ...[
+                      Divider(color: p.cardBorder, height: 1),
+                      const SizedBox(height: 20),
+                      Text(context.sL.heatmapToday,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'CormorantGaramond',
+                            fontStyle: FontStyle.italic,
+                            color: p.textSec,
+                            letterSpacing: 2,
+                          )),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _AmbStat(
+                              label: context.sL.focusSessions,
+                              value: sessionsLabel,
+                              p: p),
+                          _AmbStat(
+                              label: context.sL.focusMinutes,
+                              value: minutesLabel,
+                              p: p),
+                          _AmbStat(
+                              label: context.sL.focusStreak,
+                              value: '$streak',
+                              p: p),
+                        ],
+                      ),
+                    ] else ...[
+                      Row(children: [
+                        Expanded(
+                            child: _StatCard(
+                                label: context.sL.focusSessions,
+                                value: sessionsLabel,
+                                p: p)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: _StatCard(
+                                label: context.sL.focusMinutes,
+                                value: minutesLabel,
+                                p: p)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: _StatCard(
+                                label: context.sL.focusStreak,
+                                value:
+                                    '$streak ${streak == 1 ? context.sL.dayOne : context.sL.days}',
+                                p: p)),
+                      ]),
+                    ],
                   ],
                 ),
-
-                const SizedBox(height: 16),
-                HabitHeroBand(habitId: _habitId),
-                const SizedBox(height: 24),
-
-                // ── Ring timer ──────────────────────────────────────────
-                Center(
-                  child: SizedBox(
-                    width: 220,
-                    height: 220,
-                    child: CustomPaint(
-                      painter: _RingPainter(
-                        progress: _progress,
-                        trackColor: p.ringTrack,
-                        progressColor: p.ring,
-                        ambient: isAmb,
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _timeLabel,
-                              style: TextStyle(
-                                fontSize: isAmb ? 52 : 44,
-                                fontWeight:
-                                    isAmb ? FontWeight.w300 : FontWeight.w600,
-                                fontFamily: isAmb ? 'CormorantGaramond' : null,
-                                color: p.text,
-                              ),
-                            ),
-                            Text(
-                              context.sL.focusRemaining,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: p.textSec,
-                                fontFamily: isAmb ? 'CormorantGaramond' : null,
-                                fontStyle:
-                                    isAmb ? FontStyle.italic : FontStyle.normal,
-                                letterSpacing: isAmb ? 1.5 : 0,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Info sessione (blocco Pomodoro o Deep Work)
-                Text(
-                  _sessionInfoText(context),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: p.textSec,
-                    fontFamily: isAmb ? 'CormorantGaramond' : null,
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                // ── Bottoni ──────────────────────────────────────────────
-                if (_state == _TimerState.idle) ...[
-                  _BigButton(
-                    label: _sessionsCompletedThisVisit == 0
-                        ? context.sL.focusStartSession
-                        : context.sL.focusNewSession,
-                    color: p.btn,
-                    textColor: p.btnText,
-                    onTap: _start,
-                    ambient: isAmb,
-                  ),
-                ] else if (_state == _TimerState.running) ...[
-                  Row(children: [
-                    Expanded(
-                      child: _BigButton(
-                        label: context.sL.focusPause,
-                        color: p.bg2,
-                        textColor: p.textSec,
-                        onTap: _pause,
-                        ambient: isAmb,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _BigButton(
-                        label: context.sL.focusStop,
-                        color: p.btn,
-                        textColor: p.btnText,
-                        onTap: _stop,
-                        ambient: isAmb,
-                      ),
-                    ),
-                  ]),
-                ] else if (_state == _TimerState.paused) ...[
-                  Row(children: [
-                    Expanded(
-                      child: _BigButton(
-                        label: context.sL.focusResume,
-                        color: p.btn,
-                        textColor: p.btnText,
-                        onTap: _resume,
-                        ambient: isAmb,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _BigButton(
-                        label: context.sL.focusStop,
-                        color: p.bg2,
-                        textColor: p.textSec,
-                        onTap: _stop,
-                        ambient: isAmb,
-                      ),
-                    ),
-                  ]),
-                ] else ...[
-                  _BigButton(
-                    label: context.sL.focusNewSession,
-                    color: p.btn,
-                    textColor: p.btnText,
-                    onTap: _stop,
-                    ambient: isAmb,
-                  ),
-                ],
-
-                const SizedBox(height: 32),
-
-                // ── Stats ────────────────────────────────────────────────
-                if (isAmb) ...[
-                  Divider(color: p.cardBorder, height: 1),
-                  const SizedBox(height: 20),
-                  Text(context.sL.heatmapToday,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontFamily: 'CormorantGaramond',
-                        fontStyle: FontStyle.italic,
-                        color: p.textSec,
-                        letterSpacing: 2,
-                      )),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      _AmbStat(
-                          label: context.sL.focusSessions,
-                          value: sessionsLabel,
-                          p: p),
-                      _AmbStat(
-                          label: context.sL.focusMinutes,
-                          value: minutesLabel,
-                          p: p),
-                      _AmbStat(
-                          label: context.sL.focusStreak,
-                          value: '$streak',
-                          p: p),
-                    ],
-                  ),
-                ] else ...[
-                  Row(children: [
-                    Expanded(
-                        child: _StatCard(
-                            label: context.sL.focusSessions,
-                            value: sessionsLabel,
-                            p: p)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                        child: _StatCard(
-                            label: context.sL.focusMinutes,
-                            value: minutesLabel,
-                            p: p)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                        child: _StatCard(
-                            label: context.sL.focusStreak,
-                            value:
-                                '$streak ${streak == 1 ? context.sL.dayOne : context.sL.days}',
-                            p: p)),
-                  ]),
-                ],
-              ],
-            ),
-          ),
-        );
+              ),
+            ));
       },
     );
   }
@@ -481,27 +502,30 @@ class _BigButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(ambient ? 25 : 14),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: ambient ? FontWeight.w400 : FontWeight.w600,
-              fontFamily: ambient ? 'CormorantGaramond' : null,
-              color: textColor,
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(ambient ? 25 : 14),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: ambient ? FontWeight.w400 : FontWeight.w600,
+                  fontFamily: ambient ? 'CormorantGaramond' : null,
+                  color: textColor,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }
 

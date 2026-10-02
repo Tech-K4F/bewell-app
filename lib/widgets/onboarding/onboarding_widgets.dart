@@ -8,7 +8,7 @@ import '../../l10n/app_localizations.dart';
 // ═══════════════════════════════════════════════════════════════════════════
 
 class QuestionnaireProgressBar extends StatelessWidget {
-  final int current;   // 1-based
+  final int current; // 1-based
   final int total;
   final String? timeRemaining;
 
@@ -127,51 +127,54 @@ class OptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.read<ThemeProvider>().paletteData;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? p.primaryLight : p.card,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? p.primary : p.cardBorder,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        // mainAxisSize.min + Flexible sull'emoji: nelle griglie più strette
-        // (4 colonne, aspect ratio 1.0 — Q8, Q21) il budget verticale della
-        // cella è al millimetro e bastava un font leggermente più alto per
-        // sforare di una frazione di pixel (RenderFlex overflow).
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 20)),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: selected ? p.primary : p.textSec,
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? p.primaryLight : p.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected ? p.primary : p.cardBorder,
+                width: selected ? 1.5 : 1,
               ),
             ),
-            if (sublabel != null)
-              Text(
-                sublabel!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: p.textMut,
+            // mainAxisSize.min + Flexible sull'emoji: nelle griglie più strette
+            // (4 colonne, aspect ratio 1.0 — Q8, Q21) il budget verticale della
+            // cella è al millimetro e bastava un font leggermente più alto per
+            // sforare di una frazione di pixel (RenderFlex overflow).
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 20)),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: selected ? p.primary : p.textSec,
+                  ),
                 ),
-              ),
-          ],
-        ),
-      ),
-    );
+                if (sublabel != null)
+                  Text(
+                    sublabel!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: p.textMut,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ));
   }
 }
 
@@ -216,8 +219,7 @@ class LabeledSlider extends StatelessWidget {
               ),
             ),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
                 color: p.primaryLight,
                 borderRadius: BorderRadius.circular(6),
@@ -226,7 +228,9 @@ class LabeledSlider extends StatelessWidget {
               child: Text(
                 valueLabel(value),
                 style: TextStyle(
-                    color: p.primary, fontSize: 12, fontWeight: FontWeight.w700),
+                    color: p.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700),
               ),
             ),
           ],
@@ -281,52 +285,55 @@ class ResourceToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.read<ThemeProvider>().paletteData;
-    return GestureDetector(
-      onTap: () => onChanged(!value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: value ? p.primaryLight : p.card,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: value ? p.primary.withValues(alpha: 0.5) : p.cardBorder,
-          ),
-        ),
-        child: Row(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 20)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                        color: p.text,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    sublabel,
-                    style: TextStyle(color: p.textMut, fontSize: 11),
-                  ),
-                ],
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: () => onChanged(!value),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: value ? p.primaryLight : p.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: value ? p.primary.withValues(alpha: 0.5) : p.cardBorder,
               ),
             ),
-            Switch(
-              value: value,
-              onChanged: onChanged,
-              activeColor: p.primary,
-              trackColor: WidgetStateProperty.resolveWith((states) =>
-                  states.contains(WidgetState.selected)
-                      ? p.primary.withValues(alpha: 0.4)
-                      : p.cardBorder),
+            child: Row(
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                            color: p.text,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        sublabel,
+                        style: TextStyle(color: p.textMut, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: value,
+                  onChanged: onChanged,
+                  activeColor: p.primary,
+                  trackColor: WidgetStateProperty.resolveWith((states) =>
+                      states.contains(WidgetState.selected)
+                          ? p.primary.withValues(alpha: 0.4)
+                          : p.cardBorder),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
   }
 }
 
@@ -370,9 +377,7 @@ class QuestionnaireNavRow extends StatelessWidget {
             child: Text(
               nextLabel,
               style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: p.btnText),
+                  fontSize: 15, fontWeight: FontWeight.w700, color: p.btnText),
             ),
           ),
         ),

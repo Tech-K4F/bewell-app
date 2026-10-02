@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
+import '../../providers/settings_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +20,7 @@ import '../../models/discount_model.dart';
 import '../../models/inapp_item_model.dart';
 import '../../providers/inapp_provider.dart';
 import '../../providers/tutorial_provider.dart';
+import '../../providers/progression_provider.dart';
 import '../../widgets/spotlight_overlay.dart';
 import '../../widgets/bw_scaffold.dart';
 import '../../widgets/banner_ad_widget.dart';
@@ -74,6 +76,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
     final seen = await ctrl.hasSeenTutorial('marketplace_tour');
     if (!mounted) return;
     if (!seen) {
+      // Primo giorno: niente tour del catalogo, c'è già abbastanza da leggere.
+      // Compare alla prima visita dal secondo giorno.
+      if (context.read<ProgressionProvider>().calendarDayNumber < 1) {
+        await context
+            .read<TutorialProvider>()
+            .markSeenExternally('rewards_first_visit');
+        return;
+      }
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) ctrl.startTutorial('marketplace_tour', _marketplaceSteps);
       // Sopprime il Welly dialog rewards_first_visit per evitare duplicati —
@@ -105,7 +115,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
     final p = context.read<ThemeProvider>().paletteData;
 
     return BwScaffold(
-      bottomNavigationBar: const BannerAdWidget(),
+      bottomNavigationBar: const BannerAdWidget(screenKey: 'rewards'),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,22 +345,25 @@ class _RewardsTabState extends State<_RewardsTab> {
             Text(s.errorGeneral,
                 style: TextStyle(color: p.textSec, fontSize: 14)),
             const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _loadCatalog,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: p.btn,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(s.confirm,
-                    style: TextStyle(
-                        color: p.btnText,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13)),
-              ),
-            ),
+            Semantics(
+                button: true,
+                container: true,
+                child: GestureDetector(
+                  onTap: _loadCatalog,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: p.btn,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(s.confirm,
+                        style: TextStyle(
+                            color: p.btnText,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13)),
+                  ),
+                )),
           ],
         ),
       );
@@ -455,6 +468,11 @@ class _ShimmerBoxState extends State<_ShimmerBox>
     _ctrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 900))
       ..repeat(reverse: true);
+    // Movimento ridotto: nessuna pulsazione continua.
+    if (Motion.reduced) {
+      _ctrl.value = 0.5;
+      _ctrl.stop();
+    }
   }
 
   @override
@@ -804,44 +822,50 @@ class _RedeemSheetState extends State<_RedeemSheet>
         Row(
           children: [
             Expanded(
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: p.bg2,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: p.cardBorder, width: 0.5),
-                  ),
-                  child: Center(
-                    child: Text(s.cancel,
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: p.textSec)),
-                  ),
-                ),
-              ),
+              child: Semantics(
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: p.bg2,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: p.cardBorder, width: 0.5),
+                      ),
+                      child: Center(
+                        child: Text(s.cancel,
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: p.textSec)),
+                      ),
+                    ),
+                  )),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: GestureDetector(
-                onTap: () => _confirm(ap),
-                child: Container(
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: p.btn,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(s.confirm,
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: p.btnText)),
-                  ),
-                ),
-              ),
+              child: Semantics(
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: () => _confirm(ap),
+                    child: Container(
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: p.btn,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(s.confirm,
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: p.btnText)),
+                      ),
+                    ),
+                  )),
             ),
           ],
         ),
@@ -925,50 +949,56 @@ class _RedeemSheetState extends State<_RedeemSheet>
         const SizedBox(height: 16),
 
         // Copia codice
-        GestureDetector(
-          onTap: () {
-            Clipboard.setData(ClipboardData(text: code));
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(s.codeCopied),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ));
-          },
-          child: Container(
-            width: double.infinity,
-            height: 50,
-            decoration: BoxDecoration(
-              color: p.btn,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.copy_rounded, size: 16, color: p.btnText),
-                const SizedBox(width: 8),
-                Text(
-                  s.copyCode,
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: p.btnText),
+        Semantics(
+            button: true,
+            container: true,
+            child: GestureDetector(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: code));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(s.codeCopied),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ));
+              },
+              child: Container(
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: p.btn,
+                  borderRadius: BorderRadius.circular(14),
                 ),
-              ],
-            ),
-          ),
-        ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.copy_rounded, size: 16, color: p.btnText),
+                    const SizedBox(width: 8),
+                    Text(
+                      s.copyCode,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: p.btnText),
+                    ),
+                  ],
+                ),
+              ),
+            )),
         const SizedBox(height: 12),
 
         // Chiudi
-        GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Text(
-            s.cancel,
-            style: TextStyle(fontSize: 13, color: p.textMut),
-          ),
-        ),
+        Semantics(
+            button: true,
+            container: true,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Text(
+                s.cancel,
+                style: TextStyle(fontSize: 13, color: p.textMut),
+              ),
+            )),
       ],
     );
   }
@@ -1237,18 +1267,21 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
                           ? p.primary
                           : p.textMut),
                 ),
-                GestureDetector(
-                  onTap: () => _showWhyDialog(context),
-                  child: Text(
-                    s.whyAds,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: p.textSec,
-                      decoration: TextDecoration.underline,
-                      decorationColor: p.textSec,
-                    ),
-                  ),
-                ),
+                Semantics(
+                    button: true,
+                    container: true,
+                    child: GestureDetector(
+                      onTap: () => _showWhyDialog(context),
+                      child: Text(
+                        s.whyAds,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: p.textSec,
+                          decoration: TextDecoration.underline,
+                          decorationColor: p.textSec,
+                        ),
+                      ),
+                    )),
               ],
             ),
           ],
@@ -1294,24 +1327,28 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
             child: Text(s.cancel,
                 style: TextStyle(color: p.textMut, fontSize: 13)),
           ),
-          GestureDetector(
-            onTap: () {
-              Navigator.pop(dialogCtx);
-              _watchAd(context);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                  color: p.btn, borderRadius: BorderRadius.circular(10)),
-              child: Text(
-                s.marketWatchNow,
-                style: TextStyle(
-                    color: p.btnText,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.pop(dialogCtx);
+                  _watchAd(context);
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                      color: p.btn, borderRadius: BorderRadius.circular(10)),
+                  child: Text(
+                    s.marketWatchNow,
+                    style: TextStyle(
+                        color: p.btnText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              )),
         ],
       ),
     );
@@ -1335,23 +1372,27 @@ class _RewardedAdCardState extends State<_RewardedAdCard> {
           style: TextStyle(color: p.textSec, fontSize: 13, height: 1.6),
         ),
         actions: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: p.btn,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                s.dialogGotIt,
-                style: TextStyle(
-                    color: p.btnText,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: p.btn,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    s.dialogGotIt,
+                    style: TextStyle(
+                        color: p.btnText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              )),
         ],
       ),
     );
@@ -1494,50 +1535,56 @@ class _ReferralCardState extends State<_ReferralCard> {
               ),
             )
           else if (_myCode == null)
-            GestureDetector(
-              onTap: () {
-                setState(() => _loading = true);
-                _loadCode();
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: p.card,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: p.cardBorder),
-                ),
-                child: Center(
-                  child: Text(
-                    s.referralRetry,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: p.textSec,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600),
+            Semantics(
+                button: true,
+                container: true,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _loading = true);
+                    _loadCode();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: p.card,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: p.cardBorder),
+                    ),
+                    child: Center(
+                      child: Text(
+                        s.referralRetry,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: p.textSec,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            )
+                ))
           else
-            GestureDetector(
-              onTap: () => _share(s),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: p.btn,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
-                  child: Text(
-                    s.referralShareButton(_myCode ?? ''),
-                    style: TextStyle(
-                        color: p.btnText,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600),
+            Semantics(
+                button: true,
+                container: true,
+                child: GestureDetector(
+                  onTap: () => _share(s),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: p.btn,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Text(
+                        s.referralShareButton(_myCode ?? ''),
+                        style: TextStyle(
+                            color: p.btnText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
+                )),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -1564,29 +1611,32 @@ class _ReferralCardState extends State<_ReferralCard> {
                 ),
               ),
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => _redeem(context, s),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: p.primaryLight,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: _redeeming
-                      ? SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 1.5, color: p.primary),
-                        )
-                      : Text(s.referralApply,
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: p.primary)),
-                ),
-              ),
+              Semantics(
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: () => _redeem(context, s),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: p.primaryLight,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: _redeeming
+                          ? SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 1.5, color: p.primary),
+                            )
+                          : Text(s.referralApply,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: p.primary)),
+                    ),
+                  )),
             ],
           ),
         ],
@@ -1871,60 +1921,67 @@ class _DiscountSheet extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Copia codice
-          GestureDetector(
-            onTap: () => _copyCode(context),
-            child: Container(
-              width: double.infinity,
-              height: 50,
-              decoration: BoxDecoration(
-                color: p.btn,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.copy_rounded, size: 16, color: p.btnText),
-                  const SizedBox(width: 8),
-                  Text(
-                    s.copyCode,
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: p.btnText),
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: () => _copyCode(context),
+                child: Container(
+                  width: double.infinity,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: p.btn,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                ],
-              ),
-            ),
-          ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.copy_rounded, size: 16, color: p.btnText),
+                      const SizedBox(width: 8),
+                      Text(
+                        s.copyCode,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: p.btnText),
+                      ),
+                    ],
+                  ),
+                ),
+              )),
           const SizedBox(height: 10),
 
           // Vai al sito
-          GestureDetector(
-            onTap: () => _openSite(context),
-            child: Container(
-              width: double.infinity,
-              height: 46,
-              decoration: BoxDecoration(
-                color: p.bg2,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: p.cardBorder, width: 0.5),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.open_in_new_rounded, size: 15, color: p.textSec),
-                  const SizedBox(width: 6),
-                  Text(
-                    s.goToSite,
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: p.textSec),
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: () => _openSite(context),
+                child: Container(
+                  width: double.infinity,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: p.bg2,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: p.cardBorder, width: 0.5),
                   ),
-                ],
-              ),
-            ),
-          ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.open_in_new_rounded,
+                          size: 15, color: p.textSec),
+                      const SizedBox(width: 6),
+                      Text(
+                        s.goToSite,
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: p.textSec),
+                      ),
+                    ],
+                  ),
+                ),
+              )),
           const SizedBox(height: 14),
 
           // Affiliate note
@@ -2093,28 +2150,34 @@ class _PremiumBanner extends StatelessWidget {
           _PremiumFeature(s.premiumDiscounts),
           const SizedBox(height: 8),
           // Pulsante trial
-          GestureDetector(
-            onTap: () {
-              AnalyticsService.instance.logPremiumTapped();
-              // TODO: implementare acquisto in-app con RevenueCat/StoreKit
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 7),
-              decoration: BoxDecoration(
-                color: const Color(0x1A7C3AED), // purple 10%
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                    color: const Color(0x407C3AED), width: 0.5), // purple 25%
-              ),
-              child: Text(
-                s.premiumTrial,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 10, color: _purple, fontWeight: FontWeight.w500),
-              ),
-            ),
-          ),
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: () {
+                  AnalyticsService.instance.logPremiumTapped();
+                  // TODO: implementare acquisto in-app con RevenueCat/StoreKit
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0x1A7C3AED), // purple 10%
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: const Color(0x407C3AED),
+                        width: 0.5), // purple 25%
+                  ),
+                  child: Text(
+                    s.premiumTrial,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 10,
+                        color: _purple,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ),
+              )),
           const SizedBox(height: 5),
           Text(
             s.premiumOr,
@@ -2608,52 +2671,59 @@ class _UnlockSheetState extends State<_UnlockSheet> {
         Row(
           children: [
             Expanded(
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: p.bg2,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: p.cardBorder, width: 0.5),
-                  ),
-                  child: Center(
-                    child: Text(s.cancel,
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: p.textSec)),
-                  ),
-                ),
-              ),
+              child: Semantics(
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: p.bg2,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: p.cardBorder, width: 0.5),
+                      ),
+                      child: Center(
+                        child: Text(s.cancel,
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: p.textSec)),
+                      ),
+                    ),
+                  )),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: GestureDetector(
-                onTap: canAfford && !_loading ? _unlock : null,
-                child: Container(
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: canAfford ? _purple : p.bg2,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: _loading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : Text(
-                            s.unlockItem,
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: canAfford ? Colors.white : p.textMut),
-                          ),
-                  ),
-                ),
-              ),
+              child: Semantics(
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: canAfford && !_loading ? _unlock : null,
+                    child: Container(
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: canAfford ? _purple : p.bg2,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: _loading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : Text(
+                                s.unlockItem,
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        canAfford ? Colors.white : p.textMut),
+                              ),
+                      ),
+                    ),
+                  )),
             ),
           ],
         ),
@@ -2695,26 +2765,29 @@ class _UnlockSheetState extends State<_UnlockSheet> {
           ],
         ),
         const SizedBox(height: 24),
-        GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            width: double.infinity,
-            height: 50,
-            decoration: BoxDecoration(
-              color: p.btn,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(
-              child: Text(
-                'Ok',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: p.btnText),
+        Semantics(
+            button: true,
+            container: true,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: p.btn,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    'Ok',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: p.btnText),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
+            )),
       ],
     );
   }

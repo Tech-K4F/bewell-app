@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,6 +33,9 @@ class NotificationIds {
   // (stessa ora, testo nella lingua in cui erano stati schedulati l'ultima
   // volta — da cui il doppio avviso, a volte in due lingue diverse).
   static const int legacyWater = 1;
+  // Notifiche di ritorno (dopo giorni di assenza) — fascia 120-129.
+  static const int comebackBase = 120;
+  static const int comebackSlots = 6;
   static const int legacyEvening = 2;
 }
 
@@ -62,11 +67,66 @@ class NotificationService {
 
       const android = AndroidInitializationSettings('@mipmap/ic_launcher');
       const settings = InitializationSettings(android: android);
-      await _plugin.initialize(settings);
+      await _plugin.initialize(
+        settings,
+        onDidReceiveNotificationResponse: (r) => _handleTap(r.payload),
+      );
+      // Avvio a freddo toccando una notifica: ricorda dove andare.
+      final launch = await _plugin.getNotificationAppLaunchDetails();
+      if (launch?.didNotificationLaunchApp ?? false) {
+        tapRoute.value = launch!.notificationResponse?.payload;
+      }
 
       _initialized = true;
     } catch (e) {
       debugPrint('NotificationService init error: $e');
+    }
+  }
+
+  // ── Tocco su una notifica ────────────────────────────────────────────────────
+  /// Destinazione richiesta da una notifica toccata (es. `tab:habits`).
+  /// La shell la legge, naviga e la azzera.
+  final ValueNotifier<String?> tapRoute = ValueNotifier<String?>(null);
+
+  void _handleTap(String? payload) {
+    if (payload == null || payload.isEmpty) return;
+    tapRoute.value = payload;
+  }
+
+  // ── Permessi ─────────────────────────────────────────────────────────────────
+
+  /// True se le notifiche sono consentite dal sistema.
+  Future<bool> areEnabled() async {
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      return await android?.areNotificationsEnabled() ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Chiede il permesso; se il sistema non lo mostra più (rifiutato in via
+  /// definitiva) apre le impostazioni notifiche dell'app. Ritorna true se
+  /// alla fine sono attive.
+  Future<bool> enableOrOpenSettings() async {
+    await requestPermission();
+    if (await areEnabled()) return true;
+    await openSystemSettings();
+    return false;
+  }
+
+  Future<void> openSystemSettings() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await const AndroidIntent(
+        action: 'android.settings.APP_NOTIFICATION_SETTINGS',
+        arguments: <String, dynamic>{
+          'android.provider.extra.APP_PACKAGE': 'com.k4f.bewell',
+        },
+      ).launch();
+    } catch (e) {
+      debugPrint('NotificationService openSettings error: $e');
     }
   }
 
@@ -194,6 +254,7 @@ class NotificationService {
     required DateTime at,
     bool exact = false,
     String channel = _Channel.habits,
+    String? payload,
   }) async {
     if (!_initialized) return;
     final when = tz.TZDateTime.from(at, tz.local);
@@ -217,6 +278,7 @@ class NotificationService {
           androidScheduleMode: mode,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
+          payload: payload,
         );
     try {
       try {
@@ -236,6 +298,9 @@ class NotificationService {
     if (!_initialized) return;
     for (var i = 0; i < NotificationIds.reminderSlots; i++) {
       await _plugin.cancel(NotificationIds.reminderBase + i);
+    }
+    for (var i = 0; i < NotificationIds.comebackSlots; i++) {
+      await _plugin.cancel(NotificationIds.comebackBase + i);
     }
     // Migrazione: elimina eventuali allarmi del vecchio sistema (id 1/2)
     // ancora registrati presso l'OS da un'installazione precedente.

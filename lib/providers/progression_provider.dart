@@ -159,6 +159,18 @@ class ProgressionProvider extends ChangeNotifier {
     return DateTime.now().difference(_installDate!).inDays + _debugDayOffset;
   }
 
+  /// Giorni di CALENDARIO dall'installazione (0 = il giorno stesso, 1 = il
+  /// giorno dopo, anche se sono passate meno di 24 ore).
+  int get calendarDayNumber {
+    final i = _installDate;
+    if (i == null) return 0;
+    final t = DateTime.now();
+    return DateTime(t.year, t.month, t.day)
+            .difference(DateTime(i.year, i.month, i.day))
+            .inDays +
+        _debugDayOffset;
+  }
+
   bool get isInitialized => _initialized;
 
   HabitState? stateOf(String habitId) => _states[habitId];

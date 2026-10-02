@@ -9,6 +9,12 @@ import '../l10n/app_localizations.dart';
 /// Kleitman) satura l'attenzione invece di sostenerla.
 enum NotificationFrequency { off, low, normal, high }
 
+/// Movimento ridotto in vigore (impostazione dell'app o del telefono):
+/// le animazioni decorative e continue lo controllano prima di partire.
+class Motion {
+  static bool reduced = false;
+}
+
 /// Gestisce tutte le impostazioni dell'app che influenzano
 /// il tema e il comportamento globale.
 ///
@@ -17,31 +23,36 @@ enum NotificationFrequency { off, low, normal, high }
 /// SettingsProvider → preferenze UI e accessibilità
 class SettingsProvider extends ChangeNotifier {
   // ── Accessibilità ───────────────────────────────────────────────────────
-  bool _largeText     = false;
-  bool _highContrast  = false;
+  bool _largeText = false;
+  bool _highContrast = false;
+  bool _reduceMotion = false;
 
   // ── Notifiche ───────────────────────────────────────────────────────────
   NotificationFrequency _frequency = NotificationFrequency.normal;
   DateTime? _snoozeUntil;
 
   // ── Getters ─────────────────────────────────────────────────────────────
-  bool get largeText            => _largeText;
-  bool get highContrast         => _highContrast;
+  bool get largeText => _largeText;
+  bool get highContrast => _highContrast;
+  bool get reduceMotion => _reduceMotion;
   NotificationFrequency get frequency => _frequency;
-  DateTime? get snoozeUntil     => _snoozeUntil;
-  bool get isSnoozed            => _snoozeUntil != null && _snoozeUntil!.isAfter(DateTime.now());
+  DateTime? get snoozeUntil => _snoozeUntil;
+  bool get isSnoozed =>
+      _snoozeUntil != null && _snoozeUntil!.isAfter(DateTime.now());
 
   // ── Init ────────────────────────────────────────────────────────────────
   Future<void> init() async {
     final p = await SharedPreferences.getInstance();
-    _largeText    = p.getBool('setting_large_text')    ?? false;
+    _largeText = p.getBool('setting_large_text') ?? false;
     _highContrast = p.getBool('setting_high_contrast') ?? false;
+    _reduceMotion = p.getBool('setting_reduce_motion') ?? false;
     _frequency = NotificationFrequency.values.firstWhere(
       (f) => f.name == (p.getString('notif_frequency') ?? 'normal'),
       orElse: () => NotificationFrequency.normal,
     );
     final snoozeMs = p.getInt('notif_snooze_until');
-    _snoozeUntil = snoozeMs != null ? DateTime.fromMillisecondsSinceEpoch(snoozeMs) : null;
+    _snoozeUntil =
+        snoozeMs != null ? DateTime.fromMillisecondsSinceEpoch(snoozeMs) : null;
     notifyListeners();
     await rescheduleBwReminders();
   }
@@ -52,6 +63,13 @@ class SettingsProvider extends ChangeNotifier {
     final p = await SharedPreferences.getInstance();
     await p.setBool('setting_large_text', v);
     notifyListeners(); // ← ricostruisce MaterialApp → tema ricalcolato
+  }
+
+  Future<void> setReduceMotion(bool v) async {
+    _reduceMotion = v;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool('setting_reduce_motion', v);
+    notifyListeners();
   }
 
   Future<void> setHighContrast(bool v) async {

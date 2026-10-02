@@ -22,6 +22,8 @@ import '../profile/profile_screen.dart';
 import '../../widgets/spotlight_overlay.dart';
 import '../../providers/schedule_provider.dart';
 import '../../services/smart_reminders.dart';
+import '../../services/cloud_sync_service.dart';
+import '../../services/focus_recovery.dart';
 
 enum NavItem { home, habits, growth, marketplace, profile }
 
@@ -74,8 +76,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     NotificationService.instance.setForeground(true);
+    CloudSyncService.instance.startAutoSync();
+    NotificationService.instance.tapRoute.addListener(_onNotifRoute);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _onNotifRoute();
+      FocusRecovery.completeIfFinished(context);
       _progressionRef = context.read<ProgressionProvider>()
         ..addListener(_onProgressionChange);
       _appRef = context.read<AppProvider>()..addListener(_onAppChange);
@@ -100,6 +106,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     _progressionRef?.removeListener(_onProgressionChange);
     _appRef?.removeListener(_onAppChange);
     _scheduleRef?.removeListener(_refreshSmartReminders);
+    CloudSyncService.instance.stopAutoSync();
+    NotificationService.instance.tapRoute.removeListener(_onNotifRoute);
     super.dispose();
   }
 
@@ -122,12 +130,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         // Controlla se l'utente è stato inattivo 3+ giorni al ritorno in app
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _checkInactivityTutorial();
+          if (mounted) FocusRecovery.completeIfFinished(context);
         });
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
         NotificationService.instance.setForeground(false);
         _refreshSmartReminders();
+        CloudSyncService.instance.pushIfChanged();
       case AppLifecycleState.inactive:
         break; // transient state, keep current value
     }
@@ -474,6 +484,24 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   // ── Navigazione con analytics ─────────────────────────────────────────────
 
+  /// Notifica toccata: porta alla schermata giusta (es. `tab:habits`).
+  void _onNotifRoute() {
+    final route = NotificationService.instance.tapRoute.value;
+    if (route == null || !mounted) return;
+    NotificationService.instance.tapRoute.value = null;
+    final idx = switch (route) {
+      'tab:home' => 0,
+      'tab:habits' => 1,
+      'tab:growth' => 2,
+      'tab:market' => 3,
+      'tab:profile' => 4,
+      _ => -1,
+    };
+    if (idx < 0) return;
+    final tabs = _buildTabs(context, context.read<ProgressionProvider>());
+    if (tabs[idx].available) _onNavTap(idx);
+  }
+
   void _onNavTap(int i) {
     const tabNames = ['home', 'habits', 'growth', 'marketplace', 'profile'];
     final tabName = tabNames[i.clamp(0, tabNames.length - 1)];
@@ -628,71 +656,77 @@ class _ProgressiveNavBar extends StatelessWidget {
               final isAvailable = tab.available;
 
               return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    if (isAvailable) {
-                      onTap(i);
-                    } else {
-                      _showUnlockHint(context, tab);
-                    }
-                  },
-                  behavior: HitTestBehavior.opaque,
-                  child: AnimatedOpacity(
-                    opacity: isAvailable ? 1.0 : 0.6,
-                    duration: const Duration(milliseconds: 300),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Stack(
-                          clipBehavior: Clip.none,
+                child: Semantics(
+                    button: true,
+                    selected: isActive,
+                    container: true,
+                    child: GestureDetector(
+                      onTap: () {
+                        if (isAvailable) {
+                          onTap(i);
+                        } else {
+                          _showUnlockHint(context, tab);
+                        }
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedOpacity(
+                        opacity: isAvailable ? 1.0 : 0.6,
+                        duration: const Duration(milliseconds: 300),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              isActive ? tab.activeIcon : tab.icon,
-                              size: 22,
-                              color: isActive ? p.primary : p.textMut,
-                            ),
-                            if (!isAvailable)
-                              Positioned(
-                                right: -6,
-                                top: -6,
-                                child: Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: p.bg2,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: p.cardBorder, width: 0.5),
-                                  ),
-                                  child: Icon(Icons.lock_outline,
-                                      size: 10, color: p.textSec),
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  isActive ? tab.activeIcon : tab.icon,
+                                  size: 22,
+                                  color: isActive ? p.primary : p.textMut,
                                 ),
+                                if (!isAvailable)
+                                  Positioned(
+                                    right: -6,
+                                    top: -6,
+                                    child: Container(
+                                      width: 16,
+                                      height: 16,
+                                      decoration: BoxDecoration(
+                                        color: p.bg2,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                            color: p.cardBorder, width: 0.5),
+                                      ),
+                                      child: Icon(Icons.lock_outline,
+                                          size: 10, color: p.textSec),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _translateLabel(context, tab.item),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isActive ? p.primary : p.textMut,
+                                fontWeight: isActive
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
                               ),
+                            ),
+                            const SizedBox(height: 2),
+                            Container(
+                              width: 3,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color:
+                                    isActive ? p.primary : Colors.transparent,
+                              ),
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          _translateLabel(context, tab.item),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isActive ? p.primary : p.textMut,
-                            fontWeight:
-                                isActive ? FontWeight.w600 : FontWeight.w400,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Container(
-                          width: 3,
-                          height: 3,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isActive ? p.primary : Colors.transparent,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                      ),
+                    )),
               );
             }).toList(),
           ),

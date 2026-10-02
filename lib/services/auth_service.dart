@@ -6,6 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/auth_result.dart';
+import 'cloud_sync_service.dart';
 
 /// Unico punto di contatto con Firebase Auth.
 /// Tutte le schermate passano da qui — mai chiamare FirebaseAuth direttamente.
@@ -204,6 +205,7 @@ class AuthService {
       // dell'account Auth va a buon fine ma questa fallisse dopo, resterebbe
       // un profilo orfano — nell'ordine inverso l'utente rischierebbe di
       // restare bloccato con un account che non riesce comunque a eliminare.
+      await CloudSyncService.instance.deleteRemote();
       try {
         await FirebaseFirestore.instance.collection('users').doc(uid).delete();
       } catch (e) {

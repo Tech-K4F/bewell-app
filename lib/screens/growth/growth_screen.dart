@@ -66,7 +66,7 @@ class _GrowthScreenState extends State<GrowthScreen> {
         final s = context.sL;
 
         return BwScaffold(
-          bottomNavigationBar: const BannerAdWidget(),
+          bottomNavigationBar: const BannerAdWidget(screenKey: 'growth'),
           body: SafeArea(
             child: ListView(
               padding: EdgeInsets.fromLTRB(20, isAmb ? 72 : 24, 20, 40),
@@ -587,31 +587,34 @@ class _HeatmapSectionState extends State<_HeatmapSection> {
             // Tab selettore
             ...tabs.map((tab) {
               final selected = _filter == tab.$1;
-              return GestureDetector(
-                onTap: () => setState(() => _filter = tab.$1),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.only(left: 6),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: selected ? p.primary : p.card,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: selected ? p.primary : p.cardBorder,
-                      width: 0.5,
+              return Semantics(
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _filter = tab.$1),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: selected ? p.primary : p.card,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selected ? p.primary : p.cardBorder,
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Text(
+                        tab.$2,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? Colors.white : p.textSec,
+                        ),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    tab.$2,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: selected ? Colors.white : p.textSec,
-                    ),
-                  ),
-                ),
-              );
+                  ));
             }),
           ],
         ),

@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
+import '../providers/settings_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -293,6 +294,11 @@ class _SpotlightOverlayState extends State<SpotlightOverlay>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
+    // Movimento ridotto: nessuna pulsazione continua.
+    if (Motion.reduced) {
+      _pulseCtrl.value = 0.5;
+      _pulseCtrl.stop();
+    }
 
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _pulseAnim = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
@@ -970,32 +976,37 @@ class _BubbleCardState extends State<_BubbleCard> {
                   ),
                   const SizedBox(width: 4),
                 ],
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    (widget.onClose ?? controller.skip)();
-                  },
-                  // Nei tour multi-step la X chiude l'INTERO tour, non solo
-                  // questo passo: un'icona nuda lo lasciava ambiguo — con
-                  // un tour ancora in corso mostriamo l'etichetta "Salta"
-                  // esplicita, invece della sola X.
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: controller.totalSteps > 1 && !controller.isLastStep
-                        ? Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(s.tutorialSkip,
-                                  style: TextStyle(
-                                      fontSize: 12, color: p.textMut)),
-                              const SizedBox(width: 3),
-                              Icon(Icons.close_rounded,
-                                  size: 15, color: p.textMut),
-                            ],
-                          )
-                        : Icon(Icons.close_rounded, size: 18, color: p.textMut),
-                  ),
-                ),
+                Semantics(
+                    button: true,
+                    container: true,
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        (widget.onClose ?? controller.skip)();
+                      },
+                      // Nei tour multi-step la X chiude l'INTERO tour, non solo
+                      // questo passo: un'icona nuda lo lasciava ambiguo — con
+                      // un tour ancora in corso mostriamo l'etichetta "Salta"
+                      // esplicita, invece della sola X.
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child:
+                            controller.totalSteps > 1 && !controller.isLastStep
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(s.tutorialSkip,
+                                          style: TextStyle(
+                                              fontSize: 12, color: p.textMut)),
+                                      const SizedBox(width: 3),
+                                      Icon(Icons.close_rounded,
+                                          size: 15, color: p.textMut),
+                                    ],
+                                  )
+                                : Icon(Icons.close_rounded,
+                                    size: 18, color: p.textMut),
+                      ),
+                    )),
               ],
             ),
           ),
@@ -1027,29 +1038,33 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 44,
-        padding: compact ? const EdgeInsets.symmetric(horizontal: 22) : null,
-        decoration: BoxDecoration(
-          color: isPrimary ? p.btn : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-          border: isPrimary ? null : Border.all(color: p.cardBorder),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isPrimary ? FontWeight.w700 : FontWeight.w500,
-              fontFamily: isAmb ? 'CormorantGaramond' : null,
-              color: isPrimary ? p.btnText : p.textSec,
-              letterSpacing: isPrimary ? 0.2 : 0,
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 44,
+            padding:
+                compact ? const EdgeInsets.symmetric(horizontal: 22) : null,
+            decoration: BoxDecoration(
+              color: isPrimary ? p.btn : Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+              border: isPrimary ? null : Border.all(color: p.cardBorder),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isPrimary ? FontWeight.w700 : FontWeight.w500,
+                  fontFamily: isAmb ? 'CormorantGaramond' : null,
+                  color: isPrimary ? p.btnText : p.textSec,
+                  letterSpacing: isPrimary ? 0.2 : 0,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }

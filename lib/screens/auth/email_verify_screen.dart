@@ -77,8 +77,7 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
       _resendCooldown = _cooldownSeconds;
     });
 
-    _cooldownTimer =
-        Timer.periodic(const Duration(seconds: 1), (t) {
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) {
         t.cancel();
         return;
@@ -92,8 +91,7 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
   Widget build(BuildContext context) {
     final p = context.watch<ThemeProvider>().paletteData;
     final s = context.sL;
-    final canResend =
-        _resendCooldown == 0 && _resendCount < _maxResends;
+    final canResend = _resendCooldown == 0 && _resendCount < _maxResends;
 
     return BwScaffold(
       body: SafeArea(
@@ -137,7 +135,8 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
                     TextSpan(text: '${s.verifyEmailSent} '),
                     TextSpan(
                       text: widget.email,
-                      style: TextStyle(color: p.text, fontWeight: FontWeight.w600),
+                      style:
+                          TextStyle(color: p.text, fontWeight: FontWeight.w600),
                     ),
                     TextSpan(text: '.\n\n${s.verifyEmailCta}'),
                   ],
@@ -185,23 +184,25 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
               ),
               const Spacer(flex: 2),
               Center(
-                child: GestureDetector(
-                  onTap: () {
-                    // FIX: usa alias bw per evitare conflitto
-                    context.read<bw.AuthProvider>().logout();
-                    Navigator.of(context)
-                        .pushReplacementNamed('/register');
-                  },
-                  child: Text(
-                    s.verifyDifferentEmail,
-                    style: TextStyle(
-                      color: p.textMut,
-                      fontSize: 13,
-                      decoration: TextDecoration.underline,
-                      decorationColor: p.textMut,
-                    ),
-                  ),
-                ),
+                child: Semantics(
+                    button: true,
+                    container: true,
+                    child: GestureDetector(
+                      onTap: () {
+                        // FIX: usa alias bw per evitare conflitto
+                        context.read<bw.AuthProvider>().logout();
+                        Navigator.of(context).pushReplacementNamed('/register');
+                      },
+                      child: Text(
+                        s.verifyDifferentEmail,
+                        style: TextStyle(
+                          color: p.textMut,
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                          decorationColor: p.textMut,
+                        ),
+                      ),
+                    )),
               ),
             ],
           ),

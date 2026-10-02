@@ -4,6 +4,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/cloud_sync_service.dart';
+import '../../widgets/restart_widget.dart';
 import '../../utils/validators.dart';
 import '../../models/auth_result.dart';
 import '../../widgets/auth/auth_widgets.dart';
@@ -321,6 +323,13 @@ class _LoginScreenState extends State<LoginScreen> {
       BuildContext context, AuthProvider auth) async {
     final nav = auth.pendingNavigation;
     auth.consumeNavigation();
+    // Installazione nuova ma account con progressi nel cloud: ripristina e
+    // riparte da capo con lo stato caricato (niente onboarding da rifare).
+    if ((nav == AuthNavigation.toHome || nav == AuthNavigation.toWelcome) &&
+        await CloudSyncService.instance.restoreIfFresh()) {
+      if (context.mounted) RestartWidget.restart(context);
+      return;
+    }
     switch (nav) {
       case AuthNavigation.toHome:
         await context.read<AppProvider>().onLoginComplete();

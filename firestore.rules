@@ -61,6 +61,12 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
+    // users/{uid}/private/progress — copia del progresso dell'utente (giorni,
+    // streak, punti, abitudini, orari). Solo il proprietario legge/scrive/cancella.
+    match /users/{uid}/private/{doc} {
+      allow read, write, delete: if request.auth != null && request.auth.uid == uid;
+    }
+
     // referralCodes/{code} — indice inverso codice → uid proprietario.
     // Chiunque autenticato può leggere (serve per validare un codice inserito).
     // Solo il proprietario può creare il proprio codice, ed è immutabile.

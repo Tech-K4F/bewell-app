@@ -10,16 +10,16 @@ import '../../providers/progression_provider.dart';
 /// Regola fondamentale: nessuno stato visivamente negativo.
 /// Welly non soffre, non è triste, non rimproverara mai.
 enum WellyMood {
-  calm,       // mattino, nessuna azione ancora — idle rotation (sit / breathe)
-  present,    // acqua iniziata (1-3 bicchieri) — look
-  engaged,    // acqua a metà (4-6 bicchieri) — sit2
-  radiant,    // giornata completata — happy
-  welcoming,  // primo accesso del giorno — hug
-  wondering,  // sera senza azioni (dopo le 20) — look con loop lento
-  returning,  // rientro dopo 2+ giorni — encourage
-  resting,    // notte (dopo le 22) — sleep
-  drinking,   // animazione specifica al bicchiere — drink
-  breathing,  // durante sessione respirazione — meditate
+  calm, // mattino, nessuna azione ancora — idle rotation (sit / breathe)
+  present, // acqua iniziata (1-3 bicchieri) — look
+  engaged, // acqua a metà (4-6 bicchieri) — sit2
+  radiant, // giornata completata — happy
+  welcoming, // primo accesso del giorno — hug
+  wondering, // sera senza azioni (dopo le 20) — look con loop lento
+  returning, // rientro dopo 2+ giorni — encourage
+  resting, // notte (dopo le 22) — sleep
+  drinking, // animazione specifica al bicchiere — drink
+  breathing, // durante sessione respirazione — meditate
 }
 
 class CompanionWidget extends StatefulWidget {
@@ -46,14 +46,14 @@ class _CompanionWidgetState extends State<CompanionWidget> {
 
   // Video per ogni mood (eccetto calm che usa idle rotation)
   static const _moodVideos = {
-    WellyMood.present:   'assets/images/companion/companion_look.mp4',
-    WellyMood.engaged:   'assets/images/companion/companion_sit2.mp4',
-    WellyMood.radiant:   'assets/images/companion/companion_happy.mp4',
+    WellyMood.present: 'assets/images/companion/companion_look.mp4',
+    WellyMood.engaged: 'assets/images/companion/companion_sit2.mp4',
+    WellyMood.radiant: 'assets/images/companion/companion_happy.mp4',
     WellyMood.welcoming: 'assets/images/companion/companion_hug.mp4',
     WellyMood.wondering: 'assets/images/companion/companion_look.mp4',
     WellyMood.returning: 'assets/images/companion/companion_encourage.mp4',
-    WellyMood.resting:   'assets/images/companion/companion_sleep.mp4',
-    WellyMood.drinking:  'assets/images/companion/companion_drink.mp4',
+    WellyMood.resting: 'assets/images/companion/companion_sleep.mp4',
+    WellyMood.drinking: 'assets/images/companion/companion_drink.mp4',
     WellyMood.breathing: 'assets/images/companion/companion_meditate.mp4',
   };
 
@@ -177,12 +177,14 @@ class _CompanionWidgetState extends State<CompanionWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: widget.size,
-      height: widget.size,
-      child: widget.showPhase
-          ? _buildPhaseImage(context)
-          : _buildVideo(),
+    return Semantics(
+      label: 'Welly',
+      image: true,
+      child: SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: widget.showPhase ? _buildPhaseImage(context) : _buildVideo(),
+      ),
     );
   }
 

@@ -54,6 +54,7 @@ class SmartReminders {
         sc.endAfternoon,
         sc.lunchHour,
       ],
+      'workDays': (sc.workDays.toList()..sort()),
       'habits': [
         for (final h in progression.activeHabits)
           {
@@ -125,6 +126,39 @@ class SmartReminders {
         title: title,
         body: body,
         at: r.at,
+        payload: r.kind == _Kind.focus
+            ? 'tab:habits'
+            : (r.ids.contains('water') ? 'tab:home' : 'tab:habits'),
+      );
+    }
+
+    await _scheduleComebacks(service, s, now, earliest);
+  }
+
+  /// Notifiche di ritorno: se l'app non viene aperta, un invito gentile ogni
+  /// 3 giorni (per circa 18 giorni, poi si ferma). Contano dall'ultimo uso:
+  /// ogni volta che l'app si apre vengono rimandate in avanti.
+  static const _comebackEveryDays = 3;
+  static const _comebackHour = 19;
+
+  static Future<void> _scheduleComebacks(NotificationService service,
+      BwStrings s, DateTime now, DateTime earliest) async {
+    for (var k = 1; k <= NotificationIds.comebackSlots; k++) {
+      final day = now.add(Duration(days: _comebackEveryDays * k));
+      final at = DateTime(day.year, day.month, day.day, _comebackHour);
+      if (!at.isAfter(earliest)) continue;
+      final (title, body) = switch ((k - 1) % 4) {
+        0 => (s.notifComebackTitle1, s.notifComebackBody1),
+        1 => (s.notifComebackTitle2, s.notifComebackBody2),
+        2 => (s.notifComebackTitle3, s.notifComebackBody3),
+        _ => (s.notifComebackTitle4, s.notifComebackBody4),
+      };
+      await service.scheduleAt(
+        id: NotificationIds.comebackBase + k - 1,
+        title: title,
+        body: body,
+        at: at,
+        payload: 'tab:home',
       );
     }
   }
@@ -135,7 +169,12 @@ class SmartReminders {
     required int cap,
     required bool useDoneFlags,
   }) {
-    final worker = input['userType'] != 'student';
+    // Nei giorni liberi niente promemoria legati al lavoro (Focus) e orari
+    // più rilassati.
+    final workDays =
+        (input['workDays'] as List?)?.cast<int>() ?? const [1, 2, 3, 4, 5];
+    final isWorkDay = workDays.contains(day.weekday);
+    final worker = input['userType'] != 'student' && isWorkDay;
     final sched = (input['sched'] as List).cast<int>();
     final startMorning = sched[0];
     final startAfternoon = sched[2];
@@ -151,10 +190,11 @@ class SmartReminders {
 
     int clamp(int v, int lo, int hi) => v < lo ? lo : (v > hi ? hi : v);
     final bundleHour = <String, int>{
-      'morning': worker ? clamp(startMorning - 1, 7, 10) : 7,
-      'midday': worker ? clamp(startMorning + 2, 9, 12) : 10,
-      'lunch': worker ? clamp(lunchHour, 12, 14) : 12,
-      'afternoon': worker ? clamp(startAfternoon + 2, 14, 18) : 15,
+      'morning': worker ? clamp(startMorning - 1, 7, 10) : (isWorkDay ? 7 : 9),
+      'midday': worker ? clamp(startMorning + 2, 9, 12) : (isWorkDay ? 10 : 11),
+      'lunch': worker ? clamp(lunchHour, 12, 14) : (isWorkDay ? 12 : 13),
+      'afternoon':
+          worker ? clamp(startAfternoon + 2, 14, 18) : (isWorkDay ? 15 : 16),
       'evening': 20,
     };
 
@@ -164,7 +204,7 @@ class SmartReminders {
     // Attività lunghe (Focus): una notifica ciascuna, nel loro momento.
     final focus = pending.where((h) => h.isFocus).toList();
     final mainFocus = focus.where((h) => h.id != 'focus_no_phone').firstOrNull;
-    if (mainFocus != null) {
+    if (mainFocus != null && isWorkDay) {
       candidates.add(_Reminder(
         at(worker ? startMorning : 8),
         _Kind.focus,
@@ -173,7 +213,7 @@ class SmartReminders {
       ));
     }
     final noPhone = focus.where((h) => h.id == 'focus_no_phone').firstOrNull;
-    if (noPhone != null) {
+    if (noPhone != null && isWorkDay) {
       candidates.add(_Reminder(
         at(worker ? clamp(startAfternoon + 1, 13, 17) : 14),
         _Kind.focus,
@@ -266,6 +306,7 @@ class SmartReminders {
       body: body,
       at: DateTime.now().add(after),
       exact: true,
+      payload: 'tab:habits',
     );
   }
 

@@ -223,39 +223,45 @@ class _HabitIntroSheetState extends State<HabitIntroSheet>
 
           // "Altre opzioni" — visibile solo se ci sono più coppie da mostrare
           if (widget.pairs.length > 1)
-            GestureDetector(
-              onTap: _nextPair,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  s.habitChoiceShowOther,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: p.textSec,
-                    decoration: TextDecoration.underline,
-                    decorationColor: p.textSec,
+            Semantics(
+                button: true,
+                container: true,
+                child: GestureDetector(
+                  onTap: _nextPair,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      s.habitChoiceShowOther,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: p.textSec,
+                        decoration: TextDecoration.underline,
+                        decorationColor: p.textSec,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
+                )),
 
           // "Non mi sento pronto" — non blocca per sempre: rimanda la
           // proposta di 7 giorni invece di lasciarla "pending" a tempo
           // indeterminato (che bloccava anche la valutazione di qualsiasi
           // altra abitudine).
-          GestureDetector(
-            onTap: () => _declineChoice(context, s),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                s.habitChoiceNotReady,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: p.textMut,
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: () => _declineChoice(context, s),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    s.habitChoiceNotReady,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: p.textMut,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
+              )),
         ],
       ),
     );

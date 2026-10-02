@@ -33,7 +33,6 @@ class ThemeScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
             children: [
-
               // ── Sezione stile ─────────────────────────────────────────────
               _SectionLabel(label: s.themeTitle, color: p.textSec),
               const SizedBox(height: 12),
@@ -126,14 +125,20 @@ class _StyleCard extends StatelessWidget {
             width: selected ? 2 : 0.5,
           ),
           boxShadow: selected
-              ? [BoxShadow(color: p.primary.withValues(alpha: 0.15), blurRadius: 12, spreadRadius: 2)]
+              ? [
+                  BoxShadow(
+                      color: p.primary.withValues(alpha: 0.15),
+                      blurRadius: 12,
+                      spreadRadius: 2)
+                ]
               : [],
         ),
         child: Column(
           children: [
             // Preview miniatura
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
               child: SizedBox(
                 height: 160,
                 child: style == BwStyle.card
@@ -174,7 +179,8 @@ class _StyleCard extends StatelessWidget {
                         color: p.primary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.check, color: Colors.white, size: 14),
+                      child: const Icon(Icons.check,
+                          color: Colors.white, size: 14),
                     )
                   else
                     Container(
@@ -211,52 +217,57 @@ class _PaletteRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: selected ? currentP.primaryLight : currentP.card,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? currentP.primary : currentP.cardBorder,
-            width: selected ? 1.5 : 0.5,
-          ),
-        ),
-        child: Row(
-          children: [
-            // Swatch colori palette
-            Row(
-              children: [
-                _Swatch(color: data.bg, size: 20),
-                const SizedBox(width: 4),
-                _Swatch(color: data.primary, size: 20),
-                const SizedBox(width: 4),
-                _Swatch(color: data.accent, size: 20),
-              ],
-            ),
-            const SizedBox(width: 14),
-            // Nome
-            Expanded(
-              child: Text(
-                data.name,
-                style: TextStyle(
-                  color: currentP.text,
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                ),
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: selected ? currentP.primaryLight : currentP.card,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? currentP.primary : currentP.cardBorder,
+                width: selected ? 1.5 : 0.5,
               ),
             ),
-            // Check
-            if (selected)
-              Icon(Icons.check_circle_rounded, color: currentP.primary, size: 20)
-            else
-              Icon(Icons.circle_outlined, color: currentP.textMut, size: 20),
-          ],
-        ),
-      ),
-    );
+            child: Row(
+              children: [
+                // Swatch colori palette
+                Row(
+                  children: [
+                    _Swatch(color: data.bg, size: 20),
+                    const SizedBox(width: 4),
+                    _Swatch(color: data.primary, size: 20),
+                    const SizedBox(width: 4),
+                    _Swatch(color: data.accent, size: 20),
+                  ],
+                ),
+                const SizedBox(width: 14),
+                // Nome
+                Expanded(
+                  child: Text(
+                    data.name,
+                    style: TextStyle(
+                      color: currentP.text,
+                      fontSize: 14,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+                // Check
+                if (selected)
+                  Icon(Icons.check_circle_rounded,
+                      color: currentP.primary, size: 20)
+                else
+                  Icon(Icons.circle_outlined,
+                      color: currentP.textMut, size: 20),
+              ],
+            ),
+          ),
+        ));
   }
 }
 
@@ -317,13 +328,24 @@ class _CardPreview extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Buongiorno,', style: TextStyle(fontSize: 7, color: p.textSec)),
-                  Text('Marco', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.text)),
+                  Text('Buongiorno,',
+                      style: TextStyle(fontSize: 7, color: p.textSec)),
+                  Text('Marco',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: p.text)),
                 ],
               ),
               const Spacer(),
-              CircleAvatar(radius: 10, backgroundColor: p.primaryLight,
-                  child: Text('M', style: TextStyle(fontSize: 8, color: p.primaryText, fontWeight: FontWeight.w600))),
+              CircleAvatar(
+                  radius: 10,
+                  backgroundColor: p.primaryLight,
+                  child: Text('M',
+                      style: TextStyle(
+                          fontSize: 8,
+                          color: p.primaryText,
+                          fontWeight: FontWeight.w600))),
             ],
           ),
           const SizedBox(height: 6),
@@ -337,8 +359,13 @@ class _CardPreview extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Sessione focus', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: p.text)),
-                Text('25 min · Pomodoro', style: TextStyle(fontSize: 7, color: p.textSec)),
+                Text('Sessione focus',
+                    style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: p.text)),
+                Text('25 min · Pomodoro',
+                    style: TextStyle(fontSize: 7, color: p.textSec)),
                 const SizedBox(height: 5),
                 Container(
                   height: 22,
@@ -346,8 +373,12 @@ class _CardPreview extends StatelessWidget {
                     color: p.btn,
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Center(child: Text('Inizia sessione',
-                      style: TextStyle(fontSize: 7, color: p.btnText, fontWeight: FontWeight.w600))),
+                  child: Center(
+                      child: Text(context.sL.focusStartSession,
+                          style: TextStyle(
+                              fontSize: 7,
+                              color: p.btnText,
+                              fontWeight: FontWeight.w600))),
                 ),
               ],
             ),
@@ -362,9 +393,17 @@ class _CardPreview extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Text('Acqua', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: p.text)),
+                Text('Acqua',
+                    style: TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w600,
+                        color: p.text)),
                 const Spacer(),
-                Text('50%', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: p.accent)),
+                Text('50%',
+                    style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: p.accent)),
               ],
             ),
           ),
@@ -433,12 +472,16 @@ class _AmbientPainter extends CustomPainter {
       for (int i = 0; i < 12; i++) {
         final x = (i * 47.3) % size.width;
         final y = (i * 13.1) % 36;
-        canvas.drawCircle(Offset(x, y), 0.8, starPaint..color = const Color(0xFFC8E0D8));
+        canvas.drawCircle(
+            Offset(x, y), 0.8, starPaint..color = const Color(0xFFC8E0D8));
       }
       // Luna
-      canvas.drawCircle(const Offset(110, 14), 8, Paint()..color = const Color(0xFF1A3048));
-      canvas.drawCircle(const Offset(112, 12), 7, Paint()..color = const Color(0xFFC4D8E8));
-      canvas.drawCircle(const Offset(115, 10), 6, Paint()..color = const Color(0xFF0D1520));
+      canvas.drawCircle(
+          const Offset(110, 14), 8, Paint()..color = const Color(0xFF1A3048));
+      canvas.drawCircle(
+          const Offset(112, 12), 7, Paint()..color = const Color(0xFFC4D8E8));
+      canvas.drawCircle(
+          const Offset(115, 10), 6, Paint()..color = const Color(0xFF0D1520));
       // Montagne
       final path = Path()
         ..moveTo(0, 32)
@@ -454,8 +497,10 @@ class _AmbientPainter extends CustomPainter {
         Paint()..color = const Color(0xFFEDE5D8),
       );
       // Sole
-      canvas.drawCircle(Offset(size.width / 2, -4), 16, Paint()..color = const Color(0x4DF0C870));
-      canvas.drawCircle(Offset(size.width / 2, -4), 9, Paint()..color = const Color(0x80EAB840));
+      canvas.drawCircle(Offset(size.width / 2, -4), 16,
+          Paint()..color = const Color(0x4DF0C870));
+      canvas.drawCircle(Offset(size.width / 2, -4), 9,
+          Paint()..color = const Color(0x80EAB840));
       // Colline
       final path = Path()
         ..moveTo(0, 28)
@@ -490,7 +535,9 @@ class _RingPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 4;
 
-    canvas.drawCircle(center, radius,
+    canvas.drawCircle(
+        center,
+        radius,
         Paint()
           ..color = p.ringTrack
           ..style = PaintingStyle.stroke
@@ -499,7 +546,7 @@ class _RingPainter extends CustomPainter {
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -1.5708, // -90°
-      1.884,   // ~108° = 30% del cerchio
+      1.884, // ~108° = 30% del cerchio
       false,
       Paint()
         ..color = p.ring
@@ -511,7 +558,8 @@ class _RingPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: '25',
-        style: TextStyle(color: p.text, fontSize: 14, fontWeight: FontWeight.w300),
+        style:
+            TextStyle(color: p.text, fontSize: 14, fontWeight: FontWeight.w300),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -521,7 +569,3 @@ class _RingPainter extends CustomPainter {
   @override
   bool shouldRepaint(_RingPainter old) => old.p != p;
 }
-
-
-
-

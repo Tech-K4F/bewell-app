@@ -9,6 +9,7 @@ import '../../providers/app_provider.dart';
 import '../../providers/progression_provider.dart';
 import '../../models/habit_library.dart';
 import '../../widgets/bw_scaffold.dart';
+import '../../widgets/leave_session_guard.dart';
 
 /// Sessione di respirazione guidata, legata a un'abitudine reale
 /// (breathing_box o breathing_478) — il completamento aggiorna
@@ -218,219 +219,225 @@ class _BreathingScreenState extends State<BreathingScreen>
     final s = context.sL;
     final title = s.habitName(widget.habitId);
 
-    return BwScaffold(
-      appBar: AppBar(
-        backgroundColor: p.bg,
-        elevation: 0,
-        title: Text(title, style: TextStyle(color: p.text, fontSize: 17)),
-        leading: BackButton(color: p.text),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
-        child: Column(
-          children: [
-            if (!_isRunning) ...[
-              HabitHeroBand(habitId: widget.habitId),
-              const SizedBox(height: 16),
-              // Info card: durata di ogni fase
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: p.card,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: p.cardBorder),
-                ),
-                child: Column(
-                  children: [
-                    Text(title,
-                        style: TextStyle(
-                            color: p.text,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15)),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: List.generate(4, (i) {
-                        if (_durations[i] <= 0) return const SizedBox();
-                        return Column(
-                          children: [
-                            Text(_phaseLabel3(s, i),
-                                style:
-                                    TextStyle(color: p.textMut, fontSize: 10)),
-                            Text('${_durations[i]}s',
-                                style: TextStyle(
-                                    color: p.text,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 18)),
-                          ],
-                        );
-                      }),
+    return LeaveSessionGuard(
+        active: _isRunning,
+        child: BwScaffold(
+          appBar: AppBar(
+            backgroundColor: p.bg,
+            elevation: 0,
+            title: Text(title, style: TextStyle(color: p.text, fontSize: 17)),
+            leading: BackButton(color: p.text),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+            child: Column(
+              children: [
+                if (!_isRunning) ...[
+                  HabitHeroBand(habitId: widget.habitId),
+                  const SizedBox(height: 16),
+                  // Info card: durata di ogni fase
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: p.card,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: p.cardBorder),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Selettore cicli
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(s.breathingCycles,
-                      style: TextStyle(color: p.textMut, fontSize: 14)),
-                  const SizedBox(width: 6),
-                  ...[3, 5, 7].map((n) {
-                    final sel = n == _totalCycles;
-                    return GestureDetector(
-                      onTap: () => setState(() => _totalCycles = n),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: sel ? p.primary : Colors.transparent,
-                          shape: BoxShape.circle,
-                          border:
-                              Border.all(color: sel ? p.primary : p.cardBorder),
+                    child: Column(
+                      children: [
+                        Text(title,
+                            style: TextStyle(
+                                color: p.text,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15)),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: List.generate(4, (i) {
+                            if (_durations[i] <= 0) return const SizedBox();
+                            return Column(
+                              children: [
+                                Text(_phaseLabel3(s, i),
+                                    style: TextStyle(
+                                        color: p.textMut, fontSize: 10)),
+                                Text('${_durations[i]}s',
+                                    style: TextStyle(
+                                        color: p.text,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 18)),
+                              ],
+                            );
+                          }),
                         ),
-                        child: Center(
-                          child: Text('$n',
-                              style: TextStyle(
-                                  color: sel ? p.btnText : p.textSec,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15)),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-              const SizedBox(height: 36),
-            ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
-            // Cerchio animato — area a dimensione fissa: il cerchio pulsa e
-            // cambia colore al suo interno senza mai spostare gli elementi
-            // sotto (in particolare il pulsante interrompi).
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _isRunning ? null : _start,
-              child: SizedBox(
-                width: 340,
-                height: 340,
-                child: AnimatedBuilder(
-                  animation: _scale,
-                  builder: (_, __) {
-                    final radius = 70 + (_scale.value * 80);
-                    final color = _phaseColor(p);
-                    return Center(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          if (_isRunning)
-                            ...List.generate(3, (i) {
-                              final r = radius + (i + 1) * 20;
-                              return AnimatedContainer(
-                                duration: const Duration(milliseconds: 400),
-                                width: r * 2,
-                                height: r * 2,
+                  // Selettore cicli
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(s.breathingCycles,
+                          style: TextStyle(color: p.textMut, fontSize: 14)),
+                      const SizedBox(width: 6),
+                      ...[3, 5, 7].map((n) {
+                        final sel = n == _totalCycles;
+                        return Semantics(
+                            button: true,
+                            container: true,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _totalCycles = n),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                width: 44,
+                                height: 44,
                                 decoration: BoxDecoration(
+                                  color: sel ? p.primary : Colors.transparent,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: color.withValues(
-                                        alpha: 0.18 * (1 - i * 0.3)),
-                                    width: 1,
-                                  ),
+                                      color: sel ? p.primary : p.cardBorder),
                                 ),
-                              );
-                            }),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 400),
-                            width: radius * 2,
-                            height: radius * 2,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  color.withValues(alpha: .6),
-                                  color.withValues(alpha: .12),
-                                ],
-                              ),
-                              boxShadow: _isRunning
-                                  ? [
-                                      BoxShadow(
-                                        color: color.withValues(alpha: .5),
-                                        blurRadius: 44,
-                                        spreadRadius: 6,
-                                      )
-                                    ]
-                                  : null,
-                            ),
-                            child: Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (_isRunning) ...[
-                                    Text(
-                                      _phaseLabel(s),
+                                child: Center(
+                                  child: Text('$n',
                                       style: TextStyle(
-                                        color: p.text,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w300,
-                                        letterSpacing: 2,
+                                          color: sel ? p.btnText : p.textSec,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 15)),
+                                ),
+                              ),
+                            ));
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: 36),
+                ],
+
+                // Cerchio animato — area a dimensione fissa: il cerchio pulsa e
+                // cambia colore al suo interno senza mai spostare gli elementi
+                // sotto (in particolare il pulsante interrompi).
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _isRunning ? null : _start,
+                  child: SizedBox(
+                    width: 340,
+                    height: 340,
+                    child: AnimatedBuilder(
+                      animation: _scale,
+                      builder: (_, __) {
+                        final radius = 70 + (_scale.value * 80);
+                        final color = _phaseColor(p);
+                        return Center(
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              if (_isRunning)
+                                ...List.generate(3, (i) {
+                                  final r = radius + (i + 1) * 20;
+                                  return AnimatedContainer(
+                                    duration: const Duration(milliseconds: 400),
+                                    width: r * 2,
+                                    height: r * 2,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: color.withValues(
+                                            alpha: 0.18 * (1 - i * 0.3)),
+                                        width: 1,
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '${_currentPhaseDuration - _phaseSecond}',
-                                      style: TextStyle(
-                                          color: p.text,
-                                          fontSize: 48,
-                                          fontWeight: FontWeight.w200),
-                                    ),
-                                    Text(
-                                      '${_cycleCount + 1}/$_totalCycles',
-                                      style: TextStyle(
-                                          color: p.textMut, fontSize: 12),
-                                    ),
-                                  ] else ...[
-                                    const Text('🫁',
-                                        style: TextStyle(fontSize: 48)),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      s.breathingTapToStart,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          color: p.textSec, fontSize: 14),
-                                    ),
-                                  ],
-                                ],
+                                  );
+                                }),
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 400),
+                                width: radius * 2,
+                                height: radius * 2,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(
+                                    colors: [
+                                      color.withValues(alpha: .6),
+                                      color.withValues(alpha: .12),
+                                    ],
+                                  ),
+                                  boxShadow: _isRunning
+                                      ? [
+                                          BoxShadow(
+                                            color: color.withValues(alpha: .5),
+                                            blurRadius: 44,
+                                            spreadRadius: 6,
+                                          )
+                                        ]
+                                      : null,
+                                ),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (_isRunning) ...[
+                                        Text(
+                                          _phaseLabel(s),
+                                          style: TextStyle(
+                                            color: p.text,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w300,
+                                            letterSpacing: 2,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '${_currentPhaseDuration - _phaseSecond}',
+                                          style: TextStyle(
+                                              color: p.text,
+                                              fontSize: 48,
+                                              fontWeight: FontWeight.w200),
+                                        ),
+                                        Text(
+                                          '${_cycleCount + 1}/$_totalCycles',
+                                          style: TextStyle(
+                                              color: p.textMut, fontSize: 12),
+                                        ),
+                                      ] else ...[
+                                        const Text('🫁',
+                                            style: TextStyle(fontSize: 48)),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          s.breathingTapToStart,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              color: p.textSec, fontSize: 14),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    );
-                  },
+                        );
+                      },
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 48),
+                const SizedBox(height: 48),
 
-            if (_isRunning)
-              OutlinedButton.icon(
-                onPressed: _stop,
-                icon: Icon(Icons.stop_rounded, color: p.primary),
-                label:
-                    Text(s.breathingStop, style: TextStyle(color: p.primary)),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: p.primary),
-                  minimumSize: const Size.fromHeight(52),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+                if (_isRunning)
+                  OutlinedButton.icon(
+                    onPressed: _stop,
+                    icon: Icon(Icons.stop_rounded, color: p.primary),
+                    label: Text(s.breathingStop,
+                        style: TextStyle(color: p.primary)),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: p.primary),
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ));
   }
 
   String _phaseLabel3(BwStrings s, int i) {

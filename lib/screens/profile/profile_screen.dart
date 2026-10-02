@@ -10,9 +10,13 @@ import '../../providers/theme_provider.dart';
 import '../../providers/tutorial_provider.dart';
 import '../../widgets/bw_scaffold.dart';
 import '../settings/settings_screen.dart';
+import '../settings/accessibility_screen.dart';
 import '../../widgets/banner_ad_widget.dart';
 import '../../widgets/feedback_sheet.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/cloud_sync_service.dart';
+import '../../services/notification_service.dart';
+import '../../widgets/restart_widget.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -36,7 +40,7 @@ class ProfileScreen extends StatelessWidget {
         }
 
         return BwScaffold(
-          bottomNavigationBar: const BannerAdWidget(),
+          bottomNavigationBar: const BannerAdWidget(screenKey: 'profile'),
           appBar: AppBar(
             backgroundColor: p.bg,
             elevation: 0,
@@ -145,6 +149,12 @@ class ProfileScreen extends StatelessWidget {
                   p: p,
                   onTap: () => _showChangePassword(context, p),
                 ),
+                _Tile(
+                  icon: Icons.restart_alt_rounded,
+                  label: context.sL.resetAllTitle,
+                  p: p,
+                  onTap: () => _confirmResetAll(context, p),
+                ),
               ]),
 
               const SizedBox(height: 20),
@@ -161,6 +171,15 @@ class ProfileScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                           builder: (_) => const SettingsScreen())),
+                ),
+                _Tile(
+                  icon: Icons.accessibility_new_rounded,
+                  label: context.sL.accessibility,
+                  p: p,
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const AccessibilityScreen())),
                 ),
                 _Tile(
                   icon: Icons.notifications_outlined,
@@ -317,14 +336,47 @@ class ProfileScreen extends StatelessWidget {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await context.read<AppProvider>().resetOnLogout();
-              await context.read<bw.AuthProvider>().logout();
-              if (context.mounted) {
-                Navigator.of(context)
-                    .pushNamedAndRemoveUntil('/login', (route) => false);
-              }
+              final app = context.read<AppProvider>();
+              final auth = context.read<bw.AuthProvider>();
+              // Prima l'ultima copia nel cloud (serve ancora la sessione),
+              // poi dispositivo pulito: un altro account non eredita nulla.
+              await CloudSyncService.instance.onLogout();
+              await app.resetOnLogout();
+              await auth.logout();
+              await NotificationService.instance.cancelAll();
+              if (context.mounted) RestartWidget.restart(context);
             },
             child: Text(context.sL.logout,
+                style: const TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Reset totale: cancella progressi e impostazioni sul telefono E nel
+  /// cloud, poi riparte dall'accoglienza come un primo utilizzo.
+  void _confirmResetAll(BuildContext context, BwPaletteData p) {
+    final s = context.sL;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: p.card,
+        title: Text(s.resetAllConfirmTitle, style: TextStyle(color: p.text)),
+        content:
+            Text(s.resetAllConfirmBody, style: TextStyle(color: p.textSec)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(s.cancel, style: TextStyle(color: p.textSec))),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await NotificationService.instance.cancelAll();
+              await CloudSyncService.instance.resetEverything();
+              if (context.mounted) RestartWidget.restart(context);
+            },
+            child: Text(s.resetAllConfirmButton,
                 style: const TextStyle(color: Colors.redAccent)),
           ),
         ],
@@ -355,7 +407,9 @@ class ProfileScreen extends StatelessWidget {
               final ok = await auth.deleteAccount();
               if (!context.mounted) return;
               if (ok) {
-                navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+                await CloudSyncService.instance.wipeLocal();
+                await NotificationService.instance.cancelAll();
+                if (context.mounted) RestartWidget.restart(context);
                 messenger
                     .showSnackBar(SnackBar(content: Text(s.deleteAccountDone)));
               } else {

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'services/consent_service.dart';
+import 'widgets/restart_widget.dart';
 import 'services/schema_version_service.dart';
 import 'services/remote_flags_service.dart';
 
@@ -94,7 +95,8 @@ Future<void> _bootstrap() async {
   await localeProvider.init();
 
   runApp(
-    MultiProvider(
+    RestartWidget(
+        child: MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()..init()),
@@ -109,7 +111,7 @@ Future<void> _bootstrap() async {
         ChangeNotifierProvider(create: (_) => SpotlightController()),
       ],
       child: const BewellApp(),
-    ),
+    )),
   );
 }
 
@@ -130,6 +132,13 @@ class BewellApp extends StatelessWidget {
           ),
           debugShowCheckedModeBanner: false,
           builder: (context, child) {
+            // Movimento ridotto: scelta nell'app o nel telefono.
+            final mq = MediaQuery.of(context);
+            Motion.reduced = settings.reduceMotion || mq.disableAnimations;
+            child = MediaQuery(
+              data: mq.copyWith(disableAnimations: Motion.reduced),
+              child: child ?? const SizedBox(),
+            );
             return Consumer<ThemeProvider>(
               builder: (context, theme, _) {
                 if (!theme.isAmbient) return child ?? const SizedBox();

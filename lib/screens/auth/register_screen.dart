@@ -11,6 +11,8 @@ import '../../utils/validators.dart';
 import '../../widgets/auth/auth_widgets.dart';
 import '../../widgets/bw_scaffold.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/cloud_sync_service.dart';
+import '../../widgets/restart_widget.dart';
 
 /// S-03 · Registration Screen
 /// Solo per nuovi utenti. Email + password o SSO one-tap.
@@ -112,27 +114,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         // Torna al login — Register è sempre raggiunta con
                         // pushReplacementNamed, quindi non c'è nulla sotto
                         // nello stack: pop() non farebbe nulla.
-                        GestureDetector(
-                          onTap: () => Navigator.of(context)
-                              .pushReplacementNamed('/login'),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.arrow_back_ios,
-                                color: p.textMut,
-                                size: 16,
+                        Semantics(
+                            button: true,
+                            container: true,
+                            child: GestureDetector(
+                              onTap: () => Navigator.of(context)
+                                  .pushReplacementNamed('/login'),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.arrow_back_ios,
+                                    color: p.textMut,
+                                    size: 16,
+                                  ),
+                                  Text(
+                                    s.signIn,
+                                    style: TextStyle(
+                                      color: p.textMut,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                s.signIn,
-                                style: TextStyle(
-                                  color: p.textMut,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                            )),
                         const SizedBox(height: 24),
 
                         Text(
@@ -294,6 +299,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       BuildContext context, AuthProvider auth) async {
     final nav = auth.pendingNavigation;
     auth.consumeNavigation();
+    // Installazione nuova ma account con progressi nel cloud: ripristina e
+    // riparte da capo con lo stato caricato (niente onboarding da rifare).
+    if ((nav == AuthNavigation.toHome || nav == AuthNavigation.toWelcome) &&
+        await CloudSyncService.instance.restoreIfFresh()) {
+      if (context.mounted) RestartWidget.restart(context);
+      return;
+    }
     switch (nav) {
       case AuthNavigation.toWelcome:
         // Vedi commento gemello in login_screen.dart: senza sincronizzare

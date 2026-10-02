@@ -401,40 +401,43 @@ class _UserTypeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
-        decoration: BoxDecoration(
-          color: selected ? p.primaryLight : p.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? p.primary : p.cardBorder,
-            width: selected ? 1.5 : 0.5,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 26)),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: selected ? p.primary : p.text,
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+            decoration: BoxDecoration(
+              color: selected ? p.primaryLight : p.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected ? p.primary : p.cardBorder,
+                width: selected ? 1.5 : 0.5,
               ),
             ),
-          ],
-        ),
-      ),
-    );
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 26)),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: selected ? p.primary : p.text,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ));
   }
 }
 
@@ -622,18 +625,21 @@ class _Page5 extends StatelessWidget {
             },
           ),
           const SizedBox(height: 12),
-          GestureDetector(
-            onTap: onFinish,
-            child: Text(
-              s.notifPermSkip,
-              style: TextStyle(
-                fontSize: 14,
-                color: p.textMut,
-                decoration: TextDecoration.underline,
-                decorationColor: p.textMut,
-              ),
-            ),
-          ),
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: onFinish,
+                child: Text(
+                  s.notifPermSkip,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: p.textMut,
+                    decoration: TextDecoration.underline,
+                    decorationColor: p.textMut,
+                  ),
+                ),
+              )),
         ],
       ),
     );
@@ -755,35 +761,38 @@ class _WellyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        height: 54,
-        decoration: BoxDecoration(
-          color: p.btn,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Text(icon!, style: const TextStyle(fontSize: 18)),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: p.btnText,
-                ),
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: double.infinity,
+            height: 54,
+            decoration: BoxDecoration(
+              color: p.btn,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    Text(icon!, style: const TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: p.btnText,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }
