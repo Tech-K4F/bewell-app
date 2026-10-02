@@ -110,7 +110,8 @@ class _StreakDialogState extends State<_StreakDialog>
                   ),
                 ],
               ),
-              child: Column(
+              child: SingleChildScrollView(
+                  child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
@@ -197,7 +198,7 @@ class _StreakDialogState extends State<_StreakDialog>
                     ),
                   ),
                 ],
-              ),
+              )),
             ),
           ),
         ),

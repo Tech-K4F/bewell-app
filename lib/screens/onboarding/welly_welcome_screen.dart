@@ -186,6 +186,24 @@ class _WellyWelcomeScreenState extends State<WellyWelcomeScreen> {
 }
 
 // ── Pagina 1: Presentazione Be Well ──────────────────────────────────────────
+/// Contenuto che si adatta allo schermo: se non ci sta (testo ingrandito,
+/// schermi piccoli) scorre invece di uscire dai bordi, e i pulsanti restano
+/// raggiungibili. Quando c'è spazio si comporta come prima (Spacer incluso).
+class _ScrollFit extends StatelessWidget {
+  final Widget child;
+  const _ScrollFit({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    // SliverFillRemaining: riempie lo schermo (Spacer incluso) e scorre se il
+    // contenuto è più alto; non richiede dimensioni intrinseche (la griglia
+    // dei premi non le supporta).
+    return CustomScrollView(
+      slivers: [SliverFillRemaining(hasScrollBody: false, child: child)],
+    );
+  }
+}
+
 class _Page1 extends StatelessWidget {
   final BwPaletteData p;
   final VoidCallback onNext;
@@ -194,7 +212,8 @@ class _Page1 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.sL;
-    return Padding(
+    return _ScrollFit(
+        child: Padding(
       padding: const EdgeInsets.fromLTRB(28, 32, 28, 40),
       child: Column(
         children: [
@@ -233,7 +252,7 @@ class _Page1 extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -319,18 +338,21 @@ class _Page2 extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Divider(color: p.cardBorder, thickness: 0.5)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  s.onboardingUserTypeTitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: p.textSec,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
+              Flexible(
+                  flex: 6,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      s.onboardingUserTypeTitle,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: p.textSec,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  )),
               Expanded(child: Divider(color: p.cardBorder, thickness: 0.5)),
             ],
           ),
@@ -460,7 +482,8 @@ class _Page3 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.sL;
-    return Padding(
+    return _ScrollFit(
+        child: Padding(
       padding: const EdgeInsets.fromLTRB(28, 32, 28, 40),
       child: Column(
         children: [
@@ -525,7 +548,7 @@ class _Page3 extends StatelessWidget {
             ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -538,7 +561,8 @@ class _Page4 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.sL;
-    return Padding(
+    return _ScrollFit(
+        child: Padding(
       padding: const EdgeInsets.fromLTRB(28, 32, 28, 40),
       child: Column(
         children: [
@@ -578,7 +602,7 @@ class _Page4 extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -591,7 +615,8 @@ class _Page5 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.sL;
-    return Padding(
+    return _ScrollFit(
+        child: Padding(
       padding: const EdgeInsets.fromLTRB(28, 32, 28, 40),
       child: Column(
         children: [
@@ -644,7 +669,7 @@ class _Page5 extends StatelessWidget {
               )),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -663,48 +688,63 @@ class _RewardsPreview extends StatelessWidget {
       ('🎁', s.previewSurpriseTitle, s.previewSurpriseSub),
     ];
 
+    // Con testo grande una scheda per riga: due colonne spezzerebbero le parole.
+    final perRow = MediaQuery.textScalerOf(context).scale(1) > 1.3 ? 1 : 2;
+
+    Widget card((String, String, String) item) => Container(
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: p.cardBorder, width: 0.5),
+          ),
+          child: Row(
+            children: [
+              Text(item.$1, style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(item.$2,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: p.text)),
+                    Text(item.$3,
+                        style: TextStyle(fontSize: 10, color: p.textSec)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+
     return Stack(
       children: [
         // Cards sfocate
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 2.2,
-          children: items
-              .map((item) => Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: p.card,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: p.cardBorder, width: 0.5),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(item.$1, style: const TextStyle(fontSize: 20)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(item.$2,
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: p.text)),
-                              Text(item.$3,
-                                  style: TextStyle(
-                                      fontSize: 10, color: p.textSec)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ))
-              .toList(),
+        // Due righe da due schede (non una GridView: con testo ingrandito le
+        // schede crescono e la pagina deve poter calcolare la propria altezza).
+        Column(
+          children: [
+            for (var i = 0; i < items.length; i += perRow) ...[
+              if (i > 0) const SizedBox(height: 10),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: card(items[i])),
+                    if (perRow == 2) ...[
+                      const SizedBox(width: 10),
+                      Expanded(child: card(items[i + 1])),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
 
         // Overlay sfocatura + lock
@@ -783,12 +823,15 @@ class _WellyButton extends StatelessWidget {
                     Text(icon!, style: const TextStyle(fontSize: 18)),
                     const SizedBox(width: 8),
                   ],
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: p.btnText,
+                  Flexible(
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: p.btnText,
+                      ),
                     ),
                   ),
                 ],

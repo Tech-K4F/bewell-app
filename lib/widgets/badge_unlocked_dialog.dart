@@ -125,7 +125,8 @@ class _BadgeCelebrationState extends State<_BadgeCelebration>
                   ),
                 ],
               ),
-              child: Column(
+              child: SingleChildScrollView(
+                  child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
@@ -233,7 +234,7 @@ class _BadgeCelebrationState extends State<_BadgeCelebration>
                     ),
                   ),
                 ],
-              ),
+              )),
             ),
           ),
         ),

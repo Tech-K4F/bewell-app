@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
@@ -48,6 +49,11 @@ class SettingsProvider extends ChangeNotifier {
     _largeText = p.getBool('setting_large_text') ?? false;
     _highContrast = p.getBool('setting_high_contrast') ?? false;
     _reduceMotion = p.getBool('setting_reduce_motion') ?? false;
+    // Solo debug: la scala di prova sopravvive al riavvio (per provare
+    // onboarding e dialoghi a testo grande).
+    if (kDebugMode) {
+      _debugTextScale = (p.getInt('debug_text_scale_x10') ?? 10) / 10.0;
+    }
     _frequency = NotificationFrequency.values.firstWhere(
       (f) => f.name == (p.getString('notif_frequency') ?? 'normal'),
       orElse: () => NotificationFrequency.normal,
@@ -67,8 +73,10 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners(); // ← ricostruisce MaterialApp → tema ricalcolato
   }
 
-  void setDebugTextScale(double v) {
+  Future<void> setDebugTextScale(double v) async {
     _debugTextScale = v;
+    final p = await SharedPreferences.getInstance();
+    await p.setInt('debug_text_scale_x10', (v * 10).round());
     notifyListeners();
   }
 

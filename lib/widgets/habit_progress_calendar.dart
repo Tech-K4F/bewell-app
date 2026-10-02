@@ -109,7 +109,10 @@ class _HeroBand extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: AspectRatio(
-        aspectRatio: aspectRatio,
+        // Con testo grande la banda diventa più alta, così il testo sopra
+        // l'immagine ha spazio.
+        aspectRatio: aspectRatio /
+            MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.8),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -126,7 +129,13 @@ class _HeroBand extends StatelessWidget {
                     Colors.transparent,
                     Colors.black.withValues(alpha: 0.68),
                   ],
-                  stops: const [0.35, 1.0],
+                  // Con testo grande il testo sale sull'immagine: il velo parte prima.
+                  stops: [
+                    MediaQuery.textScalerOf(context).scale(1) > 1.3
+                        ? 0.0
+                        : 0.35,
+                    1.0
+                  ],
                 ),
               ),
             ),
@@ -184,9 +193,12 @@ class _WeekGrid extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(s.calendarTowardAssimilated,
-                style: TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700, color: p.text)),
+            Flexible(
+                child: Text(s.calendarTowardAssimilated,
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: p.text))),
             Text('$daysCompleted / 7',
                 style: TextStyle(
                     fontSize: 12,
@@ -254,9 +266,12 @@ class _LongArcProgress extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(s.calendarTowardAutomatic,
-                style: TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700, color: p.text)),
+            Flexible(
+                child: Text(s.calendarTowardAutomatic,
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: p.text))),
             Text('$daysCompleted / 66',
                 style: TextStyle(
                     fontSize: 12,

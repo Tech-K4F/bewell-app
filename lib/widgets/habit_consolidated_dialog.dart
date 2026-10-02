@@ -147,7 +147,8 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
                   ),
                 ],
               ),
-              child: Column(
+              child: SingleChildScrollView(
+                  child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
@@ -253,7 +254,7 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
                     ),
                   ),
                 ],
-              ),
+              )),
             ),
           ),
         ),
