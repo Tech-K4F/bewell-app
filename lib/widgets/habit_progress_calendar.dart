@@ -496,9 +496,7 @@ class _MilestoneCard extends StatelessWidget {
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
-                            color: p.bg.computeLuminance() > 0.5
-                                ? const Color(0xFF8A5A00)
-                                : Colors.amber)),
+                            color: p.pointsText)),
                   ],
                 ),
               ],

@@ -40,6 +40,23 @@ class BwPaletteData {
   final Color btn;
   final Color btnText;
 
+  /// Ambra per punti e avvisi, con contrasto garantito su sfondo e card
+  /// (scuro sulle palette chiare, luminoso su quelle scure).
+  Color get pointsText =>
+      isDark ? const Color(0xFFFFC857) : const Color(0xFF8A5A00);
+
+  /// Testo da usare sopra un fondo [bg] qualsiasi: bianco o quasi nero.
+  static Color onColor(Color bg) {
+    double ratio(Color a, Color b) {
+      final la = a.computeLuminance();
+      final lb = b.computeLuminance();
+      return ((la > lb ? la : lb) + 0.05) / ((la > lb ? lb : la) + 0.05);
+    }
+
+    const dark = Color(0xFF0B1220);
+    return ratio(Colors.white, bg) >= ratio(dark, bg) ? Colors.white : dark;
+  }
+
   /// Colore del testo da usare SOPRA [primary]: bianco o quasi nero, quello
   /// con più contrasto.
   Color get onPrimary {

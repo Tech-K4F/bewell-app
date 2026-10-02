@@ -599,12 +599,16 @@ class OfflineBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.wifi_off, color: Colors.orange, size: 16),
+          Icon(Icons.wifi_off,
+              color: context.read<ThemeProvider>().paletteData.pointsText,
+              size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               context.sL.offlineLoginRequired,
-              style: const TextStyle(color: Colors.orange, fontSize: 12),
+              style: TextStyle(
+                  color: context.read<ThemeProvider>().paletteData.pointsText,
+                  fontSize: 12),
             ),
           ),
         ],

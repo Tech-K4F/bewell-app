@@ -57,7 +57,8 @@ class AccessibilityScreen extends StatelessWidget {
         leading: BackButton(color: p.text),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        padding: EdgeInsets.fromLTRB(
+            20, 12, 20, 32 + MediaQuery.viewPaddingOf(context).bottom),
         children: [
           tile(
             icon: Icons.text_increase_rounded,

@@ -910,7 +910,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 20),
 
                 // ── Stats ────────────────────────────────────────────
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     _StatPill(
                       emoji: '🔥',
@@ -918,16 +920,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           '${context.watch<AppProvider>().liveStreak} ${s.daysStreak}',
                       p: p,
                     ),
-                    const SizedBox(width: 8),
                     _StatPill(
                       emoji: '⭐',
                       label: '${user?.points ?? 0} ${s.points}',
                       p: p,
                     ),
-                    const SizedBox(width: 8),
                     _StatPill(
                       emoji: progression.currentPhase >= 5 ? '💚' : '🌱',
-                      label: '${progression.totalDaysCompleted} ${s.days}',
+                      label:
+                          '${progression.totalDaysCompleted} ${progression.totalDaysCompleted == 1 ? s.dayOne : s.days}',
                       p: p,
                     ),
                   ],

@@ -490,10 +490,10 @@ class _BadgeQuestCard extends StatelessWidget {
                             const SizedBox(width: 3),
                             Text(
                               '+${pointsForBadge(badge)}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.amber,
+                                color: p.pointsText,
                               ),
                             ),
                           ],

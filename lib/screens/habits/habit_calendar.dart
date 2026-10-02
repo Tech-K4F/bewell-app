@@ -23,11 +23,11 @@ enum _BlockType { focus, shortBreak, longBreak, habit, water, meal, free }
 // ── Entry del calendario ──────────────────────────────────────────────────────
 
 class _CalEntry {
-  final String time;      // es. "09:00"
+  final String time; // es. "09:00"
   final String emoji;
   final String label;
   final _BlockType type;
-  final int durationMin;  // durata in minuti (0 = punto nel tempo)
+  final int durationMin; // durata in minuti (0 = punto nel tempo)
 
   const _CalEntry({
     required this.time,
@@ -76,11 +76,11 @@ class _HabitCalendarState extends State<HabitCalendar> {
 
   @override
   Widget build(BuildContext context) {
-    final theme    = context.watch<ThemeProvider>();
+    final theme = context.watch<ThemeProvider>();
     final progress = context.watch<ProgressionProvider>();
     final schedule = context.watch<ScheduleProvider>();
-    final s        = context.sL;
-    final p        = theme.paletteData;
+    final s = context.sL;
+    final p = theme.paletteData;
 
     // Mostra solo dalla fase 2 (focus_25 sbloccato)
     final focusStatus = progress.statusOf('focus_25');
@@ -93,22 +93,22 @@ class _HabitCalendarState extends State<HabitCalendar> {
     if (allEntries.isEmpty) return const SizedBox.shrink();
 
     // ── Windowing: ±2h prima – +4h dopo ──────────────────────────────────────
-    final now         = DateTime.now();
+    final now = DateTime.now();
     final windowStart = now.subtract(const Duration(hours: 2));
-    final windowEnd   = now.add(const Duration(hours: 4));
+    final windowEnd = now.add(const Duration(hours: 4));
 
     final windowedEntries = <_AnnotatedEntry>[];
     for (final e in allEntries) {
       final start = _parseTime(e.time, now);
-      final dur   = e.durationMin > 0 ? e.durationMin : 10;
-      final end   = start.add(Duration(minutes: dur));
+      final dur = e.durationMin > 0 ? e.durationMin : 10;
+      final end = start.add(Duration(minutes: dur));
 
       // Includi solo se il blocco interseca la finestra temporale
       if (start.isBefore(windowEnd) && end.isAfter(windowStart)) {
         windowedEntries.add((
-          entry:     e,
+          entry: e,
           isCurrent: now.isAfter(start) && now.isBefore(end),
-          isPast:    end.isBefore(now),
+          isPast: end.isBefore(now),
         ));
       }
     }
@@ -119,8 +119,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
       // Prossime entry non ancora terminate
       for (final e in allEntries) {
         final start = _parseTime(e.time, now);
-        final dur   = e.durationMin > 0 ? e.durationMin : 10;
-        final end   = start.add(Duration(minutes: dur));
+        final dur = e.durationMin > 0 ? e.durationMin : 10;
+        final end = start.add(Duration(minutes: dur));
         if (end.isAfter(now)) {
           windowedEntries.add((entry: e, isCurrent: false, isPast: false));
           if (windowedEntries.length >= 4) break;
@@ -165,13 +165,13 @@ class _HabitCalendarState extends State<HabitCalendar> {
           child: Column(
             children: windowedEntries.asMap().entries.map((e) {
               final isLast = e.key == windowedEntries.length - 1;
-              final ae     = e.value;
+              final ae = e.value;
               return _CalRow(
-                entry:     ae.entry,
-                p:         p,
-                isLast:    isLast,
+                entry: ae.entry,
+                p: p,
+                isLast: isLast,
                 isCurrent: ae.isCurrent,
-                isPast:    ae.isPast,
+                isPast: ae.isPast,
               );
             }).toList(),
           ),
@@ -185,8 +185,11 @@ class _HabitCalendarState extends State<HabitCalendar> {
   static DateTime _parseTime(String time, DateTime now) {
     final parts = time.split(':');
     return DateTime(
-      now.year, now.month, now.day,
-      int.parse(parts[0]), int.parse(parts[1]),
+      now.year,
+      now.month,
+      now.day,
+      int.parse(parts[0]),
+      int.parse(parts[1]),
     );
   }
 
@@ -231,8 +234,9 @@ class _HabitCalendarState extends State<HabitCalendar> {
         type: _BlockType.focus,
         durationMin: 25,
       ));
-      ({ int h, int m }) next = _add(h, m, 25);
-      h = next.h; m = next.m;
+      ({int h, int m}) next = _add(h, m, 25);
+      h = next.h;
+      m = next.m;
 
       if (cycle < 2) {
         final breakLabel = cycle == 0 && inCal('breathing_box')
@@ -254,7 +258,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
           durationMin: 5,
         ));
         next = _add(h, m, 5);
-        h = next.h; m = next.m;
+        h = next.h;
+        m = next.m;
       }
     }
 
@@ -275,7 +280,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
       durationMin: 20,
     ));
     var next2 = _add(h, m, 20);
-    h = next2.h; m = next2.m;
+    h = next2.h;
+    m = next2.m;
 
     // ── Secondo blocco mattutino (2 Pomodoro prima del pranzo) ────────────
     for (int cycle = 0; cycle < 2; cycle++) {
@@ -287,7 +293,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
         durationMin: 25,
       ));
       next2 = _add(h, m, 25);
-      h = next2.h; m = next2.m;
+      h = next2.h;
+      m = next2.m;
 
       if (cycle == 0) {
         final breakLabel = inCal('posture')
@@ -301,7 +308,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
           durationMin: 5,
         ));
         next2 = _add(h, m, 5);
-        h = next2.h; m = next2.m;
+        h = next2.h;
+        m = next2.m;
       }
     }
 
@@ -338,7 +346,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
         durationMin: 20,
       ));
       final n = _add(h, m, 20);
-      h = n.h; m = n.m;
+      h = n.h;
+      m = n.m;
     }
 
     for (int cycle = 0; cycle < 3; cycle++) {
@@ -354,7 +363,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
         durationMin: dur,
       ));
       var n = _add(h, m, dur);
-      h = n.h; m = n.m;
+      h = n.h;
+      m = n.m;
 
       if (cycle < 2) {
         final bLabel = cycle == 1 && inCal('breathing_478')
@@ -368,7 +378,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
           durationMin: 5,
         ));
         n = _add(h, m, 5);
-        h = n.h; m = n.m;
+        h = n.h;
+        m = n.m;
       }
     }
 
@@ -419,7 +430,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
       ));
     }
 
-    int h = 8; int m = 0;
+    int h = 8;
+    int m = 0;
     for (int i = 0; i < 3; i++) {
       entries.add(_CalEntry(
         time: fmt(h, m),
@@ -429,7 +441,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
         durationMin: 25,
       ));
       var n = _add(h, m, 25);
-      h = n.h; m = n.m;
+      h = n.h;
+      m = n.m;
       if (i < 2) {
         entries.add(_CalEntry(
           time: fmt(h, m),
@@ -439,7 +452,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
           durationMin: 5,
         ));
         n = _add(h, m, 5);
-        h = n.h; m = n.m;
+        h = n.h;
+        m = n.m;
       }
     }
 
@@ -453,7 +467,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
       durationMin: 20,
     ));
     var n = _add(h, m, 20);
-    h = n.h; m = n.m;
+    h = n.h;
+    m = n.m;
 
     for (int i = 0; i < 3; i++) {
       entries.add(_CalEntry(
@@ -464,7 +479,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
         durationMin: 25,
       ));
       var n2 = _add(h, m, 25);
-      h = n2.h; m = n2.m;
+      h = n2.h;
+      m = n2.m;
       if (i < 2) {
         entries.add(_CalEntry(
           time: fmt(h, m),
@@ -474,7 +490,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
           durationMin: 5,
         ));
         n2 = _add(h, m, 5);
-        h = n2.h; m = n2.m;
+        h = n2.h;
+        m = n2.m;
       }
     }
 
@@ -486,7 +503,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
       durationMin: 60,
     ));
 
-    h = 13; m = 30;
+    h = 13;
+    m = 30;
     for (int i = 0; i < 2; i++) {
       entries.add(_CalEntry(
         time: fmt(h, m),
@@ -496,7 +514,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
         durationMin: 25,
       ));
       var n3 = _add(h, m, 25);
-      h = n3.h; m = n3.m;
+      h = n3.h;
+      m = n3.m;
       if (i == 0) {
         entries.add(_CalEntry(
           time: fmt(h, m),
@@ -508,7 +527,8 @@ class _HabitCalendarState extends State<HabitCalendar> {
           durationMin: 5,
         ));
         n3 = _add(h, m, 5);
-        h = n3.h; m = n3.m;
+        h = n3.h;
+        m = n3.m;
       }
     }
 
@@ -553,49 +573,66 @@ class _CalRow extends StatelessWidget {
   Color _dotColor() {
     if (isCurrent) return p.primary;
     switch (entry.type) {
-      case _BlockType.focus:      return p.primary;
-      case _BlockType.water:      return p.accent;
-      case _BlockType.meal:       return p.accent;
-      case _BlockType.habit:      return p.primaryText;
+      case _BlockType.focus:
+        return p.primary;
+      case _BlockType.water:
+        return p.accent;
+      case _BlockType.meal:
+        return p.accent;
+      case _BlockType.habit:
+        return p.primaryText;
       case _BlockType.shortBreak:
-      case _BlockType.longBreak:  return p.textMut;
-      case _BlockType.free:       return p.textMut;
+      case _BlockType.longBreak:
+        return p.textMut;
+      case _BlockType.free:
+        return p.textMut;
     }
   }
 
   Color _labelColor() {
     if (isCurrent) return p.primary;
     switch (entry.type) {
-      case _BlockType.focus:      return p.primary;
-      case _BlockType.water:      return p.accent;
-      case _BlockType.meal:       return p.text;
-      case _BlockType.habit:      return p.text;
+      case _BlockType.focus:
+        return p.primary;
+      case _BlockType.water:
+        return p.accent;
+      case _BlockType.meal:
+        return p.text;
+      case _BlockType.habit:
+        return p.text;
       case _BlockType.shortBreak:
-      case _BlockType.longBreak:  return p.textSec;
-      case _BlockType.free:       return p.textMut;
+      case _BlockType.longBreak:
+        return p.textSec;
+      case _BlockType.free:
+        return p.textMut;
     }
   }
 
   double _dotSize() {
     switch (entry.type) {
-      case _BlockType.focus:      return 10;
-      case _BlockType.longBreak:  return 8;
-      case _BlockType.meal:       return 9;
-      case _BlockType.habit:      return 9;
-      default:                    return 6;
+      case _BlockType.focus:
+        return 10;
+      case _BlockType.longBreak:
+        return 8;
+      case _BlockType.meal:
+        return 9;
+      case _BlockType.habit:
+        return 9;
+      default:
+        return 6;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final dotColor   = _dotColor();
+    final dotColor = _dotColor();
     final labelColor = _labelColor();
     // Slot corrente: dot più grande per evidenziarlo
-    final dotSize    = isCurrent ? (_dotSize() + 4) : _dotSize();
-    final isFocus    = entry.type == _BlockType.focus;
-    final isBreak    = entry.type == _BlockType.shortBreak ||
-                       entry.type == _BlockType.longBreak;
-    final isFilled   = isFocus || isCurrent;
+    final dotSize = isCurrent ? (_dotSize() + 4) : _dotSize();
+    final isFocus = entry.type == _BlockType.focus;
+    final isBreak = entry.type == _BlockType.shortBreak ||
+        entry.type == _BlockType.longBreak;
+    final isFilled = isFocus || isCurrent;
 
     Widget rowContent = IntrinsicHeight(
       child: Row(
@@ -603,10 +640,10 @@ class _CalRow extends StatelessWidget {
         children: [
           // Ora — più grande e in grassetto per lo slot corrente
           SizedBox(
-            width: 50,
+            width:
+                50 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0),
             child: Padding(
-              padding: EdgeInsets.only(
-                  top: isCurrent ? 16 : 14, left: 14),
+              padding: EdgeInsets.only(top: isCurrent ? 16 : 14, left: 14),
               child: Text(
                 entry.time,
                 style: TextStyle(
@@ -628,8 +665,8 @@ class _CalRow extends StatelessWidget {
                 height: dotSize,
                 decoration: BoxDecoration(
                   color: isFilled ? dotColor : Colors.transparent,
-                  border: Border.all(
-                      color: dotColor, width: isFilled ? 0 : 1.5),
+                  border:
+                      Border.all(color: dotColor, width: isFilled ? 0 : 1.5),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -652,21 +689,34 @@ class _CalRow extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.only(
                 top: isCurrent ? 12 : 10,
-                bottom: isLast ? 16 : isCurrent ? 12 : 8,
+                bottom: isLast
+                    ? 16
+                    : isCurrent
+                        ? 12
+                        : 8,
                 right: 14,
               ),
               child: Row(
                 children: [
                   Text(
                     entry.emoji,
-                    style: TextStyle(fontSize: isCurrent ? 16 : isBreak ? 12 : 14),
+                    style: TextStyle(
+                        fontSize: isCurrent
+                            ? 16
+                            : isBreak
+                                ? 12
+                                : 14),
                   ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       entry.label,
                       style: TextStyle(
-                        fontSize: isCurrent ? 14 : isBreak ? 11 : 13,
+                        fontSize: isCurrent
+                            ? 14
+                            : isBreak
+                                ? 11
+                                : 13,
                         fontWeight: isCurrent
                             ? FontWeight.w700
                             : isFocus

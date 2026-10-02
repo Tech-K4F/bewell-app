@@ -217,7 +217,7 @@ class _PointsStrip extends StatelessWidget {
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                   fontFamily: 'Georgia',
-                  color: Colors.amber[700],
+                  color: p.pointsText,
                 ),
               ),
               Text(
@@ -273,9 +273,16 @@ class _MarketplaceTabBar extends StatelessWidget {
             const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
         dividerColor: Colors.transparent,
         tabs: [
-          Tab(text: s.marketplaceTabRewards),
-          Tab(text: s.marketplaceTabDiscounts),
-          Tab(text: s.marketplaceTabInApp),
+          Tab(
+              child: FittedBox(
+                  fit: BoxFit.scaleDown, child: Text(s.marketplaceTabRewards))),
+          Tab(
+              child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(s.marketplaceTabDiscounts))),
+          Tab(
+              child: FittedBox(
+                  fit: BoxFit.scaleDown, child: Text(s.marketplaceTabInApp))),
         ],
       ),
     );
@@ -611,13 +618,15 @@ class _RewardCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         reward.brand,
                         style: TextStyle(fontSize: 11, color: p.textSec),
                       ),
-                      const SizedBox(width: 6),
                       _TypeBadge(type: reward.type, p: p),
                     ],
                   ),
@@ -638,7 +647,7 @@ class _RewardCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: _canAfford ? Colors.white : p.textMut,
+                  color: _canAfford ? p.onPrimary : p.textMut,
                 ),
               ),
             ),
@@ -1758,13 +1767,15 @@ class _DiscountCard extends StatelessWidget {
                         color: p.text),
                   ),
                   const SizedBox(height: 2),
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         discount.description,
                         style: TextStyle(fontSize: 11, color: p.textSec),
                       ),
-                      const SizedBox(width: 6),
                       // Exclusive badge
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -1792,15 +1803,16 @@ class _DiscountCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.amber[700],
+                color: context.read<ThemeProvider>().paletteData.pointsText,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 context.sL.unlockItem,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white),
+                    color: BwPaletteData.onColor(
+                        context.read<ThemeProvider>().paletteData.pointsText)),
               ),
             ),
           ],
@@ -2262,11 +2274,13 @@ class _InAppGrid extends StatelessWidget {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      // Con il testo ingrandito le card diventano più alte (stessa larghezza).
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
-        childAspectRatio: 1.1,
+        childAspectRatio:
+            1.1 / MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0),
       ),
       itemCount: items.length,
       itemBuilder: (_, i) {

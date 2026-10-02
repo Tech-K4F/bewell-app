@@ -205,10 +205,10 @@ class _BadgeCelebrationState extends State<_BadgeCelebration>
                         const SizedBox(width: 8),
                         Text(
                           '+$_shownCount ${s.points}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: Colors.amber,
+                            color: p.pointsText,
                           ),
                         ),
                       ],

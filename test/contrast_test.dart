@@ -42,6 +42,8 @@ void main() {
       check('testo secondario su card', p.textSec, card, text);
       check('testo tenue su sfondo', p.textMut, p.bg, text);
       check('testo tenue su card', p.textMut, card, text);
+      check('punti/avvisi (ambra) su sfondo', p.pointsText, p.bg, text);
+      check('punti/avvisi (ambra) su card', p.pointsText, card, text);
       check('accento su sfondo', p.accent, p.bg, text);
       check('accento su card', p.accent, card, text);
       check('colore primario su sfondo', p.primary, p.bg, ui);
