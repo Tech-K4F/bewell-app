@@ -126,9 +126,9 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
               child: Column(
                 children: [
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                        minHeight: 52, minWidth: double.infinity),
                     child: ElevatedButton(
                       onPressed: () => _nextOrStart(slides.length),
                       style: ElevatedButton.styleFrom(

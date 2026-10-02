@@ -442,9 +442,9 @@ class BwAuthButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.read<ThemeProvider>().paletteData;
-    return SizedBox(
-      width: double.infinity,
-      height: 54,
+    return ConstrainedBox(
+      constraints:
+          const BoxConstraints(minHeight: 54, minWidth: double.infinity),
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(

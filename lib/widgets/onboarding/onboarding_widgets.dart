@@ -367,9 +367,9 @@ class QuestionnaireNavRow extends StatelessWidget {
     final s = context.sL;
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          height: 52,
+        ConstrainedBox(
+          constraints:
+              const BoxConstraints(minHeight: 52, minWidth: double.infinity),
           child: ElevatedButton(
             onPressed: nextEnabled ? onNext : null,
             style: ElevatedButton.styleFrom(

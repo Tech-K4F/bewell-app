@@ -54,44 +54,50 @@ class WorkScheduleCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Semantics(button: true, container: true, child: GestureDetector(
-                onTap: onEdit,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: p.card,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: p.cardBorder, width: 0.5),
-                  ),
-                  child: Text(
-                    s.workScheduleEdit,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: p.text),
-                  ),
-                ),
-              )),
+              Semantics(
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: onEdit,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: p.card,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: p.cardBorder, width: 0.5),
+                      ),
+                      child: Text(
+                        s.workScheduleEdit,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: p.text),
+                      ),
+                    ),
+                  )),
               const SizedBox(width: 8),
-              Semantics(button: true, container: true, child: GestureDetector(
-                onTap: onConfirm,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: p.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    s.workScheduleConfirm,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white),
-                  ),
-                ),
-              )),
+              Semantics(
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: onConfirm,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: p.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        s.workScheduleConfirm,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white),
+                      ),
+                    ),
+                  )),
             ],
           ),
         ],
@@ -357,34 +363,40 @@ class _WorkScheduleSheetState extends State<WorkScheduleSheet> {
           const SizedBox(height: 16),
 
           // Pausa pranzo
-          Semantics(button: true, container: true, child: GestureDetector(
-            onTap: () => setState(() => _hasLunch = !_hasLunch),
-            child: Row(
-              children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: _hasLunch ? p.primary : p.card,
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(
-                      color: _hasLunch ? p.primary : p.cardBorder,
-                      width: 1.5,
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: () => setState(() => _hasLunch = !_hasLunch),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: _hasLunch ? p.primary : p.card,
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(
+                          color: _hasLunch ? p.primary : p.cardBorder,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: _hasLunch
+                          ? const Icon(Icons.check,
+                              color: Colors.white, size: 13)
+                          : null,
                     ),
-                  ),
-                  child: _hasLunch
-                      ? const Icon(Icons.check, color: Colors.white, size: 13)
-                      : null,
+                    const SizedBox(width: 10),
+                    Text(
+                      s.workScheduleLunch,
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: p.text,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  s.workScheduleLunch,
-                  style: TextStyle(
-                      fontSize: 13, color: p.text, fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          )),
+              )),
 
           if (_hasLunch) ...[
             const SizedBox(height: 12),
@@ -433,38 +445,41 @@ class _WorkScheduleSheetState extends State<WorkScheduleSheet> {
 
           const SizedBox(height: 24),
 
-          Semantics(button: true, container: true, child: GestureDetector(
-            onTap: () async {
-              final schedule = WorkSchedule(
-                startMorning: _startMorning,
-                endMorning: _endMorning,
-                startAfternoon: _startAfternoon,
-                endAfternoon: _endAfternoon,
-                lunchHour: _lunchHour,
-                lunchDurationMin: _hasLunch ? _lunchDuration : 0,
-                workDays: _days,
-              );
-              await widget.onSave(schedule);
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: Container(
-              width: double.infinity,
-              height: 48,
-              decoration: BoxDecoration(
-                color: p.btn,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Center(
-                child: Text(
-                  s.workScheduleSave,
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: p.btnText),
+          Semantics(
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: () async {
+                  final schedule = WorkSchedule(
+                    startMorning: _startMorning,
+                    endMorning: _endMorning,
+                    startAfternoon: _startAfternoon,
+                    endAfternoon: _endAfternoon,
+                    lunchHour: _lunchHour,
+                    lunchDurationMin: _hasLunch ? _lunchDuration : 0,
+                    workDays: _days,
+                  );
+                  await widget.onSave(schedule);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(minHeight: 48),
+                  decoration: BoxDecoration(
+                    color: p.btn,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      s.workScheduleSave,
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: p.btnText),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          )),
+              )),
         ],
       ),
     );
@@ -486,33 +501,36 @@ class _TimeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(button: true, container: true, child: GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: p.card,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: p.cardBorder, width: 0.5),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style: TextStyle(
-                    fontSize: 10,
-                    color: p.textMut,
-                    fontWeight: FontWeight.w500)),
-            const SizedBox(height: 2),
-            Text(
-              time,
-              style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w700, color: p.text),
+    return Semantics(
+        button: true,
+        container: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: p.card,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: p.cardBorder, width: 0.5),
             ),
-          ],
-        ),
-      ),
-    ));
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: p.textMut,
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: 2),
+                Text(
+                  time,
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700, color: p.text),
+                ),
+              ],
+            ),
+          ),
+        ));
   }
 }
 

@@ -770,7 +770,7 @@ class _WellyButton extends StatelessWidget {
           onTap: onTap,
           child: Container(
             width: double.infinity,
-            height: 54,
+            constraints: const BoxConstraints(minHeight: 54),
             decoration: BoxDecoration(
               color: p.btn,
               borderRadius: BorderRadius.circular(16),

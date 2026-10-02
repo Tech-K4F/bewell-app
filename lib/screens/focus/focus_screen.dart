@@ -518,7 +518,7 @@ class _BigButton extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 50,
+            constraints: const BoxConstraints(minHeight: 50),
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(ambient ? 25 : 14),

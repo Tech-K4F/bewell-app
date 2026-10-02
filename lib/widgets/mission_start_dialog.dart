@@ -226,9 +226,9 @@ class _MissionCardState extends State<_MissionCard>
                     ),
                   ],
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                        minHeight: 48, minWidth: double.infinity),
                     child: ElevatedButton(
                       onPressed: () => Navigator.of(context).pop(),
                       style: ElevatedButton.styleFrom(

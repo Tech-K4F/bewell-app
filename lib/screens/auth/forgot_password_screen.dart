@@ -186,9 +186,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 32),
 
         // Reinvia
-        SizedBox(
-          width: double.infinity,
-          height: 54,
+        ConstrainedBox(
+          constraints:
+              const BoxConstraints(minHeight: 54, minWidth: double.infinity),
           child: ElevatedButton(
             onPressed: canResend ? _resend : null,
             style: ElevatedButton.styleFrom(
@@ -211,9 +211,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 14),
 
         // Torna al login
-        SizedBox(
-          width: double.infinity,
-          height: 54,
+        ConstrainedBox(
+          constraints:
+              const BoxConstraints(minHeight: 54, minWidth: double.infinity),
           child: OutlinedButton(
             onPressed: () =>
                 Navigator.of(context).pushReplacementNamed('/login'),

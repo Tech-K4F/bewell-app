@@ -828,7 +828,7 @@ class _RedeemSheetState extends State<_RedeemSheet>
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
-                      height: 46,
+                      constraints: const BoxConstraints(minHeight: 46),
                       decoration: BoxDecoration(
                         color: p.bg2,
                         borderRadius: BorderRadius.circular(12),
@@ -852,7 +852,7 @@ class _RedeemSheetState extends State<_RedeemSheet>
                   child: GestureDetector(
                     onTap: () => _confirm(ap),
                     child: Container(
-                      height: 46,
+                      constraints: const BoxConstraints(minHeight: 46),
                       decoration: BoxDecoration(
                         color: p.btn,
                         borderRadius: BorderRadius.circular(12),
@@ -965,7 +965,7 @@ class _RedeemSheetState extends State<_RedeemSheet>
               },
               child: Container(
                 width: double.infinity,
-                height: 50,
+                constraints: const BoxConstraints(minHeight: 50),
                 decoration: BoxDecoration(
                   color: p.btn,
                   borderRadius: BorderRadius.circular(14),
@@ -1928,7 +1928,7 @@ class _DiscountSheet extends StatelessWidget {
                 onTap: () => _copyCode(context),
                 child: Container(
                   width: double.infinity,
-                  height: 50,
+                  constraints: const BoxConstraints(minHeight: 50),
                   decoration: BoxDecoration(
                     color: p.btn,
                     borderRadius: BorderRadius.circular(14),
@@ -1959,7 +1959,7 @@ class _DiscountSheet extends StatelessWidget {
                 onTap: () => _openSite(context),
                 child: Container(
                   width: double.infinity,
-                  height: 46,
+                  constraints: const BoxConstraints(minHeight: 46),
                   decoration: BoxDecoration(
                     color: p.bg2,
                     borderRadius: BorderRadius.circular(14),
@@ -2677,7 +2677,7 @@ class _UnlockSheetState extends State<_UnlockSheet> {
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
-                      height: 46,
+                      constraints: const BoxConstraints(minHeight: 46),
                       decoration: BoxDecoration(
                         color: p.bg2,
                         borderRadius: BorderRadius.circular(12),
@@ -2701,7 +2701,7 @@ class _UnlockSheetState extends State<_UnlockSheet> {
                   child: GestureDetector(
                     onTap: canAfford && !_loading ? _unlock : null,
                     child: Container(
-                      height: 46,
+                      constraints: const BoxConstraints(minHeight: 46),
                       decoration: BoxDecoration(
                         color: canAfford ? _purple : p.bg2,
                         borderRadius: BorderRadius.circular(12),
@@ -2772,7 +2772,7 @@ class _UnlockSheetState extends State<_UnlockSheet> {
               onTap: () => Navigator.pop(context),
               child: Container(
                 width: double.infinity,
-                height: 50,
+                constraints: const BoxConstraints(minHeight: 50),
                 decoration: BoxDecoration(
                   color: p.btn,
                   borderRadius: BorderRadius.circular(14),

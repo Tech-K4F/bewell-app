@@ -143,9 +143,9 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
                 ),
               ),
               const SizedBox(height: 36),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
+              ConstrainedBox(
+                constraints: const BoxConstraints(
+                    minHeight: 54, minWidth: double.infinity),
                 child: ElevatedButton(
                   onPressed: canResend ? _resendEmail : null,
                   style: ElevatedButton.styleFrom(
@@ -168,9 +168,9 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
+              ConstrainedBox(
+                constraints: const BoxConstraints(
+                    minHeight: 54, minWidth: double.infinity),
                 child: OutlinedButton(
                   onPressed: _checkVerified,
                   style: OutlinedButton.styleFrom(

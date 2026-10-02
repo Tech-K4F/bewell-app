@@ -233,9 +233,9 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
                     ),
                   ),
                   const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                        minHeight: 50, minWidth: double.infinity),
                     child: ElevatedButton(
                       onPressed: () => Navigator.of(context).pop(),
                       style: ElevatedButton.styleFrom(

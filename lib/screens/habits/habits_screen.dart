@@ -657,7 +657,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   onTap: () => Navigator.pop(context),
                   child: Container(
                     width: double.infinity,
-                    height: 48,
+                    constraints: const BoxConstraints(minHeight: 48),
                     decoration: BoxDecoration(
                       color: p.btn,
                       borderRadius: BorderRadius.circular(14),
